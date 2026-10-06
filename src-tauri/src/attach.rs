@@ -774,8 +774,7 @@ mod tests {
             old.clone(),
         )
         .unwrap();
-        tokio::time::sleep(Duration::from_millis(800)).await;
-        assert!(old.bytes.lock().unwrap().len() > (1 << 20));
+        wait_for(|| old.bytes.lock().unwrap().len() > (1 << 20)).await;
         m.release(&key("e"));
         let new = Arc::new(Rec::default());
         m.open(key("e"), sh("sleep 30"), 80, 24, new.clone())
