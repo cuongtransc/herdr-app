@@ -112,13 +112,17 @@ function FontSettings() {
   const isDefault =
     s.terminalFontFamily === DEFAULTS.terminalFontFamily &&
     s.terminalFontSize === DEFAULTS.terminalFontSize &&
-    s.chatFontSize === DEFAULTS.chatFontSize;
+    s.chatFontSize === DEFAULTS.chatFontSize &&
+    s.chatFontFamily === DEFAULTS.chatFontFamily &&
+    s.chatMonoFamily === DEFAULTS.chatMonoFamily;
   return (
     <>
       <FontPicker label="Terminal font" value={s.terminalFontFamily} onChange={(f) => s.set({ terminalFontFamily: f })} />
       <Stepper label="Terminal size" value={s.terminalFontSize} range={TERM_SIZE} onChange={(v) => s.set({ terminalFontSize: v })} />
+      <FontPicker label="Chat font" monospace={false} value={s.chatFontFamily} onChange={(f) => s.set({ chatFontFamily: f })} />
+      <FontPicker label="Chat code font" value={s.chatMonoFamily} onChange={(f) => s.set({ chatMonoFamily: f })} />
       <Stepper label="Chat size" value={s.chatFontSize} range={CHAT_SIZE} onChange={(v) => s.set({ chatFontSize: v })} />
-      <p className="note">Lists the monospace fonts installed on this Mac. JetBrains Mono is bundled and covers Vietnamese.</p>
+      <p className="note">Lists the fonts installed on this Mac; the code pickers only monospace ones. JetBrains Mono is bundled, covers Vietnamese, and stands in for a code font that is missing.</p>
       <div className="settings-foot">
         <button className="btn btn-xs" aria-label="Reset fonts" disabled={isDefault} onClick={s.reset}>
           Reset to defaults

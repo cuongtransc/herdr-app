@@ -1,8 +1,19 @@
 import { useEffect, useId, useRef, useState } from "react";
 import { filterFonts, loadFontFamilies } from "./store";
 
-/** Searchable combobox over the installed monospace fonts; each option previews in its own face. */
-export function FontPicker({ label, value, onChange }: { label: string; value: string; onChange: (f: string) => void }) {
+/** Searchable combobox over the installed fonts (monospace only unless `monospace` is false); each option previews in its own face. */
+export function FontPicker({
+  label,
+  value,
+  onChange,
+  monospace = true,
+}: {
+  label: string;
+  value: string;
+  onChange: (f: string) => void;
+  monospace?: boolean;
+}) {
+  const generic = monospace ? "monospace" : "sans-serif";
   const [all, setAll] = useState<string[]>([]);
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState("");
@@ -12,11 +23,11 @@ export function FontPicker({ label, value, onChange }: { label: string; value: s
 
   useEffect(() => {
     let live = true;
-    void loadFontFamilies().then((f) => live && setAll(f));
+    void loadFontFamilies(monospace).then((f) => live && setAll(f));
     return () => {
       live = false;
     };
-  }, []);
+  }, [monospace]);
 
   const shown = filterFonts(all, query);
 
@@ -49,7 +60,7 @@ export function FontPicker({ label, value, onChange }: { label: string; value: s
           autoCapitalize="off"
           value={open ? query : value}
           placeholder={value}
-          style={{ fontFamily: open ? undefined : `"${value}", monospace` }}
+          style={{ fontFamily: open ? undefined : `"${value}", ${generic}` }}
           onFocus={() => {
             setOpen(true);
             setHi(Math.max(0, all.indexOf(value)));
@@ -86,7 +97,7 @@ export function FontPicker({ label, value, onChange }: { label: string; value: s
                 role="option"
                 aria-selected={f === value}
                 className={i === hi ? "hi" : undefined}
-                style={{ fontFamily: `"${f}", monospace` }}
+                style={{ fontFamily: `"${f}", ${generic}` }}
                 onMouseEnter={() => setHi(i)}
                 // mousedown keeps focus in the input, so blur does not close the list first.
                 onMouseDown={(e) => {

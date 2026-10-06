@@ -651,10 +651,11 @@ pub async fn chat_close(
     Ok(())
 }
 
-/// Installed monospace font families (empty off macOS).
+/// Installed font families, only the monospace ones unless `monospace` is false (empty off macOS).
 #[tauri::command]
-pub async fn system_fonts() -> Result<Vec<String>, AppError> {
-    tokio::task::spawn_blocking(crate::fonts::installed_monospace)
+pub async fn system_fonts(monospace: Option<bool>) -> Result<Vec<String>, AppError> {
+    let mono_only = monospace.unwrap_or(true);
+    tokio::task::spawn_blocking(move || crate::fonts::installed_families(mono_only))
         .await
         .map_err(|e| AppError::new("io", e.to_string()))
 }

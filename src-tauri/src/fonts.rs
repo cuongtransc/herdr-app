@@ -1,11 +1,12 @@
-//! Installed monospace font families, for the terminal font picker.
+//! Installed font families, for the terminal and chat font pickers.
 
-/// Unique family names of the monospace faces, sorted case-insensitively.
-/// Hidden system families (leading `.`) are skipped: the WebView cannot select them by name.
-pub fn monospace_families(faces: impl IntoIterator<Item = (String, bool)>) -> Vec<String> {
+/// Unique family names of the faces (only the monospace ones when `mono_only`), sorted
+/// case-insensitively. Hidden system families (leading `.`) are skipped: the WebView cannot
+/// select them by name.
+pub fn families(faces: impl IntoIterator<Item = (String, bool)>, mono_only: bool) -> Vec<String> {
     let mut out: Vec<String> = faces
         .into_iter()
-        .filter(|(name, mono)| *mono && !name.is_empty() && !name.starts_with('.'))
+        .filter(|(name, mono)| (*mono || !mono_only) && !name.is_empty() && !name.starts_with('.'))
         .map(|(name, _)| name)
         .collect();
     out.sort_by_key(|n| n.to_lowercase());
@@ -16,12 +17,12 @@ pub fn monospace_families(faces: impl IntoIterator<Item = (String, bool)>) -> Ve
 /// Never panics: core-text's `family_name()`/`traits()` assert on missing attributes, and the
 /// release profile aborts on panic, so one odd font must only be skipped.
 #[cfg(target_os = "macos")]
-pub fn installed_monospace() -> Vec<String> {
+pub fn installed_families(mono_only: bool) -> Vec<String> {
     use core_text::font_collection::create_for_all_families;
     let Some(descs) = create_for_all_families().get_descriptors() else {
         return Vec::new();
     };
-    monospace_families(descs.iter().filter_map(|d| mac::face(&d)))
+    families(descs.iter().filter_map(|d| mac::face(&d)), mono_only)
 }
 
 /// Whether the WebView can be handed this face as a web font: a single-face file outside the
@@ -110,7 +111,7 @@ mod mac {
 }
 
 #[cfg(not(target_os = "macos"))]
-pub fn installed_monospace() -> Vec<String> {
+pub fn installed_families(_mono_only: bool) -> Vec<String> {
     Vec::new()
 }
 
@@ -124,16 +125,43 @@ mod tests {
 
     #[test]
     fn keeps_monospace_families_once_sorted() {
-        let got = monospace_families([
-            face("Menlo", true),
-            face("lilex", true),
-            face("Helvetica", false),
-            face("Menlo", true),
-            face(".SF NS Mono", true),
-            face("", true),
-            face("Fira Code", true),
-        ]);
+        let got = families(
+            [
+                face("Menlo", true),
+                face("lilex", true),
+                face("Helvetica", false),
+                face("Menlo", true),
+                face(".SF NS Mono", true),
+                face("", true),
+                face("Fira Code", true),
+            ],
+            true,
+        );
         assert_eq!(got, ["Fira Code", "lilex", "Menlo"]);
+    }
+
+    #[test]
+    fn keeps_every_family_once_sorted_when_not_only_monospace() {
+        let got = families(
+            [
+                face("Menlo", true),
+                face("Helvetica", false),
+                face("Helvetica", false),
+                face(".SF NS", false),
+                face("", false),
+                face("avenir", false),
+            ],
+            false,
+        );
+        assert_eq!(got, ["avenir", "Helvetica", "Menlo"]);
+    }
+
+    #[cfg(target_os = "macos")]
+    #[test]
+    fn finds_helvetica_among_all_families_on_macos() {
+        let all = installed_families(false);
+        assert!(all.iter().any(|f| f == "Helvetica"));
+        assert!(!installed_families(true).iter().any(|f| f == "Helvetica"));
     }
 
     #[test]
@@ -164,6 +192,6 @@ mod tests {
     #[cfg(target_os = "macos")]
     #[test]
     fn finds_menlo_on_macos() {
-        assert!(installed_monospace().iter().any(|f| f == "Menlo"));
+        assert!(installed_families(true).iter().any(|f| f == "Menlo"));
     }
 }

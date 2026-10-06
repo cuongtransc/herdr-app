@@ -10,12 +10,18 @@ export interface FontSettings {
   terminalFontSize: number;
   terminalFontFamily: string;
   chatFontSize: number;
+  /** The chat's prose: messages, Markdown, the composer. */
+  chatFontFamily: string;
+  /** The chat's code: inline and fenced code, tool output, shell commands. */
+  chatMonoFamily: string;
 }
 
 export const DEFAULTS: FontSettings = {
   terminalFontSize: 13,
   terminalFontFamily: "JetBrains Mono",
   chatFontSize: 13.5,
+  chatFontFamily: "Helvetica",
+  chatMonoFamily: "Source Code Pro",
 };
 
 export const TERM_SIZE = { min: 10, max: 20 };
@@ -29,14 +35,16 @@ export function fontFamilies(installed: string[]): string[] {
   return [BUNDLED_FONT, ...installed.filter((f) => f !== BUNDLED_FONT)];
 }
 
-let families: Promise<string[]> | null = null;
+const families: { mono?: Promise<string[]>; all?: Promise<string[]> } = {};
 
-/** Installed monospace families from the backend, fetched once. */
-export function loadFontFamilies(): Promise<string[]> {
-  families ??= systemFonts()
-    .then(fontFamilies)
-    .catch(() => fontFamilies(["Menlo", "Monaco"]));
-  return families;
+/** Installed families from the backend (only the monospace ones unless `monospace` is false), fetched once each. */
+export function loadFontFamilies(monospace = true): Promise<string[]> {
+  if (monospace) {
+    families.mono ??= systemFonts().then(fontFamilies).catch(() => fontFamilies(["Menlo", "Monaco"]));
+    return families.mono;
+  }
+  families.all ??= systemFonts(false).catch(() => ["Helvetica", "Helvetica Neue", "Menlo"]);
+  return families.all;
 }
 
 /** Case-insensitive substring match; names starting with the query come first. */
@@ -62,11 +70,13 @@ function readRaw(): Record<string, unknown> {
 
 function normalize(p: Partial<Record<keyof FontSettings, unknown>>, base: FontSettings): FontSettings {
   const num = (v: unknown) => (typeof v === "number" && Number.isFinite(v) ? v : undefined);
-  const family = typeof p.terminalFontFamily === "string" && p.terminalFontFamily.trim() ? p.terminalFontFamily.trim() : undefined;
+  const family = (v: unknown) => (typeof v === "string" && v.trim() ? v.trim() : undefined);
   return {
     terminalFontSize: clamp(num(p.terminalFontSize) ?? base.terminalFontSize, TERM_SIZE),
-    terminalFontFamily: family ?? base.terminalFontFamily,
+    terminalFontFamily: family(p.terminalFontFamily) ?? base.terminalFontFamily,
     chatFontSize: clamp(num(p.chatFontSize) ?? base.chatFontSize, CHAT_SIZE),
+    chatFontFamily: family(p.chatFontFamily) ?? base.chatFontFamily,
+    chatMonoFamily: family(p.chatMonoFamily) ?? base.chatMonoFamily,
   };
 }
 
@@ -91,6 +101,8 @@ const pick = (s: FontSettings): FontSettings => ({
   terminalFontSize: s.terminalFontSize,
   terminalFontFamily: s.terminalFontFamily,
   chatFontSize: s.chatFontSize,
+  chatFontFamily: s.chatFontFamily,
+  chatMonoFamily: s.chatMonoFamily,
 });
 
 export const useSettings = create<SettingsStore>((setState, get) => ({
@@ -148,8 +160,25 @@ export function ensureTermFont(family: string): Promise<void> {
   return p;
 }
 
-export function applyChatFont(px: number): void {
-  document.documentElement.style.setProperty("--chat-font", `${px}px`);
+export function chatSansFamily(family: string): string {
+  return `"${family}", -apple-system, BlinkMacSystemFont, sans-serif`;
+}
+
+/** Falls back to the bundled JetBrains Mono, so code stays monospace without the chosen font. */
+export function chatMonoFamily(family: string): string {
+  return `"${family}", "${BUNDLED_FONT}", Menlo, monospace`;
+}
+
+type ChatFonts = Pick<FontSettings, "chatFontSize" | "chatFontFamily" | "chatMonoFamily">;
+
+/** Sets the chat's size and families on the root; installed families are registered as web fonts first (see `ensureTermFont`). */
+export function applyChatFont({ chatFontSize, chatFontFamily, chatMonoFamily: mono }: ChatFonts): void {
+  const root = document.documentElement.style;
+  root.setProperty("--chat-font", `${chatFontSize}px`);
+  root.setProperty("--chat-sans", chatSansFamily(chatFontFamily));
+  root.setProperty("--chat-mono", chatMonoFamily(mono));
+  void ensureTermFont(chatFontFamily);
+  void ensureTermFont(mono);
 }
 
 const VI_SAMPLE = "aăâđêôơư ạảấầẩẫậắằẳẵặ";
