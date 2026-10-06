@@ -17,6 +17,26 @@ APP = "src-tauri/target/release/bundle/macos/Herdr.app"
 [deps.pnpm]
 auto = true
 
+# The global dispatcher (~/.config/git/hooks/ct-hook-dispatch) already runs
+# .githooks; a local core.hooksPath would bypass it, so set one only without it.
+[tasks.setup]
+description = "One-time setup after cloning: wire the pre-commit gate"
+run = """
+hooks_dir=$(git config --global --get core.hooksPath) || hooks_dir=
+case "$hooks_dir" in
+  "~") hooks_dir=$HOME ;;
+  "~/"*) hooks_dir="$HOME/${hooks_dir#"~/"}" ;;
+esac
+if [ -n "$hooks_dir" ] && [ -x "$hooks_dir/ct-hook-dispatch" ]; then
+  [ "$(git config --local --get core.hooksPath)" = ".githooks" ] && git config --local --unset core.hooksPath
+  echo 'git hooks: global dispatcher runs .githooks'
+else
+  git config core.hooksPath .githooks
+  echo 'git hooks: core.hooksPath=.githooks'
+fi
+echo 'next: mise run dev'
+"""
+
 [tasks.dev]
 description = "Run the app with hot reload"
 run = "pnpm tauri dev"
@@ -65,7 +85,7 @@ description = "Integration tests against a real local herdr"
 dir = "src-tauri"
 run = "cargo test -- --ignored --test-threads=1"
 
-# Read-only. Runs checks in parallel.
+# Read-only, runs on pre-commit (.githooks/pre-commit).
 [tasks.ci]
 description = "The gate: typecheck, lint and test, run before claiming done"
 depends = ["typecheck", "lint", "test"]
