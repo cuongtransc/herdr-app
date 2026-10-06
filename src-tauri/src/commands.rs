@@ -93,6 +93,16 @@ pub async fn session_delete(
 }
 
 #[tauri::command]
+pub async fn session_rename(
+    mgr: Mgr<'_>,
+    machine_id: String,
+    session: String,
+    to: String,
+) -> Result<(), AppError> {
+    mgr.rename_session(&machine_id, &session, &to).await
+}
+
+#[tauri::command]
 pub async fn session_stop(
     mgr: Mgr<'_>,
     machine_id: String,

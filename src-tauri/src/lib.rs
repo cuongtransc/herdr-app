@@ -46,6 +46,7 @@ pub fn run() {
             commands::session_start,
             commands::session_stop,
             commands::session_delete,
+            commands::session_rename,
             commands::herdr_call,
             commands::notify_pane,
             commands::image_save_temp,

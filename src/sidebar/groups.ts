@@ -253,6 +253,28 @@ export function forgetSessions(layout: Layout, keys: SessionKey[]): Layout {
   return forgetWhere(layout, (k) => set.has(k));
 }
 
+/** The renamed Session keeps its place in the tree and its bookmark. */
+export function renameSessionKey(layout: Layout, from: SessionKey, to: SessionKey): Layout {
+  const walk = (nodes: LayoutNode[]): LayoutNode[] => {
+    let changed = false;
+    const out = nodes.map((n): LayoutNode => {
+      if (n.kind === "session") {
+        if (n.key !== from) return n;
+        changed = true;
+        return { ...n, key: to };
+      }
+      const children = walk(n.children);
+      if (children === n.children) return n;
+      changed = true;
+      return { ...n, children };
+    });
+    return changed ? out : nodes;
+  };
+  const tree = walk(layout.tree);
+  const bookmarks = layout.bookmarks.includes(from) ? layout.bookmarks.map((k) => (k === from ? to : k)) : layout.bookmarks;
+  return tree === layout.tree && bookmarks === layout.bookmarks ? layout : { tree, bookmarks };
+}
+
 export function forgetMachine(layout: Layout, machineId: string): Layout {
   const prefix = `${encodeURIComponent(machineId)}/`;
   return forgetWhere(layout, (k) => k.startsWith(prefix));

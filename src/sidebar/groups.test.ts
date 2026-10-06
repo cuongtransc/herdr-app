@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   EMPTY_LAYOUT, addGroup, canMove, deleteGroup, forgetMachine, forgetSessions, groupPaths, moveBookmark, moveNode,
-  renameGroup, sessionKey, setBookmarked,
+  renameGroup, renameSessionKey, sessionKey, setBookmarked,
 } from "./groups";
 import type { GroupNode, Layout, LayoutNode, SessionNode } from "./groups";
 
@@ -149,5 +149,19 @@ describe("no-ops return the same object", () => {
     expect(moveBookmark(l, "y", null)).toBe(l);
     expect(forgetSessions(l, ["absent"])).toBe(l);
     expect(forgetMachine(l, "nobody")).toBe(l);
+  });
+});
+
+describe("renameSessionKey", () => {
+  it("swaps the key in place, nested or bookmarked, and leaves other sessions alone", () => {
+    const l: Layout = { tree: [s("a"), g("w", s("x"), g("n", s("x2")))], bookmarks: ["x", "a"] };
+    const r = renameSessionKey(l, "x", "y");
+    expect(shape(r.tree)).toEqual(["a", { w: ["y", { n: ["x2"] }] }]);
+    expect(r.bookmarks).toEqual(["y", "a"]);
+    expect(r.tree[0]).toBe(l.tree[0]);
+  });
+  it("returns the same layout when the session is not in it", () => {
+    const l: Layout = { tree: [g("w", s("a"))], bookmarks: ["a"] };
+    expect(renameSessionKey(l, "x", "y")).toBe(l);
   });
 });

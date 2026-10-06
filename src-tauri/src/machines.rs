@@ -168,6 +168,11 @@ async fn session_entries(
     Ok(drop_client_only(t, parse_session_list(stdout)).await)
 }
 
+/// Moves a stopped Session's directory (`$1`) to `$2`. herdr has no rename and names a
+/// session after its directory; the check keeps `mv` from nesting into an existing one.
+const RENAME_SCRIPT: &str =
+    r#"[ -e "$2" ] && { echo "$2 already exists" >&2; exit 3; }; mv -- "$1" "$2""#;
+
 /// Watcher retry delay: 1, 2, 4, 8, 16, 32, then 60 s.
 pub fn backoff(attempt: u32) -> Duration {
     Duration::from_secs(if attempt >= 6 { 60 } else { 1u64 << attempt })
@@ -1310,6 +1315,45 @@ impl MachineManager {
         self.refresh_sessions(id).await
     }
 
+    /// Rename a stopped Session by moving its directory beside itself (see `RENAME_SCRIPT`).
+    pub async fn rename_session(&self, id: &str, name: &str, to: &str) -> AppResult<()> {
+        let invalid = |msg: String| Err(AppError::new("invalid", msg));
+        if !Self::valid_session_name(to) || to == "default" {
+            return invalid(format!("invalid session name {to:?}"));
+        }
+        let entry = self.session(id, name)?;
+        if entry.running {
+            return invalid(format!("stop session {name} before renaming it"));
+        }
+        if self.session(id, to).is_ok() {
+            return invalid(format!("session {to} already exists"));
+        }
+        // The default session lives in herdr's own directory; every other one in `sessions/<name>`.
+        let dir = std::path::Path::new(&entry.socket).parent();
+        let Some(dir) =
+            dir.filter(|d| name != "default" && d.file_name().is_some_and(|f| f == name))
+        else {
+            return invalid(format!("session {name} cannot be renamed"));
+        };
+        let target = dir.with_file_name(to);
+        let argv: Vec<String> = vec![
+            "sh".into(),
+            "-c".into(),
+            RENAME_SCRIPT.into(),
+            "sh".into(),
+            dir.to_string_lossy().into_owned(),
+            target.to_string_lossy().into_owned(),
+        ];
+        let out = exec(self.transport(id)?.as_ref(), &argv).await?;
+        if out.status != 0 {
+            return Err(AppError::new(
+                "herdr_error",
+                format!("could not rename {name}: {}", out.stderr.trim()),
+            ));
+        }
+        self.refresh_sessions(id).await
+    }
+
     pub async fn call(
         &self,
         pane_machine: &str,
@@ -1541,7 +1585,7 @@ mod tests {
     impl FakeT {
         fn list(&self) -> String {
             format!(
-                "name status directory socket\ndefault running /x {}\nold stopped /y /y/herdr.sock\n",
+                "name status directory socket\ndefault running /x {}\nold stopped /s/sessions/old /s/sessions/old/herdr.sock\n",
                 self.sock
             )
         }
@@ -1932,6 +1976,112 @@ mod tests {
         let e = mgr.delete_session("local", "old").await.unwrap_err();
         assert_eq!(e.code, "herdr_error");
         assert!(e.message.contains("locked"), "{}", e.message);
+    }
+
+    /// Records the rename's `mv` script run instead of running it.
+    struct RenT {
+        inner: FakeT,
+        runs: Arc<Mutex<Vec<String>>>,
+        fail: Option<&'static str>,
+    }
+    #[async_trait::async_trait]
+    impl Transport for RenT {
+        fn wrap(&self, argv: &[String], tty: bool) -> Vec<String> {
+            if argv.first().map(String::as_str) == Some("sh")
+                && argv.get(2).map(String::as_str) == Some(RENAME_SCRIPT)
+            {
+                self.runs.lock().unwrap().push(argv[4..].join(" "));
+                return match self.fail {
+                    Some(msg) => vec!["sh".into(), "-c".into(), format!("echo {msg} >&2; exit 3")],
+                    None => vec!["true".into()],
+                };
+            }
+            self.inner.wrap(argv, tty)
+        }
+        async fn local_socket(&self, s: &SessionEntry) -> AppResult<PathBuf> {
+            self.inner.local_socket(s).await
+        }
+        async fn release_socket(&self, s: &SessionEntry) -> AppResult<()> {
+            self.inner.release_socket(s).await
+        }
+    }
+
+    async fn rename_mgr(
+        fail: Option<&'static str>,
+    ) -> (Arc<MachineManager>, Arc<Mutex<Vec<String>>>, FakeHerdr) {
+        let f = FakeHerdr::start(Arc::new(|_, _| Ok(json!({"type":"ok"}))));
+        let runs: Arc<Mutex<Vec<String>>> = Arc::default();
+        let d = tempfile::tempdir().unwrap();
+        let mgr = MachineManager::new(d.path().join("m.json"), Arc::new(|_| {}));
+        let (sock, r) = (f.path.to_string_lossy().to_string(), runs.clone());
+        mgr.with_transport_factory(Arc::new(move |_| {
+            Arc::new(RenT {
+                inner: FakeT { sock: sock.clone() },
+                runs: r.clone(),
+                fail,
+            }) as Arc<dyn Transport>
+        }));
+        mgr.connect("local").await.unwrap();
+        (mgr, runs, f)
+    }
+
+    #[tokio::test]
+    async fn rename_session_moves_the_directory_of_a_stopped_session() {
+        let (mgr, runs, _f) = rename_mgr(None).await;
+        mgr.rename_session("local", "old", "newer").await.unwrap();
+        assert_eq!(*runs.lock().unwrap(), ["/s/sessions/old /s/sessions/newer"]);
+    }
+
+    #[tokio::test]
+    async fn rename_session_refuses_bad_names_and_running_unknown_or_taken_sessions() {
+        let (mgr, runs, _f) = rename_mgr(None).await;
+        for (from, to) in [
+            ("default", "x"), // running, and the default session's directory is herdr's own
+            ("nope", "x"),    // unknown
+            ("old", "a/b"),   // not a session name
+            ("old", "-x"),
+            ("old", ""),
+            ("old", "default"), // taken
+            ("old", "old"),
+        ] {
+            assert!(
+                mgr.rename_session("local", from, to).await.is_err(),
+                "{from} -> {to}"
+            );
+        }
+        assert!(runs.lock().unwrap().is_empty());
+    }
+
+    #[tokio::test]
+    async fn rename_session_reports_a_failed_move() {
+        let (mgr, _runs, _f) = rename_mgr(Some("exists")).await;
+        let e = mgr
+            .rename_session("local", "old", "newer")
+            .await
+            .unwrap_err();
+        assert_eq!(e.code, "herdr_error");
+        assert!(e.message.contains("exists"), "{}", e.message);
+    }
+
+    #[test]
+    fn rename_script_moves_and_never_nests_into_an_existing_directory() {
+        let d = tempfile::tempdir().unwrap();
+        let (a, b, c) = (d.path().join("a"), d.path().join("b"), d.path().join("c"));
+        std::fs::create_dir(&a).unwrap();
+        std::fs::write(a.join("session.json"), "{}").unwrap();
+        std::fs::create_dir(&c).unwrap();
+        let run = |from: &PathBuf, to: &PathBuf| {
+            std::process::Command::new("sh")
+                .args(["-c", RENAME_SCRIPT, "sh"])
+                .arg(from)
+                .arg(to)
+                .status()
+                .unwrap()
+        };
+        assert!(run(&a, &b).success());
+        assert!(b.join("session.json").exists() && !a.exists());
+        assert!(!run(&b, &c).success());
+        assert!(b.exists() && !c.join("b").exists());
     }
 
     #[tokio::test]

@@ -8,6 +8,7 @@ import {
   machineRemove,
   machineUpdate,
   sessionDelete,
+  sessionRename,
   sessionsRefresh,
   sessionStart,
   sessionStop,
@@ -17,13 +18,14 @@ import { useApp } from "../store/app";
 import { StatusDot } from "./StatusDot";
 import type { MenuItem } from "./ContextMenu";
 import { ActionsProvider, useActions } from "./actions";
-import { forgetSessionFolders } from "../workspaces/folder";
+import { forgetSessionFolders, moveSessionFolders } from "../workspaces/folder";
 import { DashboardEntry } from "../dashboard/AgentDashboard";
 import {
   ChevronIcon,
   FolderInputIcon,
   LaptopIcon,
   PlayIcon,
+  PencilIcon,
   PlusIcon,
   RefreshIcon,
   ServerIcon,
@@ -33,7 +35,7 @@ import {
   TrashIcon,
   UnplugIcon,
 } from "../ui/icons";
-import { forgetSessions, resolve, setBookmarked, useLayout } from "./groups";
+import { forgetSessions, renameSessionKey, resolve, sessionKey, setBookmarked, useLayout } from "./groups";
 import type { RSession } from "./groups";
 import { GroupTree } from "./GroupTree";
 
@@ -77,6 +79,20 @@ export function SessionRow({ node, bookmark, nextKey = null }: { node: RSession;
             { label: "Start session", icon: PlayIcon, onSelect: () => a.guard(() => sessionStart(machineId, session.name)) },
             bookmarkItem,
             moveItem,
+            ...(session.name === "default" ? [] : [{
+              label: "Rename session…",
+              icon: PencilIcon,
+              // herdr has no rename: the backend moves the stopped session's directory.
+              onSelect: () =>
+                a.rename("Rename session", session.name, (to) =>
+                  sessionRename(machineId, session.name, to).then(() => {
+                    moveSessionFolders(machineId, session.name, to);
+                    useLayout.getState().update((l) => renameSessionKey(l, key, sessionKey(machineId, to)));
+                    const v = useApp.getState().viewed;
+                    if (v?.machine_id === machineId && v.session === session.name) view({ machine_id: machineId, session: to });
+                  }),
+                ),
+            }]),
             {
               label: "Delete session…",
               icon: TrashIcon,
