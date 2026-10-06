@@ -237,6 +237,27 @@ expects it to open a Kanban view. It goes. In its place:
 
 ### 7.3 Level 1: the sidebar
 
+**Section structure.** Today BOOKMARKS hangs under the SESSIONS label at the same level as the
+Groups, but with a different header style (small caps and a star, against bold Group rows with a
+folder). Its rows are indented like a Group's children, so it reads both as a section and as a
+Group. A bookmarked Session shows twice and both rows light up when selected, and ungrouped Sessions
+trail after the last (possibly nested) Group with no header, reading as its children. The fix:
+
+- **Three sibling sections, one header style**: BOOKMARKS (only when not empty), SESSIONS, MACHINES,
+  each an 11px/600 caps label with the same fold chevron. All|Active belongs to the SESSIONS header
+  and filters Bookmarks too.
+- **Bookmarks are shortcuts, not a container.** Their rows sit flush (no Group indent), carry no fold
+  chevron of their own beyond the section's, and keep the user's order.
+- **One selected row.** Selecting a Session highlights the row that was clicked. Its twin (the same
+  Session in the other section) shows only the quieter "current" mark (`--hover` fill), so two rows
+  are never both "selected".
+- **Ungrouped Sessions get a place**: they come first in SESSIONS, before the Groups (or under an
+  "Ungrouped" label when Groups exist), never after the last Group where they read as its children.
+- Group nesting is indented 12px per level with a 1px `--line` guide, so depth stays legible past
+  two levels.
+
+**Rows.**
+
 - Machine badge only for remote Machines; local Sessions show none.
 - A Session row shows an amber count when something in it needs the user; nothing otherwise.
 - The Machines section stays at the bottom and folds by default once more than one Machine exists.
@@ -261,3 +282,6 @@ expects it to open a Kanban view. It goes. In its place:
 - **Q2.** The Board's name and shortcut: "Board" and ⇧⌘D?
 - **Q3.** Is a shell running a long command (`cargo watch`, a dev server) something to supervise?
   If so it shows as working; if not it stays folded with the other shells.
+- **Q4.** Should a bookmarked Session still show in its Group (today, per `CONTEXT.md`: "independent
+  of which Group it is in"), or only in Bookmarks? Showing it once removes the duplicate entirely
+  but changes the Bookmark concept; §7.3 assumes it stays in both, with one selected row.
