@@ -201,7 +201,9 @@ confirmation while tabs and workspaces confirm.
 
 ## 7. Applying it: decisions for the current UI
 
-These are the agreed directions. Each lands with a mockup and its own PR.
+These are the agreed directions; each lands in its own PR. Mockup (source of truth for layout and
+copy of §7.1–§7.3; a Design-canvas `.dc.html`, sample data; screenshots are not committed):
+[sidebar redesign](assets/2026-10-07-sidebar-redesign-mockup.html).
 
 ### 7.1 Level 2: the Agents column
 
