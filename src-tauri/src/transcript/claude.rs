@@ -2,7 +2,8 @@
 use super::images::{decode_image, ImageSink};
 use super::locate::input_summary;
 use super::{
-    cap_input, meta_label, truncate_result as truncate, ChatItem, ChatMeta, ImageRef, Parser, ParserOutput,
+    cap_input, meta_label, truncate_result as truncate, ChatItem, ChatMeta, ImageRef, Parser,
+    ParserOutput,
 };
 use serde_json::Value;
 
@@ -332,10 +333,18 @@ mod tests {
     fn caps_a_huge_write_but_summarises_the_whole_input() {
         let content = "x".repeat(1024 * 1024);
         let line = serde_json::json!({"type":"assistant","message":{"content":[{"type":"tool_use","id":"t","name":"Write","input":{"file_path":"/src/a.rs","content":content}}]}}).to_string();
-        let full = input_summary("Write", &serde_json::json!({"file_path":"/src/a.rs","content":content}));
-        match ClaudeParser::default().push_line(&line, &mut Vec::<(String, String, Vec<u8>)>::new()) {
+        let full = input_summary(
+            "Write",
+            &serde_json::json!({"file_path":"/src/a.rs","content":content}),
+        );
+        match ClaudeParser::default().push_line(&line, &mut Vec::<(String, String, Vec<u8>)>::new())
+        {
             ParserOutput::Append(v) => match &v[0] {
-                ChatItem::ToolCall { input, input_summary, .. } => {
+                ChatItem::ToolCall {
+                    input,
+                    input_summary,
+                    ..
+                } => {
                     assert!(input["content"].as_str().unwrap().len() < 70 * 1024);
                     assert_eq!(input_summary, &full);
                 }

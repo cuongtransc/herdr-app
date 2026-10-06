@@ -14,7 +14,11 @@ use tokio::task::JoinHandle;
 const BATCH: Duration = Duration::from_millis(50);
 const RESET_ITEMS: usize = 500;
 /// Silence that ends the first backlog when the size header is unreadable.
-const QUIET: Duration = if cfg!(test) { Duration::from_secs(1) } else { Duration::from_secs(2) };
+const QUIET: Duration = if cfg!(test) {
+    Duration::from_secs(1)
+} else {
+    Duration::from_secs(2)
+};
 const MAX_LINE: usize = 32 * 1024 * 1024;
 
 pub type Sink = Arc<dyn Fn(ChatEvent) + Send + Sync>;
@@ -243,7 +247,10 @@ pub fn spawn_tail(
         images: images.clone(),
         last_meta: ChatMeta::default(),
         parser,
-        link: Arc::new(Mutex::new(Link { sink: Some(sink), pending: None })),
+        link: Arc::new(Mutex::new(Link {
+            sink: Some(sink),
+            pending: None,
+        })),
         events: Vec::new(),
         appended: Vec::new(),
         sent_first: false,
@@ -260,7 +267,12 @@ pub fn spawn_tail(
         .name("chat-parse".into())
         .spawn(move || parse_loop(state, rx));
     if let Err(e) = spawned {
-        emit(&link, ChatEvent::Error { error: AppError::new("io", e.to_string()) });
+        emit(
+            &link,
+            ChatEvent::Error {
+                error: AppError::new("io", e.to_string()),
+            },
+        );
     }
     let task = tokio::spawn(read(t, path, link.clone(), tx));
     TailHandle {
@@ -472,16 +484,29 @@ mod tests {
         let h = spawn_tail(
             Arc::new(crate::transport::local::LocalTransport),
             p.to_string_lossy().into(),
-            Box::new(Stuck { entered: entered_tx, release: release_rx }),
+            Box::new(Stuck {
+                entered: entered_tx,
+                release: release_rx,
+            }),
             Arc::new(|_| {}),
         );
         let store = h.images();
-        tokio::task::spawn_blocking(move || entered.recv_timeout(std::time::Duration::from_secs(3)))
-            .await.unwrap().expect("parser never ran");
-        assert!(store.try_lock().is_ok(), "the store is locked during the parse");
+        tokio::task::spawn_blocking(move || {
+            entered.recv_timeout(std::time::Duration::from_secs(3))
+        })
+        .await
+        .unwrap()
+        .expect("parser never ran");
+        assert!(
+            store.try_lock().is_ok(),
+            "the store is locked during the parse"
+        );
         release.send(()).unwrap();
         tokio::time::sleep(std::time::Duration::from_millis(200)).await;
-        assert_eq!(store.lock().unwrap().get("r"), Some(("image/png".to_string(), vec![1])));
+        assert_eq!(
+            store.lock().unwrap().get("r"),
+            Some(("image/png".to_string(), vec![1]))
+        );
     }
 
     #[tokio::test]
@@ -678,29 +703,67 @@ mod tests {
     #[async_trait::async_trait]
     impl crate::transport::Transport for Slow {
         fn wrap(&self, argv: &[String], _tty: bool) -> Vec<String> {
-            let mut v: Vec<String> = vec!["sh".into(), "-c".into(), format!("sleep {}; exec \"$@\"", self.0), "sh".into()];
+            let mut v: Vec<String> = vec![
+                "sh".into(),
+                "-c".into(),
+                format!("sleep {}; exec \"$@\"", self.0),
+                "sh".into(),
+            ];
             v.extend(argv.iter().cloned());
             v
         }
-        async fn local_socket(&self, _: &crate::transport::SessionEntry) -> crate::error::AppResult<std::path::PathBuf> { unreachable!() }
-        async fn release_socket(&self, _: &crate::transport::SessionEntry) -> crate::error::AppResult<()> { unreachable!() }
+        async fn local_socket(
+            &self,
+            _: &crate::transport::SessionEntry,
+        ) -> crate::error::AppResult<std::path::PathBuf> {
+            unreachable!()
+        }
+        async fn release_socket(
+            &self,
+            _: &crate::transport::SessionEntry,
+        ) -> crate::error::AppResult<()> {
+            unreachable!()
+        }
     }
     /// Prints a junk first line before the command: the size header is unreadable.
     struct Junk;
     #[async_trait::async_trait]
     impl crate::transport::Transport for Junk {
         fn wrap(&self, argv: &[String], _tty: bool) -> Vec<String> {
-            let mut v: Vec<String> = vec!["sh".into(), "-c".into(), "echo ' junk'; exec \"$@\"".into(), "sh".into()];
+            let mut v: Vec<String> = vec![
+                "sh".into(),
+                "-c".into(),
+                "echo ' junk'; exec \"$@\"".into(),
+                "sh".into(),
+            ];
             v.extend(argv.iter().cloned());
             v
         }
-        async fn local_socket(&self, _: &crate::transport::SessionEntry) -> crate::error::AppResult<std::path::PathBuf> { unreachable!() }
-        async fn release_socket(&self, _: &crate::transport::SessionEntry) -> crate::error::AppResult<()> { unreachable!() }
+        async fn local_socket(
+            &self,
+            _: &crate::transport::SessionEntry,
+        ) -> crate::error::AppResult<std::path::PathBuf> {
+            unreachable!()
+        }
+        async fn release_socket(
+            &self,
+            _: &crate::transport::SessionEntry,
+        ) -> crate::error::AppResult<()> {
+            unreachable!()
+        }
     }
-    fn collect(t: Arc<dyn crate::transport::Transport>, p: &std::path::Path) -> (TailHandle, Arc<Mutex<Vec<ChatEvent>>>) {
+    fn collect(
+        t: Arc<dyn crate::transport::Transport>,
+        p: &std::path::Path,
+    ) -> (TailHandle, Arc<Mutex<Vec<ChatEvent>>>) {
         let got: Arc<Mutex<Vec<ChatEvent>>> = Arc::default();
         let g = got.clone();
-        let h = spawn_tail(t, p.to_string_lossy().into(), Box::new(Lines), Arc::new(move |e| g.lock().unwrap().push(e)));
+        let h = spawn_tail(
+            t,
+            p.to_string_lossy().into(),
+            Box::new(Lines),
+            Arc::new(move |e| g.lock().unwrap().push(e)),
+        );
         (h, got)
     }
 
@@ -710,7 +773,10 @@ mod tests {
             images: Arc::new(Mutex::new(ImageStore::new(IMAGE_BUDGET))),
             last_meta: ChatMeta::default(),
             parser,
-            link: Arc::new(Mutex::new(Link { sink: None, pending: None })),
+            link: Arc::new(Mutex::new(Link {
+                sink: None,
+                pending: None,
+            })),
             events: Vec::new(),
             appended: Vec::new(),
             sent_first: false,
@@ -743,7 +809,10 @@ mod tests {
         let h = TailHandle {
             items: Arc::default(),
             images: Arc::new(Mutex::new(ImageStore::new(IMAGE_BUDGET))),
-            link: Arc::new(Mutex::new(Link { sink: None, pending: None })),
+            link: Arc::new(Mutex::new(Link {
+                sink: None,
+                pending: None,
+            })),
             task: tokio::spawn(std::future::pending()),
             done: done.clone(),
         };
@@ -758,7 +827,10 @@ mod tests {
         st.line("a");
         st.line("b");
         assert_eq!(st.items.lock().unwrap().len(), 2);
-        assert!(st.appended.is_empty(), "the first Reset already carries the backlog");
+        assert!(
+            st.appended.is_empty(),
+            "the first Reset already carries the backlog"
+        );
         st.sent_first = true;
         st.line("c");
         assert_eq!(st.appended.len(), 1);
@@ -780,8 +852,14 @@ mod tests {
         let (_h, got) = collect(Arc::new(Slow("1.3")), &p);
         tokio::time::sleep(std::time::Duration::from_millis(2500)).await;
         let ev = got.lock().unwrap();
-        assert!(matches!(&ev[0], ChatEvent::Reset { total: 50, .. }), "{ev:?}");
-        assert!(!ev.iter().any(|e| matches!(e, ChatEvent::Append { .. })), "{ev:?}");
+        assert!(
+            matches!(&ev[0], ChatEvent::Reset { total: 50, .. }),
+            "{ev:?}"
+        );
+        assert!(
+            !ev.iter().any(|e| matches!(e, ChatEvent::Append { .. })),
+            "{ev:?}"
+        );
     }
 
     #[tokio::test]
@@ -791,12 +869,24 @@ mod tests {
         std::fs::write(&p, "a\nb").unwrap();
         let (_h, got) = collect(Arc::new(crate::transport::local::LocalTransport), &p);
         tokio::time::sleep(std::time::Duration::from_millis(300)).await;
-        assert!(matches!(&got.lock().unwrap()[0], ChatEvent::Reset { total: 1, .. }));
+        assert!(matches!(
+            &got.lock().unwrap()[0],
+            ChatEvent::Reset { total: 1, .. }
+        ));
         use std::io::Write;
-        std::fs::OpenOptions::new().append(true).open(&p).unwrap().write_all(b"\n").unwrap();
+        std::fs::OpenOptions::new()
+            .append(true)
+            .open(&p)
+            .unwrap()
+            .write_all(b"\n")
+            .unwrap();
         tokio::time::sleep(std::time::Duration::from_millis(1200)).await;
         let ev = got.lock().unwrap();
-        assert!(ev.iter().any(|e| matches!(e, ChatEvent::Append { items } if items.len() == 1)), "{ev:?}");
+        assert!(
+            ev.iter()
+                .any(|e| matches!(e, ChatEvent::Append { items } if items.len() == 1)),
+            "{ev:?}"
+        );
     }
 
     #[tokio::test]
@@ -809,6 +899,9 @@ mod tests {
         assert!(got.lock().unwrap().is_empty(), "sent before QUIET");
         tokio::time::sleep(std::time::Duration::from_millis(900)).await;
         // The real size line becomes an item: only the quiet rule could have sent this Reset.
-        assert!(matches!(&got.lock().unwrap()[0], ChatEvent::Reset { total: 2, .. }));
+        assert!(matches!(
+            &got.lock().unwrap()[0],
+            ChatEvent::Reset { total: 2, .. }
+        ));
     }
 }

@@ -1,5 +1,5 @@
 import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 vi.mock("../lib/ipc", () => ({ quotaFetch: vi.fn() }));
 import { quotaFetch } from "../lib/ipc";
 import type { QuotaOutcome, QuotaProvider } from "../lib/types";
@@ -14,8 +14,13 @@ describe("QuotaColumn", () => {
     fetchMock.mockReset();
     useQuota.setState({ slots: initialSlots() });
   });
+  afterEach(() => {
+    vi.useRealTimers();
+  });
 
   it("shows every Provider with its state after fetching on mount", async () => {
+    // Frozen clock: the countdown below must not depend on how long the render takes.
+    vi.useFakeTimers({ toFake: ["Date"] });
     const now = Date.now();
     const outcomes: Record<QuotaProvider, QuotaOutcome> = {
       claude: { kind: "ok", fetchedAt: now, windows: [

@@ -3,7 +3,9 @@
 use super::images::{decode_image, ImageSink};
 use super::locate::input_summary;
 use super::skill_prompt::parse_skill_prompt;
-use super::{cap_input, meta_label, truncate_result, ChatItem, ChatMeta, ImageRef, Parser, ParserOutput};
+use super::{
+    cap_input, meta_label, truncate_result, ChatItem, ChatMeta, ImageRef, Parser, ParserOutput,
+};
 use serde_json::Value;
 use std::collections::HashMap;
 
@@ -363,10 +365,17 @@ mod tests {
     fn caps_a_huge_write_but_summarises_the_whole_input() {
         let content = "x".repeat(1024 * 1024);
         let line = serde_json::json!({"type":"message","id":"a","parentId":null,"message":{"role":"assistant","content":[{"type":"toolCall","id":"t","name":"write","arguments":{"path":"/src/a.rs","content":content}}]}}).to_string();
-        let full = input_summary("write", &serde_json::json!({"path":"/src/a.rs","content":content}));
+        let full = input_summary(
+            "write",
+            &serde_json::json!({"path":"/src/a.rs","content":content}),
+        );
         match PiParser::default().push_line(&line, &mut Vec::<(String, String, Vec<u8>)>::new()) {
             ParserOutput::Append(v) | ParserOutput::Reset(v) => match &v[0] {
-                ChatItem::ToolCall { input, input_summary, .. } => {
+                ChatItem::ToolCall {
+                    input,
+                    input_summary,
+                    ..
+                } => {
                     assert!(input["content"].as_str().unwrap().len() < 70 * 1024);
                     assert_eq!(input_summary, &full);
                 }
@@ -382,10 +391,18 @@ mod tests {
         let text = "<skill name=\"tdd\" location=\"/t/SKILL.md\">\nbody\n</skill>";
         let line = serde_json::json!({"type":"message","id":"a","parentId":null,"message":{"role":"user","content":[{"type":"text","text":text}]}}).to_string();
         match p.push_line(&line, &mut Vec::<(String, String, Vec<u8>)>::new()) {
-            ParserOutput::Append(v) => assert_eq!(v, vec![User {
-                ts: None, text: "/skill:tdd".into(), images: vec![],
-                skills: vec![SkillUse { name: "tdd".into(), path: "/t/SKILL.md".into() }],
-            }]),
+            ParserOutput::Append(v) => assert_eq!(
+                v,
+                vec![User {
+                    ts: None,
+                    text: "/skill:tdd".into(),
+                    images: vec![],
+                    skills: vec![SkillUse {
+                        name: "tdd".into(),
+                        path: "/t/SKILL.md".into()
+                    }],
+                }]
+            ),
             o => panic!("{o:?}"),
         }
     }

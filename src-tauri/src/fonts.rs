@@ -28,10 +28,12 @@ pub fn installed_monospace() -> Vec<String> {
 /// system font folders. WebKit already renders system fonts everywhere; a collection would only
 /// yield its first face.
 pub fn web_loadable(path: &std::path::Path) -> bool {
-    let single = path
-        .extension()
-        .and_then(|e| e.to_str())
-        .is_some_and(|e| matches!(e.to_ascii_lowercase().as_str(), "otf" | "ttf" | "woff" | "woff2"));
+    let single = path.extension().and_then(|e| e.to_str()).is_some_and(|e| {
+        matches!(
+            e.to_ascii_lowercase().as_str(),
+            "otf" | "ttf" | "woff" | "woff2"
+        )
+    });
     single && !path.starts_with("/System/")
 }
 
@@ -137,11 +139,19 @@ mod tests {
     #[test]
     fn web_loadable_takes_single_face_files_outside_the_system() {
         use std::path::Path;
-        assert!(web_loadable(Path::new("/Users/me/Library/Fonts/Lilex-Regular.otf")));
+        assert!(web_loadable(Path::new(
+            "/Users/me/Library/Fonts/Lilex-Regular.otf"
+        )));
         assert!(web_loadable(Path::new("/Library/Fonts/Foo.TTF")));
-        assert!(!web_loadable(Path::new("/Users/me/Library/Fonts/Iosevka.ttc")));
-        assert!(!web_loadable(Path::new("/System/Library/Fonts/SFNSMono.ttf")));
-        assert!(!web_loadable(Path::new("/Users/me/Library/Fonts/Old.dfont")));
+        assert!(!web_loadable(Path::new(
+            "/Users/me/Library/Fonts/Iosevka.ttc"
+        )));
+        assert!(!web_loadable(Path::new(
+            "/System/Library/Fonts/SFNSMono.ttf"
+        )));
+        assert!(!web_loadable(Path::new(
+            "/Users/me/Library/Fonts/Old.dfont"
+        )));
     }
 
     #[cfg(target_os = "macos")]
