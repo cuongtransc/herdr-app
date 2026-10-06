@@ -12,6 +12,7 @@ vi.mock("./terminal/TerminalLens", async () => {
 import App from "./App";
 import { useApp } from "./store/app";
 import { useLensSettings } from "./settings/lens";
+import { useLayout } from "./settings/layout";
 
 describe("App shell", () => {
   it("renders the sidebar and the empty main area", () => {
@@ -93,5 +94,53 @@ describe("App shell", () => {
     expect(fireEvent.drop(document, { dataTransfer: { types: ["Files"] } })).toBe(false);
     expect(fireEvent.dragOver(document, { dataTransfer: { types: ["application/x-herdr-node"] } })).toBe(true);
     expect(fireEvent.drop(document, { dataTransfer: { types: ["application/x-herdr-node"] } })).toBe(true);
+  });
+
+  describe("layout", () => {
+    const blockedMachine = {
+      id: "local", label: "local", kind: "local" as const, state: "connected" as const, error: null, version: "0.9.3", status: "blocked" as const,
+      sessions: [{ name: "default", running: true, status: "blocked" as const, error: null, workspaces: [
+        { workspace_id: "w1", label: "x", number: 1, status: "blocked" as const, tabs: [
+          { tab_id: "w1:t1", label: "1", number: 1, status: "blocked" as const, panes: [
+            { pane_id: "w1:p1", terminal_id: "t1", title: "fix", cwd: null, agent: "claude", status: "blocked" as const } ] } ] } ] }],
+    };
+    const machinesNav = () => screen.queryByRole("navigation", { name: "Machines" });
+    const agentsCol = () => screen.queryByRole("complementary", { name: "Agents" });
+
+    it("⌘B hides and shows the sidebar, keeping the Agents column", () => {
+      useLayout.setState({ layout: "normal" });
+      useApp.setState({ machines: {}, order: [], selected: null, dashboardOpen: false });
+      render(<App />);
+      expect(screen.getByRole("button", { name: "Hide sidebar" }).getAttribute("aria-expanded")).toBe("true");
+      fireEvent.keyDown(window, { key: "b", metaKey: true });
+      expect(machinesNav()).toBeNull();
+      expect(agentsCol()).toBeTruthy();
+      expect(screen.getByRole("button", { name: "Show sidebar" }).getAttribute("aria-expanded")).toBe("false");
+      fireEvent.keyDown(window, { key: "b", metaKey: true });
+      expect(machinesNav()).toBeTruthy();
+    });
+
+    it("⌘⇧B hides both columns and shows how many agents wait; the pill brings them back", () => {
+      useLayout.setState({ layout: "normal" });
+      useApp.setState({ machines: { local: blockedMachine }, order: ["local"], selected: null, dashboardOpen: false });
+      render(<App />);
+      expect(screen.queryByRole("button", { name: /waiting/ })).toBeNull();
+      fireEvent.keyDown(window, { key: "B", metaKey: true, shiftKey: true });
+      expect(machinesNav()).toBeNull();
+      expect(agentsCol()).toBeNull();
+      fireEvent.click(screen.getByRole("button", { name: "1 agent waiting, show the sidebar" }));
+      expect(machinesNav()).toBeTruthy();
+      expect(agentsCol()).toBeTruthy();
+      expect(useLayout.getState().layout).toBe("normal");
+    });
+
+    it("the toggle button shows the sidebar again from focus", () => {
+      useLayout.setState({ layout: "focus" });
+      useApp.setState({ machines: {}, order: [], selected: null, dashboardOpen: false });
+      render(<App />);
+      fireEvent.click(screen.getByRole("button", { name: "Show sidebar" }));
+      expect(machinesNav()).toBeTruthy();
+      expect(agentsCol()).toBeTruthy();
+    });
   });
 });

@@ -59,6 +59,21 @@ export function dashboardCards(
   return cards.map((c) => (c.bucket === "done" || c.bucket === "idle" ? sorted[c.bucket][next[c.bucket]++] : c));
 }
 
+/** Agents waiting for input, counted as the dashboard's "Needs you" column. */
+export function waitingCount(machines: Record<string, MachineView>): number {
+  let n = 0;
+  for (const machine of Object.values(machines)) {
+    if (machine.state !== "connected") continue;
+    for (const session of machine.sessions) {
+      if (!session.running) continue;
+      for (const workspace of session.workspaces)
+        for (const tab of workspace.tabs)
+          for (const pane of tab.panes) if (pane.agent && pane.status === "blocked") n++;
+    }
+  }
+  return n;
+}
+
 export function bucketCounts(cards: DashCard[]): Record<Bucket, number> {
   const counts: Record<Bucket, number> = { attention: 0, working: 0, done: 0, idle: 0 };
   for (const c of cards) counts[c.bucket]++;

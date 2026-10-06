@@ -8,6 +8,8 @@ import { Settings } from "./settings/Settings";
 import { applyChatFont, useSettings } from "./settings/store";
 import { applyTheme, useTheme } from "./settings/theme";
 import { Header } from "./main/Header";
+import { LayoutControls } from "./main/LayoutControls";
+import { useLayout } from "./settings/layout";
 import { Sidebar } from "./sidebar/Sidebar";
 import { guardFileDrops } from "./sidebar/dnd";
 import { AgentList } from "./agents/AgentList";
@@ -94,6 +96,7 @@ export default function App() {
   const [paletteOpen, setPaletteOpen] = useState(false);
   const dashboardOpen = useApp((s) => s.dashboardOpen);
   const chatFontSize = useSettings((s) => s.chatFontSize);
+  const layout = useLayout((s) => s.layout);
 
   const theme = useTheme((s) => s.theme);
   const themePref = useTheme((s) => s.pref);
@@ -145,6 +148,10 @@ export default function App() {
         e.preventDefault();
         setPaletteOpen((o) => !o);
       }
+      if (e.metaKey && !e.altKey && !e.ctrlKey && e.key.toLowerCase() === "b") {
+        e.preventDefault();
+        if (!e.repeat) useLayout.getState().toggle(e.shiftKey ? "focus" : "sidebar");
+      }
       if (e.metaKey && !e.shiftKey && !e.altKey && !e.ctrlKey && e.key.toLowerCase() === "t") {
         e.preventDefault();
         if (e.repeat) return;
@@ -167,15 +174,16 @@ export default function App() {
   useTranscriptProbe(ref, pane?.status);
 
   return (
-    <div className="app">
-      <nav className="sidebar" aria-label="Machines">
+    <div className="app" data-layout={layout}>
+      <LayoutControls />
+      <nav className="sidebar" id="sidebar" aria-label="Machines" hidden={layout !== "normal"}>
         <div className="titlebar" data-tauri-drag-region />
         <div className="sidebar-scroll">
           <Sidebar />
         </div>
         <Settings />
       </nav>
-      <aside className="agents" aria-label="Agents">
+      <aside className="agents" aria-label="Agents" hidden={layout === "focus"}>
         <AgentList />
       </aside>
       <main className="main">
