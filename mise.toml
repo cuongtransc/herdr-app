@@ -1,11 +1,21 @@
 # Herdr — Tauri 2 (pnpm + cargo). `mise tasks` lists them, `mise run <task>` runs one.
+min_version = "2026.9.0"
+
+[settings]
+experimental = true # [deps] is experimental
+
+# Same majors as .github/workflows/release.yml.
+[tools]
+node = "24"
+pnpm = "11"
 
 [env]
 APP = "src-tauri/target/release/bundle/macos/Herdr.app"
 
-[tasks.install]
-description = "Install frontend dependencies"
-run = "pnpm install"
+# Frontend dependencies install before any `mise run` when the lockfile changed.
+# By hand: `mise deps`.
+[deps.pnpm]
+auto = true
 
 [tasks.dev]
 description = "Run the app with hot reload"
@@ -15,13 +25,13 @@ run = "pnpm tauri dev"
 description = "Build the release bundle (Herdr.app)"
 run = "pnpm tauri build --bundles app"
 
-[tasks.run]
+[tasks.start]
 description = "Build the release bundle and open it"
 depends = ["build"]
 run = "open $APP"
 
 # Replaces any previous copy so files removed from the bundle don't linger.
-[tasks."install:app"]
+[tasks."app:install"]
 description = "Build the release bundle and install it into /Applications"
 depends = ["build"]
 run = ["rm -rf /Applications/Herdr.app", "ditto $APP /Applications/Herdr.app"]
@@ -31,21 +41,21 @@ description = "Type-check the frontend"
 run = "pnpm typecheck"
 
 [tasks.lint]
-description = "Clippy on the backend, warnings as errors"
+description = "Lint the backend; any warning fails"
 dir = "src-tauri"
 run = "cargo clippy -- -D warnings"
 
 [tasks."test:frontend"]
-description = "Frontend tests (vitest)"
+description = "Frontend unit tests"
 run = "pnpm test"
 
 [tasks."test:backend"]
-description = "Backend tests (cargo)"
+description = "Backend unit tests"
 dir = "src-tauri"
 run = "cargo test"
 
 [tasks.test]
-description = "Frontend and backend tests"
+description = "Frontend and backend unit tests"
 depends = ["test:frontend", "test:backend"]
 
 # Starts isolated `herdrapp-test-*` sessions on the local herdr and always
@@ -55,13 +65,15 @@ description = "Integration tests against a real local herdr"
 dir = "src-tauri"
 run = "cargo test -- --ignored --test-threads=1"
 
-[tasks.check]
-description = "Typecheck, lint and test"
+# Read-only. Runs checks in parallel.
+[tasks.ci]
+description = "The gate: typecheck, lint and test, run before claiming done"
 depends = ["typecheck", "lint", "test"]
+run = "echo 'ci passed'"
 
 # Regenerates src-tauri/icons from one square source image. Only needed when the
 # icon itself changes; the committed icons are what `build` packages.
-[tasks.icon]
+[tasks."gen:icons"]
 description = "Regenerate app icons from a source image"
 usage = 'arg "[source]" default="src-tauri/icons/icon.png" help="Square PNG or SVG, 1024px+"'
 run = 'pnpm tauri icon "${usage_source}"'
