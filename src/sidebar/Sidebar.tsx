@@ -35,7 +35,8 @@ import {
   TrashIcon,
   UnplugIcon,
 } from "../ui/icons";
-import { forgetSessions, renameSessionKey, resolve, sessionKey, setBookmarked, useLayout } from "./groups";
+import { forgetSessions, renameSessionKey, sessionKey, setBookmarked, useLayout } from "./groups";
+import { useSessionFilter, useSidebarSessions } from "./activeFilter";
 import type { RSession } from "./groups";
 import { GroupTree } from "./GroupTree";
 
@@ -235,6 +236,22 @@ function SectionHeader({ id, label, icon }: { id: string; label: string; icon?: 
   );
 }
 
+/** All | Active: Active leaves out sessions with no agent work (see `isActiveSession`). */
+function SessionFilterBar({ kept }: { kept: number }) {
+  const filter = useSessionFilter((s) => s.filter);
+  const setFilter = useSessionFilter((s) => s.setFilter);
+  return (
+    <div className="session-filter">
+      <span className="section-label">Sessions</span>
+      <div className={"seg seg-sm" + (filter === "active" ? " seg-right" : "")} role="group" aria-label="Show sessions">
+        <span className="seg-thumb" aria-hidden="true" />
+        <button type="button" aria-pressed={filter === "all"} onClick={() => setFilter("all")}>All</button>
+        <button type="button" aria-pressed={filter === "active"} onClick={() => setFilter("active")}>Active {kept}</button>
+      </div>
+    </div>
+  );
+}
+
 function BookmarksSection({ bookmarks }: { bookmarks: RSession[] }) {
   const open = useApp((s) => s.expanded["bookmarks"] ?? true);
   const drag = useDragState();
@@ -256,8 +273,7 @@ function BookmarksSection({ bookmarks }: { bookmarks: RSession[] }) {
 export const Sidebar = memo(function Sidebar() {
   const machines = useApp((s) => s.machines);
   const order = useApp((s) => s.order);
-  const layout = useLayout((s) => s.layout);
-  const bookmarks = useMemo(() => resolve(layout, machines, order).bookmarks, [layout, machines, order]);
+  const { bookmarks, kept } = useSidebarSessions();
   const machinesOpen = useApp((s) => s.expanded["machines"] ?? true);
   const [dragging, setDragging] = useState<Drag | null>(null);
   const [indicator, setIndicator] = useState<Indicator | null>(null);
@@ -292,6 +308,7 @@ export const Sidebar = memo(function Sidebar() {
     <ActionsProvider>
       <DragContext.Provider value={dragState}>
         <DashboardEntry />
+        <SessionFilterBar kept={kept} />
         {(bookmarks.length > 0 || (draggingSession && emptyBookmarksShown)) && <BookmarksSection bookmarks={bookmarks} />}
         <GroupTree />
         <section aria-label="Machines" className="machines-section">

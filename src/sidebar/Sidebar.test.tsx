@@ -5,6 +5,7 @@ import { sessionStart } from "../lib/ipc";
 import { useApp } from "../store/app";
 import { EMPTY_LAYOUT, sessionKey, useLayout } from "./groups";
 import { Sidebar } from "./Sidebar";
+import { useSessionFilter } from "./activeFilter";
 import type { MachineView } from "../lib/types";
 
 const m: MachineView = {
@@ -24,6 +25,26 @@ describe("Sidebar", () => {
   beforeEach(() => {
     useApp.setState({ machines: { box: m }, order: ["box"], selected: null, viewed: null, expanded: {} });
     useLayout.setState({ layout: EMPTY_LAYOUT });
+    useSessionFilter.setState({ filter: "all" });
+  });
+  it("Active shows only sessions with agent work, keeps the viewed one, and Show brings the rest back", () => {
+    render(<Sidebar />);
+    expect(row("ai-radar")).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: "Active 1" }));
+    expect(screen.queryByText("ai-radar")).toBeNull();
+    expect(row("default")).toBeTruthy();
+    expect(JSON.parse(localStorage.getItem("herdr-app:settings")!).sessionFilter).toBe("active");
+    expect(screen.getByText("1 hidden · idle or stopped")).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: "Show" }));
+    expect(row("ai-radar")).toBeTruthy();
+    expect(useSessionFilter.getState().filter).toBe("all");
+  });
+  it("Active keeps the session being viewed whatever its state", () => {
+    useApp.setState({ viewed: { machine_id: "box", session: "ai-radar" } });
+    useSessionFilter.setState({ filter: "active" });
+    render(<Sidebar />);
+    expect(row("ai-radar")).toBeTruthy();
+    expect(screen.queryByText(/hidden · idle or stopped/)).toBeNull();
   });
   it("shows sessions with a machine badge and machines without sessions", () => {
     render(<Sidebar />);

@@ -1,8 +1,8 @@
-import { useMemo } from "react";
 import type { MouseEvent } from "react";
 import { useApp } from "../store/app";
 import { useActions } from "./actions";
-import { addGroup, deleteGroup, renameGroup, resolve, useLayout } from "./groups";
+import { addGroup, deleteGroup, renameGroup, useLayout } from "./groups";
+import { useSessionFilter, useSidebarSessions } from "./activeFilter";
 import type { RGroup, RNode } from "./groups";
 import { Chevron, SessionRow } from "./Sidebar";
 import { useDragState } from "./dnd";
@@ -73,10 +73,8 @@ function Nodes({ nodes }: { nodes: RNode[] }) {
 }
 
 export function GroupTree() {
-  const machines = useApp((s) => s.machines);
-  const order = useApp((s) => s.order);
-  const layout = useLayout((s) => s.layout);
-  const tree = useMemo(() => resolve(layout, machines, order).tree, [layout, machines, order]);
+  const { tree, hidden, active } = useSidebarSessions();
+  const setFilter = useSessionFilter((s) => s.setFilter);
   const a = useActions();
   const endDnd = useTreeEndDnd();
   const drag = useDragState();
@@ -97,6 +95,12 @@ export function GroupTree() {
       <ul className="tree">
         {tree.map((n) => (n.kind === "group" ? <GroupRow key={n.id} group={n} /> : <SessionRow key={n.key} node={n} />))}
       </ul>
+      {active && hidden > 0 && (
+        <div className="filter-hidden">
+          <span>{hidden} hidden · idle or stopped</span>
+          <button type="button" className="link-btn" onClick={() => setFilter("all")}>Show</button>
+        </div>
+      )}
       <div className={"tree-end" + indicatorClass(drag, "tree-end")} {...endDnd} />
     </section>
   );

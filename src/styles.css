@@ -239,6 +239,18 @@ kbd {
   font-size: 11px; font-weight: 600; letter-spacing: 0.04em; text-transform: uppercase;
 }
 
+/* All | Active above the session list; the footer says what Active leaves out. */
+.session-filter { display: flex; align-items: center; gap: 8px; padding: 2px 0 6px; }
+.session-filter .section-label { flex: 1; padding: 0 8px; }
+.seg-sm button { height: 20px; padding: 0 9px; font-size: 11.5px; }
+.filter-hidden {
+  display: flex; align-items: center; gap: 8px; margin: 8px 0 0; padding: 7px 10px;
+  border: 1px dashed var(--line-2); border-radius: var(--r-sm); color: var(--fg-3); font-size: 12px;
+}
+.filter-hidden span { flex: 1; }
+.link-btn { padding: 0; border: 0; background: none; color: var(--accent); font-size: 12px; cursor: pointer; }
+.link-btn:hover { text-decoration: underline; }
+
 /* ---------- Layout: ⌘B hides the sidebar, ⇧⌘B the Agents column too ---------- */
 .sidebar[hidden], .agents[hidden] { display: none; }
 /* Beside the traffic lights in every layout; above the dashboard. */
