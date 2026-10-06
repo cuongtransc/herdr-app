@@ -14,7 +14,7 @@
 
   --fg: #e6e7eb;
   --fg-2: #a3a6b0;
-  --fg-3: #6e717c;
+  --fg-3: #8f929d; /* quiet text: 5.2:1 on --surface-1 (docs/design/ui-ux-guidelines.md §3.5) */
 
   --line: rgba(255, 255, 255, 0.07);
   --line-2: rgba(255, 255, 255, 0.11);
@@ -26,9 +26,10 @@
   --ring: 0 0 0 2px rgba(124, 140, 255, 0.55);
 
   --amber: #f0a742;
+  --amber-text: var(--amber); /* amber as a text colour, e.g. the INPUT word */
   --blue: #5b9dff;
   --green: #46c37b;
-  --grey: #6e717c;
+  --grey: var(--fg-3);
   --err: #f0716b;
 
   --btn-hover: #2f3037;
@@ -75,6 +76,20 @@
   --t: 180ms;
 
   --titlebar: 46px;
+
+  /* Scales (docs/design/ui-ux-guidelines.md §3.3–3.4): new rules use these, old literals move over as they are touched. */
+  --row-xs: 24px; /* workspace headers, folded lines */
+  --row-s: 28px; /* list rows, menus */
+  --fs-xs: 11px;
+  --fs-s: 12px;
+  --fs-m: 13px;
+  --fs-l: 15px;
+  --s-1: 2px;
+  --s-2: 4px;
+  --s-3: 6px;
+  --s-4: 8px;
+  --s-5: 12px;
+  --s-6: 16px;
   --mono: "JetBrains Mono", ui-monospace, "SF Mono", Menlo, monospace;
   --chat-font: 13.5px; /* user setting, written by applyChatFont */
   --chat-sans: "Helvetica", -apple-system, BlinkMacSystemFont, sans-serif; /* likewise */
@@ -94,7 +109,7 @@
   --surface-chrome: rgba(246, 246, 248, 0.84);
   --surface-0: #ffffff;
   --surface-1: #f6f6f8;
-  --surface-2: #ffffff;
+  --surface-2: #f9f9fb; /* differs from --surface-0, so raised layers still read */
   --surface-3: #ececf0;
   --surface-term: #fbfbfc; /* = TERM_THEME_LIGHT.background */
   --surface-code: #f5f5f8;
@@ -103,7 +118,7 @@
 
   --fg: #1d1e22;
   --fg-2: #50535c;
-  --fg-3: #868994;
+  --fg-3: #6a6d77; /* 4.8:1 on --surface-1 */
 
   --line: rgba(0, 0, 0, 0.08);
   --line-2: rgba(0, 0, 0, 0.12);
@@ -115,9 +130,10 @@
   --ring: 0 0 0 2px rgba(82, 96, 232, 0.45);
 
   --amber: #c27a10;
+  --amber-text: #9a5f08; /* --amber is 3.2:1 on light surfaces, too faint for text */
   --blue: #2f74e0;
   --green: #1f9a55;
-  --grey: #9a9ca5;
+  --grey: var(--fg-3);
   --err: #d6443d;
 
   --btn-hover: #e2e2e7;
@@ -232,7 +248,8 @@ kbd {
 .sidebar-scroll { flex: 1; min-height: 0; overflow-y: auto; padding: 0 8px 8px; display: flex; flex-direction: column; }
 .sidebar-scroll > * { flex-shrink: 0; }
 /* Groups fill the gap so right-clicking anywhere above Machines offers "New group"; Machines sit at the bottom. */
-.sidebar-scroll > .groups-section { flex: 1 0 auto; display: flex; flex-direction: column; }
+.sidebar-scroll > .sessions-section { flex: 1 0 auto; display: flex; flex-direction: column; }
+.sessions-section > .groups-section { flex: 1 0 auto; display: flex; flex-direction: column; }
 .groups-section > .tree-end { flex: 1 0 24px; }
 .section-label {
   padding: 6px 8px 6px; color: var(--fg-3);
@@ -240,8 +257,7 @@ kbd {
 }
 
 /* All | Active above the session list; the footer says what Active leaves out. */
-.session-filter { display: flex; align-items: center; gap: 8px; padding: 2px 0 6px; }
-.session-filter .section-label { flex: 1; padding: 0 8px; }
+.section-head .seg { flex: none; margin: 4px 0 0 8px; }
 .seg-sm button { height: 20px; padding: 0 9px; font-size: 11.5px; }
 .filter-hidden {
   display: flex; align-items: center; gap: 8px; margin: 8px 0 0; padding: 7px 10px;
@@ -260,10 +276,16 @@ kbd {
 }
 /* A disclosure, not a menu: no pressed look while the sidebar shows. */
 .layout-controls .icon-btn[aria-expanded="true"]:not(:hover) { background: none; color: var(--fg-2); }
+.board-btn {
+  display: inline-flex; align-items: center; gap: 6px; height: 28px; padding: 0 8px 0 7px; border: 0; border-radius: var(--r-sm);
+  background: none; color: var(--fg-2); font-size: var(--fs-m); font-weight: 500; cursor: pointer; transition: background var(--t-fast), color var(--t-fast);
+}
+.board-btn:hover { background: var(--hover); color: var(--fg); }
+.board-btn[aria-pressed="true"] { background: var(--active); color: var(--fg); }
 .waiting-pill {
   display: inline-flex; align-items: center; gap: 6px; height: 24px; padding: 0 10px; box-sizing: border-box;
   border: 0; border-radius: 999px; cursor: pointer; font-size: 12px; font-weight: 600;
-  color: var(--amber); background: color-mix(in srgb, var(--amber) 15%, transparent);
+  color: var(--amber-text); background: color-mix(in srgb, var(--amber) 15%, transparent);
   transition: background var(--t-fast);
 }
 .waiting-pill:hover { background: color-mix(in srgb, var(--amber) 24%, transparent); }
@@ -288,7 +310,7 @@ kbd {
 .triage-title { font-size: 13px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .triage-list li.current .triage-title { font-weight: 600; }
 .triage-where { font-size: 11.5px; color: var(--fg-3); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.triage-badge { flex: none; font-size: 10.5px; font-weight: 700; color: var(--amber); }
+.triage-badge { flex: none; font-size: 10.5px; font-weight: 700; color: var(--amber-text); }
 .triage-list li.done .triage-badge { color: var(--green); }
 .triage-keys { display: flex; gap: 14px; align-items: center; margin-top: 4px; padding: 8px 6px 2px; border-top: 1px solid var(--line); color: var(--fg-3); font-size: 11.5px; }
 .triage-keys .grow { flex: 1; }
@@ -349,22 +371,31 @@ kbd {
 .title, .mono { font-family: var(--mono); font-size: 12px; }
 .agent { margin-left: auto; color: var(--fg-3); font-size: 11px; }
 .machine.offline > .row, .machine.offline > .row .label { color: var(--fg-3); }
-.session.offline .row { color: var(--fg-3); opacity: .5; cursor: default; }
+.session.offline .row { color: var(--fg-3); cursor: default; }
 .row .label { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .badge {
   display: inline-flex; align-items: center; gap: 5px; flex-shrink: 0; margin-left: auto;
   padding: 1px 7px; border-radius: 999px; background: var(--hover); color: var(--fg-3); font-size: 11px;
 }
 .row.active .badge { background: var(--surface-0); }
+/* A Session row: name, then (right) the bookmark star in its Group, a remote Machine's name, the needs-you count. */
+.session .row .label { flex: 1; }
+.machine-chip { flex: none; color: var(--fg-3); font-size: var(--fs-xs); }
+.bookmark-mark { width: 11px; height: 11px; color: var(--fg-3); }
+.need {
+  flex: none; min-width: 16px; height: 16px; padding: 0 5px; box-sizing: border-box; display: grid; place-items: center;
+  border-radius: 999px; background: color-mix(in srgb, var(--amber) 14%, transparent); color: var(--amber-text);
+  font-size: var(--fs-xs); font-weight: 700; font-variant-numeric: tabular-nums;
+}
+/* The twin of the selected row in the other section (Bookmarks vs Sessions). */
+.row.current { background: var(--hover); }
 .group > .row .label { font-weight: 600; }
 .group-icon, .star-icon { color: var(--fg-3); }
 .section-toggle {
   display: flex; align-items: center; gap: 6px; width: 100%; padding: 6px 8px 2px; border: 0; background: none;
   color: var(--fg-3); font-size: 11px; font-weight: 600; letter-spacing: .04em; text-transform: uppercase; cursor: pointer; text-align: left;
 }
-.section-toggle .star-icon { width: 12px; height: 12px; }
 .session.stopped .row { color: var(--fg-3); }
-.session.stopped .label { opacity: 0.7; }
 .error { margin: 0; padding: 2px 8px 6px 28px; color: var(--err); font-size: 11.5px; line-height: 1.4; }
 
 .machine-actions { display: flex; align-items: center; gap: 6px; padding: 0 8px 6px 28px; }
@@ -398,7 +429,7 @@ kbd {
   border-radius: 999px; font-size: 10px; font-weight: 600; letter-spacing: 0.05em;
   color: var(--fg-2); background: var(--active);
 }
-.badge-blocked { color: var(--amber); background: color-mix(in srgb, var(--amber) 15%, transparent); }
+.badge-blocked { color: var(--amber-text); background: color-mix(in srgb, var(--amber) 15%, transparent); }
 .badge-working { color: var(--blue); background: color-mix(in srgb, var(--blue) 15%, transparent); }
 .badge-done { color: var(--green); background: color-mix(in srgb, var(--green) 14%, transparent); }
 .badge-unknown { background: none; box-shadow: inset 0 0 0 1px var(--line-2); color: var(--fg-3); }
@@ -421,56 +452,76 @@ kbd {
   border-radius: 999px; background: var(--active); color: var(--fg-2); font-size: 11px; font-weight: 600; pointer-events: none;
 }
 .agents-empty { margin: 0; padding: 24px 16px; color: var(--fg-3); text-align: center; }
-.agent-cards { list-style: none; margin: 0; padding: 2px 6px; display: flex; flex-direction: column; gap: 1px; }
-.tab-group {
-  margin: 2px 0; border: 1px solid var(--line); border-radius: var(--r-lg);
-  background: color-mix(in srgb, var(--fg) 3%, transparent);
+/* ---------- Agents column rows (docs/design/ui-ux-guidelines.md §7.1) ---------- */
+.agent-cards { list-style: none; margin: 0; padding: 0 6px; display: flex; flex-direction: column; gap: 1px; }
+/* A multi-pane tab: indented under a hairline, no box. */
+.tab-group { margin: 0 0 0 10px; padding-left: 4px; border-left: 1px solid var(--line); }
+.tab-group > .agent-cards { padding: 0; }
+.ws-head { display: flex; align-items: center; gap: var(--s-3); height: var(--row-xs); margin-top: var(--s-4); padding: 0 8px 0 10px; min-width: 0; }
+.ws-label {
+  flex: 0 1 auto; min-width: 0; max-width: 70%; padding: 0; border: 0; background: none; cursor: pointer; text-align: left;
+  color: var(--fg-2); font-size: var(--fs-s); font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
 }
-.tab-group > .agent-cards { padding: 2px; }
-.ws-head { display: flex; align-items: center; gap: 8px; padding: 8px 14px 0; min-width: 0; }
-.ws-label { flex: 0 1 auto; min-width: 0; max-width: 60%; font-weight: 600; font-size: 12px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.ws-folder { flex: 1; min-width: 0; color: var(--fg-3); font-size: 12px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ws-label:hover, .ws-label[aria-expanded="false"] { color: var(--fg); }
+.ws-folder { flex: 1; min-width: 0; color: var(--fg-3); font-size: var(--fs-xs); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .ws-add {
   flex: none; margin-left: auto; width: 22px; height: 22px; display: grid; place-items: center; padding: 0;
-  border: none; border-radius: var(--r-md); background: none; color: var(--fg-3); cursor: pointer;
+  border: none; border-radius: var(--r-sm); background: none; color: var(--fg-3); cursor: pointer;
 }
 .ws-add:hover { background: var(--hover); color: var(--fg); }
 .ws-add svg { width: 14px; height: 14px; }
+/* A workspace's "+" shows on hover or keyboard focus; the column head's stays. */
+.ws-head .ws-add { opacity: 0; transition: opacity var(--t-fast); }
+.ws-head:hover .ws-add, .ws-head:focus-within .ws-add { opacity: 1; }
+.ws-quiet {
+  display: flex; align-items: center; gap: var(--s-3); width: calc(100% - 12px); height: var(--row-xs); margin: 0 6px; padding: 0 10px;
+  border: 0; border-radius: var(--r-sm); background: none; color: var(--fg-3); font-size: var(--fs-s); cursor: pointer; text-align: left;
+}
+.ws-quiet:hover { background: var(--hover); color: var(--fg-2); }
+.ws-quiet .chev { width: 10px; height: 10px; }
+.agents-head .need-chip {
+  flex: none; height: 18px; padding: 0 7px; display: inline-flex; align-items: center; border-radius: 999px;
+  background: color-mix(in srgb, var(--amber) 14%, transparent); color: var(--amber-text); font-size: var(--fs-xs); font-weight: 700;
+}
+.agents-stopped { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 12px 16px; color: var(--fg-3); font-size: var(--fs-s); }
 .agent-card {
-  position: relative; display: flex; align-items: center; gap: 9px; width: 100%; box-sizing: border-box;
-  padding: 5px 8px; border: 1px solid transparent; border-radius: var(--r-md);
-  background: none; text-align: left; cursor: pointer;
-  transition: background var(--t-fast), border-color var(--t-fast), box-shadow var(--t-fast);
+  position: relative; display: flex; align-items: center; gap: var(--s-4); width: 100%; height: var(--row-s); box-sizing: border-box;
+  padding: 0 10px; border: 0; border-radius: var(--r-sm); background: none; text-align: left; cursor: pointer;
+  transition: background var(--t-fast);
 }
 /* Hover on the row, not the card: the close button sits outside the card. :where keeps
    this below .active/.blocked so their backgrounds still win. */
 :where(.agent-card-item:hover) > .agent-card { background: var(--hover); }
-.agent-card.active { background: var(--accent-soft); border-color: var(--accent-line); }
-.agent-card.active::before {
-  content: ""; position: absolute; left: -1px; top: 7px; bottom: 7px; width: 3px;
-  border-radius: 0 3px 3px 0; background: var(--accent);
-}
-.agent-card.blocked {
-  background: color-mix(in srgb, var(--amber) 7%, transparent);
-  border-color: color-mix(in srgb, var(--amber) 35%, transparent);
-  box-shadow: 0 0 18px -6px color-mix(in srgb, var(--amber) 45%, transparent);
-}
-.agent-card.blocked.active { background: color-mix(in srgb, var(--amber) 12%, var(--surface-3)); }
-.agent-card-body { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
-.agent-card-title { font-weight: 500; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.agent-card-meta { display: flex; align-items: center; gap: 8px; min-width: 0; }
-.agent-card-meta .badge { margin-left: 0; }
+/* Selected is neutral (D4): accent and --blue read alike, so selection must not look like "working". */
+.agent-card.active { background: var(--active); }
+.agent-card.active .agent-card-title { font-weight: 600; }
+.agent-card.blocked { background: color-mix(in srgb, var(--amber) 7%, transparent); }
+.agent-card.blocked .agent-card-title { font-weight: 600; }
+.agent-card.blocked.active { background: color-mix(in srgb, var(--amber) 7%, var(--active)); }
+.agent-card-title { flex: 1; min-width: 0; font-size: var(--fs-m); font-weight: 500; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.agent-card.shell .agent-card-title { color: var(--fg-2); font-weight: 400; }
+.agent-card-sub { flex: none; max-width: 30%; color: var(--fg-3); font-size: var(--fs-xs); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+/* The mark slot at a row's end; idle and shells keep it empty so titles align. */
+.agent-card .mark { flex: none; width: 8px; height: 8px; border-radius: 50%; }
+.agent-card .mark-working { background: var(--blue); }
+.agent-card .mark-blocked { background: var(--amber); box-shadow: 0 0 0 3px color-mix(in srgb, var(--amber) 22%, transparent); animation: pulse 1.6s ease-in-out infinite; }
+.agent-card .mark-done { flex: none; width: 12px; height: 12px; margin: 0 -2px; color: var(--green); stroke-width: 3; }
+.agent-input { flex: none; color: var(--amber-text); font-size: var(--fs-xs); font-weight: 700; letter-spacing: .04em; }
+/* The agent's mark at 16px, no tile, in a list row. */
+.agent-card .agent-tile { flex: 0 0 16px; width: 16px; height: 16px; border: 0; border-radius: 0; background: none; box-shadow: none; }
+.agent-card .agent-tile svg { width: 16px; height: 16px; }
+.agent-card .agent-tile-bare { border-radius: 4px; }
+.agent-card .agent-mono { font-size: 10px; }
 .agent-card-item { position: relative; }
 .agent-card-close {
   position: absolute; top: 50%; right: 6px; transform: translateY(-50%);
   width: 22px; height: 22px; display: grid; place-items: center; padding: 0;
-  border: none; border-radius: var(--r-md); background: var(--surface-3); color: var(--fg-3); cursor: pointer;
+  border: none; border-radius: var(--r-sm); background: var(--surface-3); color: var(--fg-3); cursor: pointer;
   opacity: 0; transition: opacity var(--t-fast), background var(--t-fast), color var(--t-fast);
 }
 .agent-card-item:hover .agent-card-close, .agent-card-close:focus-visible { opacity: 1; }
 .agent-card-close:hover { color: var(--fg); box-shadow: inset 0 0 0 1px var(--line-2); }
 .agent-card-close svg { width: 13px; height: 13px; }
-.agent-card-sub { color: var(--fg-3); font-size: 12px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 /* Where a dragged tab will land: a line in the gap before or after the tab's row. */
 .tab-group { position: relative; }
 .agent-card-item.drop-before::after, .agent-card-item.drop-after::after,
@@ -506,7 +557,7 @@ kbd {
   flex: none; display: inline-flex; align-items: center; gap: 7px; height: 24px; padding: 0 10px;
   border-radius: 999px; background: var(--hover); border: 1px solid var(--line); color: var(--fg-2); font-size: 12px;
 }
-.agent-status.status-blocked { color: var(--amber); background: color-mix(in srgb, var(--amber) 10%, transparent); border-color: color-mix(in srgb, var(--amber) 25%, transparent); }
+.agent-status.status-blocked { color: var(--amber-text); background: color-mix(in srgb, var(--amber) 10%, transparent); border-color: color-mix(in srgb, var(--amber) 25%, transparent); }
 .agent-status.status-working { color: var(--blue); }
 
 .seg {
@@ -1054,7 +1105,7 @@ button.composer-model:disabled { cursor: default; }
   box-shadow: 0 0 32px -12px color-mix(in srgb, var(--amber) 45%, transparent);
 }
 .blocked-panel:focus { outline: none; }
-.blocked-head { display: flex; align-items: center; gap: 10px; color: var(--amber); font-size: 12.5px; font-weight: 600; }
+.blocked-head { display: flex; align-items: center; gap: 10px; color: var(--amber-text); font-size: 12.5px; font-weight: 600; }
 .blocked-screen { height: 220px; padding: 8px; background: var(--surface-term); border: 1px solid var(--line); border-radius: var(--r-md); overflow: hidden; }
 .blocked-open { margin-left: auto; display: flex; gap: 6px; }
 .prompt-title { color: var(--fg); }
@@ -1141,38 +1192,6 @@ button.composer-model:disabled { cursor: default; }
 @keyframes slide-in { from { opacity: 0; transform: translateX(16px); } }
 
 /* ---------- Agent Dashboard ---------- */
-.dash-entry { margin-bottom: 6px; border: 1px solid transparent; color: var(--fg); }
-.dash-entry .label { flex: 1; min-width: 0; }
-.dash-entry-counts { display: flex; align-items: center; gap: 6px; flex: none; }
-.dash-count { display: inline-flex; align-items: center; gap: 4px; color: var(--fg-3); font-size: 11px; font-weight: 600; }
-.dash-count i { width: 6px; height: 6px; border-radius: 50%; }
-.dash-count-attention i { background: var(--amber); }
-.dash-count-working i { background: var(--blue); }
-.dash-count-done i { background: var(--green); }
-/* Blocked and unseen Done are what the user acts on: a tinted pill with a bigger, breathing dot. */
-.dash-count-attention, .dash-count-done {
-  --c: var(--amber); height: 16px; padding: 0 5px 0 4px; gap: 4px; box-sizing: border-box; border-radius: 999px;
-  color: var(--c); background: color-mix(in srgb, var(--c) 16%, transparent);
-}
-.dash-count-done { --c: var(--green); }
-.dash-count-attention i, .dash-count-done i { width: 8px; height: 8px; animation: dash-halo 1.6s ease-out infinite; }
-.dash-count-done i { animation-duration: 2.4s; }
-@keyframes dash-halo {
-  0% { box-shadow: 0 0 0 0 color-mix(in srgb, var(--c) 70%, transparent); }
-  70%, 100% { box-shadow: 0 0 0 4px color-mix(in srgb, var(--c) 0%, transparent); }
-}
-/* The whole row lights up like a blocked agent card: amber while an agent needs you, green for
-   unseen Done. */
-.dash-entry.needs-you, .dash-entry.has-done {
-  --c: var(--amber);
-  border-color: color-mix(in srgb, var(--c) 35%, transparent);
-  background: color-mix(in srgb, var(--c) 7%, transparent);
-  box-shadow: 0 0 18px -6px color-mix(in srgb, var(--c) 45%, transparent);
-}
-.dash-entry.has-done { --c: var(--green); }
-.dash-entry.needs-you:hover, .dash-entry.has-done:hover { background: color-mix(in srgb, var(--c) 11%, transparent); }
-.dash-entry.needs-you.active, .dash-entry.has-done.active { background: color-mix(in srgb, var(--c) 12%, var(--surface-3)); }
-
 /* Covers the Agents column and the main area; the sidebar stays usable and the panes underneath
    stay mounted. */
 .dashboard {
@@ -1234,7 +1253,7 @@ button.composer-model:disabled { cursor: default; }
 }
 .dash-col-head { flex: none; display: flex; align-items: center; justify-content: space-between; padding: 12px 12px 8px; }
 .dash-col-title { color: var(--fg-2); font-size: 11px; font-weight: 600; letter-spacing: 0.05em; text-transform: uppercase; }
-.dash-col-attention .dash-col-title { color: var(--amber); }
+.dash-col-attention .dash-col-title { color: var(--amber-text); }
 .dash-col-empty { margin: 0; padding: 4px 12px; color: var(--fg-3); }
 .dash-cards { list-style: none; margin: 0; padding: 0 8px 8px; overflow-y: auto; display: flex; flex-direction: column; gap: 6px; }
 .dash-card {

@@ -159,6 +159,10 @@ export default function App() {
         e.preventDefault();
         if (!e.repeat) useTriage.getState().step(e.shiftKey ? -1 : 1);
       }
+      if (e.metaKey && e.shiftKey && !e.altKey && !e.ctrlKey && e.key.toLowerCase() === "d") {
+        e.preventDefault();
+        if (!e.repeat) useApp.getState().setDashboardOpen(!useApp.getState().dashboardOpen);
+      }
       if (e.metaKey && !e.altKey && !e.ctrlKey && e.key.toLowerCase() === "b") {
         e.preventDefault();
         if (!e.repeat) useLayout.getState().toggle(e.shiftKey ? "focus" : "sidebar");

@@ -242,3 +242,10 @@ export const SidebarIcon = (p: SVGProps<SVGSVGElement>) => (
     <path d="M9 4v16" />
   </Icon>
 );
+export const BoardIcon = (p: SVGProps<SVGSVGElement>) => (
+  <Icon {...p}>
+    <rect x="3" y="4" width="5" height="16" rx="1.5" />
+    <rect x="10" y="4" width="5" height="11" rx="1.5" />
+    <rect x="17" y="4" width="4" height="7" rx="1.5" />
+  </Icon>
+);

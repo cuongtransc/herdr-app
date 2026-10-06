@@ -420,12 +420,15 @@ export function resolve(
   };
   const tree = build(layout.tree);
 
+  // Sessions the layout has not placed come first: after the last Group they would read as its children.
   const unplaced: SessionKey[] = [];
+  const loose: RNode[] = [];
   for (const [key, r] of live) {
     if (placed.has(key)) continue;
     unplaced.push(key);
-    tree.push(r);
+    loose.push(r);
   }
+  tree.unshift(...loose);
 
   const bookmarks = layout.bookmarks.flatMap((k) => {
     const r = live.get(k);
