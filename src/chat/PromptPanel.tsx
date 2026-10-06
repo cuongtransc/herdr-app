@@ -299,8 +299,10 @@ export function PromptPanel({
   );
   const mirrorOn = useRef(false);
   const refresh = useCallback(
-    () =>
-      read()
+    () => {
+      // An answer or Escape settling past the panel's close must not read the screen.
+      if (!live.current) return Promise.resolve();
+      return read()
         .then(async (text) => {
           const next = show(text);
           if (mirrorOn.current || next?.fallback) {
@@ -308,7 +310,8 @@ export function PromptPanel({
             if (live.current) setScreenText(ansi);
           }
         })
-        .catch((e) => console.error("pane.read failed", e)),
+        .catch((e) => console.error("pane.read failed", e));
+    },
     [read, readAs, show],
   );
 

@@ -145,6 +145,23 @@ describe("PromptPanel", () => {
     expect(sent()).toHaveLength(1);
   });
 
+  it("reads nothing once closed while an Escape was settling", async () => {
+    vi.useFakeTimers();
+    try {
+      const { unmount } = render(<PromptPanel pane={pane} view={view} />);
+      await act(() => vi.advanceTimersByTimeAsync(0));
+      fireEvent.keyDown(screen.getByRole("textbox", { name: "Your own answer" }), { key: "Escape" });
+      await act(() => vi.advanceTimersByTimeAsync(0));
+      unmount();
+      const reads = () => vi.mocked(herdrCall).mock.calls.filter(([, , m]) => m === "pane.read").length;
+      const atUnmount = reads();
+      await vi.advanceTimersByTimeAsync(1000);
+      expect(reads()).toBe(atUnmount);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
   it("does not re-read the screen while the window is hidden", async () => {
     vi.useFakeTimers();
     let hidden = true;
