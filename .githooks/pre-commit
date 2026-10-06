@@ -1,0 +1,5 @@
+#!/bin/sh
+# Runs the gate before every commit. GIT_* vars are unset so tests that call
+# `git -C <tmp>` cannot write to the committing repository.
+for v in $(env | sed -n 's/^\(GIT_[A-Z_]*\)=.*/\1/p'); do unset "$v"; done
+exec mise run ci

@@ -2068,9 +2068,15 @@ mod tests {
     }
 
     /// A master start that takes `ms` and then succeeds, flagging `started` when done.
-    fn slow_master(ms: u64, started: Arc<std::sync::atomic::AtomicBool>) -> MasterStart {
+    /// `began` is raised when the start is entered, `started` when it finishes.
+    fn slow_master(
+        ms: u64,
+        began: Arc<std::sync::atomic::AtomicBool>,
+        started: Arc<std::sync::atomic::AtomicBool>,
+    ) -> MasterStart {
         Arc::new(move || {
             let started = started.clone();
+            began.store(true, std::sync::atomic::Ordering::SeqCst);
             Box::pin(async move {
                 tokio::time::sleep(std::time::Duration::from_millis(ms)).await;
                 started.store(true, std::sync::atomic::Ordering::SeqCst);
@@ -2099,19 +2105,14 @@ mod tests {
             Arc::new(std::sync::atomic::AtomicBool::new(false)),
             Arc::new(Mutex::new(Vec::new())),
         );
-        mgr.with_master_start(slow_master(400, started.clone()));
+        let began = Arc::new(std::sync::atomic::AtomicBool::new(false));
+        mgr.with_master_start(slow_master(400, began.clone(), started.clone()));
         mgr.with_master_exit(recording_exit(started.clone(), exits.clone()));
         mgr.add("i1-disc".into(), None, None).await.unwrap();
         let m = mgr.clone();
         let connect = tokio::spawn(async move { m.connect("i1-disc").await });
-        let m = mgr.clone();
-        assert!(
-            wait_for(move || m
-                .views()
-                .iter()
-                .any(|v| v.id == "i1-disc" && v.state == MachineState::Authenticating))
-            .await
-        );
+        // Mid-start, not merely Authenticating: the master_alive check before it is a real ssh spawn.
+        assert!(wait_for(|| began.load(std::sync::atomic::Ordering::SeqCst)).await);
         mgr.disconnect("i1-disc").await;
         connect.await.unwrap().unwrap();
         assert!(started.load(std::sync::atomic::Ordering::SeqCst));
@@ -2134,19 +2135,14 @@ mod tests {
             Arc::new(std::sync::atomic::AtomicBool::new(false)),
             Arc::new(Mutex::new(Vec::new())),
         );
-        mgr.with_master_start(slow_master(400, started.clone()));
+        let began = Arc::new(std::sync::atomic::AtomicBool::new(false));
+        mgr.with_master_start(slow_master(400, began.clone(), started.clone()));
         mgr.with_master_exit(recording_exit(started.clone(), exits.clone()));
         mgr.add("i1-remove".into(), None, None).await.unwrap();
         let m = mgr.clone();
         let connect = tokio::spawn(async move { m.connect("i1-remove").await });
-        let m = mgr.clone();
-        assert!(
-            wait_for(move || m
-                .views()
-                .iter()
-                .any(|v| v.id == "i1-remove" && v.state == MachineState::Authenticating))
-            .await
-        );
+        // Mid-start, not merely Authenticating: the master_alive check before it is a real ssh spawn.
+        assert!(wait_for(|| began.load(std::sync::atomic::Ordering::SeqCst)).await);
         mgr.remove("i1-remove").await.unwrap();
         connect.await.unwrap().unwrap();
         assert!(
