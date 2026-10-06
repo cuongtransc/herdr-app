@@ -13,6 +13,7 @@ import App from "./App";
 import { useApp } from "./store/app";
 import { useLensSettings } from "./settings/lens";
 import { useLayout } from "./settings/layout";
+import { initialSlots, useQuota } from "./quota/store";
 
 describe("App shell", () => {
   it("renders the sidebar and the empty main area", () => {
@@ -48,10 +49,14 @@ describe("App shell", () => {
     expect(await screen.findByText("herdr is not installed on this Mac")).toBeTruthy();
   });
 
-  it("opens the Agent Dashboard over the main area from the sidebar, keeping the main area mounted", () => {
+  it("opens the Agent Board from the titlebar, keeping the main area mounted", () => {
     useApp.setState({ machines: {}, order: [], selected: null, dashboardOpen: false });
     render(<App />);
-    fireEvent.click(screen.getByRole("button", { name: /agent dashboard/i }));
+    expect(screen.queryByRole("button", { name: /agent dashboard/i })).toBeNull();
+    const board = screen.getByRole("button", { name: /^Board/ });
+    expect(board.getAttribute("aria-pressed")).toBe("false");
+    fireEvent.click(board);
+    expect(board.getAttribute("aria-pressed")).toBe("true");
     expect(screen.getByRole("dialog", { name: "Agent Dashboard" })).toBeTruthy();
     expect(screen.getByText("Select a pane")).toBeTruthy();
     // ⌘K searches the dashboard instead of opening the palette.
@@ -181,6 +186,39 @@ describe("App shell", () => {
       fireEvent.keyDown(window, { key: "j", metaKey: true });
       expect(hud()?.textContent).toContain("Nothing needs you");
       expect(useApp.getState().selected).toBeNull();
+    });
+  });
+
+  describe("Board", () => {
+    const blockedMachine = {
+      id: "local", label: "local", kind: "local" as const, state: "connected" as const, error: null, version: "0.9.3", status: "blocked" as const,
+      sessions: [{ name: "default", running: true, status: "blocked" as const, error: null, workspaces: [
+        { workspace_id: "w1", label: "x", number: 1, status: "blocked" as const, tabs: [
+          { tab_id: "w1:t1", label: "1", number: 1, status: "blocked" as const, panes: [
+            { pane_id: "w1:p1", terminal_id: "t1", title: "fix", cwd: null, agent: "claude", status: "blocked" as const } ] } ] } ] }],
+    };
+    it("carries how many need you, and ⇧⌘D opens and closes it", async () => {
+      const { invoke } = await import("@tauri-apps/api/core");
+      // The Board's quota column fetches on open; give it an outcome rather than the default [].
+      (invoke as any).mockImplementation((cmd: string) => Promise.resolve(cmd === "quota_fetch" ? { kind: "notSignedIn" } : []));
+      // An earlier test opened the Board while every call answered []; its quota slots are not outcomes.
+      useQuota.setState({ slots: initialSlots() });
+      useLayout.setState({ layout: "normal" });
+      useApp.setState({ machines: { local: blockedMachine }, order: ["local"], selected: null, dashboardOpen: false, doneSeen: {} });
+      render(<App />);
+      expect(screen.getByRole("button", { name: "Board, 1 needs you (⇧⌘D)" })).toBeTruthy();
+      fireEvent.keyDown(window, { key: "D", metaKey: true, shiftKey: true });
+      expect(screen.getByRole("dialog", { name: "Agent Dashboard" })).toBeTruthy();
+      fireEvent.keyDown(window, { key: "D", metaKey: true, shiftKey: true });
+      expect(screen.queryByRole("dialog", { name: "Agent Dashboard" })).toBeNull();
+      (invoke as any).mockImplementation(() => Promise.resolve([]));
+    });
+    it("leaves the count to the waiting pill in focus", () => {
+      useLayout.setState({ layout: "focus" });
+      useApp.setState({ machines: { local: blockedMachine }, order: ["local"], selected: null, dashboardOpen: false, doneSeen: {} });
+      render(<App />);
+      expect(screen.getByRole("button", { name: "Board (⇧⌘D)" })).toBeTruthy();
+      useLayout.setState({ layout: "normal" });
     });
   });
 });

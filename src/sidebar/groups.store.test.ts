@@ -103,7 +103,7 @@ describe("layout file", () => {
 
 describe("resolve", () => {
   const machines = { local: mach("local", "a", "b"), box: mach("box", "c") };
-  it("joins placed sessions, hides missing ones and appends unplaced ones in machine order", () => {
+  it("joins placed sessions, hides missing ones and puts unplaced ones first in machine order", () => {
     const layout = {
       tree: [
         { kind: "group" as const, id: "g1", label: "Work", children: [{ kind: "session" as const, key: sessionKey("local", "b") }] },
@@ -113,7 +113,7 @@ describe("resolve", () => {
       bookmarks: [sessionKey("local", "a"), sessionKey("ghost", "zz")],
     };
     const r = resolve(layout, machines, ["local", "box"]);
-    expect(names(r.tree)).toEqual([{ Work: ["local:b"] }, "local:a", "box:c"]);
+    expect(names(r.tree)).toEqual(["local:a", "box:c", { Work: ["local:b"] }]);
     expect(r.bookmarks.map((b) => b.session.name)).toEqual(["a"]);
     expect(r.unplaced).toEqual([sessionKey("local", "a"), sessionKey("box", "c")]);
   });

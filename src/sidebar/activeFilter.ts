@@ -51,6 +51,26 @@ export function isActiveSession(machine: MachineView, session: SessionView, done
   );
 }
 
+/** Agent panes of the session waiting for input or Done and unseen: what ⌘J would visit there. */
+export function needYouCount(machine: MachineView, session: SessionView, doneSeen: Record<string, true>): number {
+  if (machine.state !== "connected" || !session.running) return 0;
+  let n = 0;
+  for (const w of session.workspaces)
+    for (const t of w.tabs)
+      for (const p of t.panes) {
+        if (!p.agent) continue;
+        if (p.status === "blocked") n++;
+        else if (p.status === "done" && !doneSeen[paneKey({ machine_id: machine.id, session: session.name, pane_id: p.pane_id })]) n++;
+      }
+  return n;
+}
+
+/** Which twin of a bookmarked Session the user clicked last, so only that row reads as selected. */
+export const useViewOrigin = create<{ from: "bookmarks" | "sessions"; set: (from: "bookmarks" | "sessions") => void }>((set) => ({
+  from: "sessions",
+  set: (from) => set({ from }),
+}));
+
 /** The resolved sidebar with only the sessions `keep` accepts: order kept, emptied groups dropped. */
 export function filterResolved(
   r: { tree: RNode[]; bookmarks: RSession[] },
