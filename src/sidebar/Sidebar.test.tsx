@@ -54,7 +54,8 @@ describe("Sidebar", () => {
     expect(bm.getAttribute("aria-current")).toBe("true");
     expect(inTree.getAttribute("aria-current")).toBeNull();
     expect(inTree.className).toContain("current");
-    expect(inTree.querySelector("[aria-label='bookmarked']")).toBeTruthy();
+    // The star travels with the name, not with the right-hand chips.
+    expect(inTree.querySelector(".session-name > [aria-label='bookmarked']")).toBeTruthy();
     fireEvent.click(inTree);
     expect(inTree.getAttribute("aria-current")).toBe("true");
     expect(bm.getAttribute("aria-current")).toBeNull();

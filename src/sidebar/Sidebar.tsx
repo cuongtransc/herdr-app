@@ -131,8 +131,10 @@ export function SessionRow({ node, bookmark, nextKey = null }: { node: RSession;
         onClick={onClick}
         onContextMenu={onMenu}
       >
-        <span className="label">{session.name}</span>
-        {bookmarked && !bookmark && <StarIcon className="icon bookmark-mark" aria-label="bookmarked" aria-hidden={undefined} />}
+        <span className="session-name">
+          <span className="label">{session.name}</span>
+          {bookmarked && !bookmark && <StarIcon className="icon bookmark-mark" aria-label="bookmarked" aria-hidden={undefined} />}
+        </span>
         {machine.kind !== "local" && (
           <span className="machine-chip">
             <span className="badge-label">{machine.label}</span>
