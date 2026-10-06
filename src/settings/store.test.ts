@@ -2,6 +2,8 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import {
   DEFAULTS,
   applyChatFont,
+  chatMonoFamily,
+  chatSansFamily,
   ensureTermFont,
   filterFonts,
   fontFamilies,
@@ -33,7 +35,7 @@ describe("loadFonts", () => {
 
   it("reads stored values and clamps sizes", () => {
     localStorage.setItem(KEY, JSON.stringify({ terminalFontSize: 99, chatFontSize: 2, terminalFontFamily: "Menlo" }));
-    expect(loadFonts()).toEqual({ terminalFontSize: 20, chatFontSize: 11, terminalFontFamily: "Menlo" });
+    expect(loadFonts()).toEqual({ ...DEFAULTS, terminalFontSize: 20, chatFontSize: 11, terminalFontFamily: "Menlo" });
   });
 
   it("ignores values of the wrong type", () => {
@@ -70,9 +72,33 @@ describe("termFontFamily", () => {
 });
 
 describe("applyChatFont", () => {
-  it("sets the --chat-font variable", () => {
-    applyChatFont(15);
-    expect(document.documentElement.style.getPropertyValue("--chat-font")).toBe("15px");
+  it("sets the chat size and both chat families, each with a fallback", () => {
+    // Registering an installed family needs FontFace, which jsdom lacks.
+    vi.stubGlobal("FontFace", class {});
+    fontFace.mockRejectedValue({ code: "not_found" });
+    applyChatFont({ chatFontSize: 15, chatFontFamily: "Avenir Next", chatMonoFamily: "Fira Code" });
+    const css = (v: string) => document.documentElement.style.getPropertyValue(v);
+    expect(css("--chat-font")).toBe("15px");
+    expect(css("--chat-sans")).toBe(chatSansFamily("Avenir Next"));
+    expect(css("--chat-mono")).toBe(chatMonoFamily("Fira Code"));
+    expect(fontFace).toHaveBeenCalledWith("Fira Code", "Regular");
+    vi.unstubAllGlobals();
+  });
+});
+
+describe("chat families", () => {
+  it("default to Helvetica and Source Code Pro", () => {
+    expect(DEFAULTS).toMatchObject({ chatFontFamily: "Helvetica", chatMonoFamily: "Source Code Pro" });
+  });
+  it("fall back to the system UI font and the bundled monospace font", () => {
+    expect(chatSansFamily("Helvetica")).toBe('"Helvetica", -apple-system, BlinkMacSystemFont, sans-serif');
+    expect(chatMonoFamily("Source Code Pro")).toBe('"Source Code Pro", "JetBrains Mono", Menlo, monospace');
+  });
+  it("are read back, ignoring blank or wrong values", () => {
+    localStorage.setItem(KEY, JSON.stringify({ chatFontFamily: "Avenir", chatMonoFamily: "  " }));
+    expect(loadFonts()).toMatchObject({ chatFontFamily: "Avenir", chatMonoFamily: "Source Code Pro" });
+    localStorage.setItem(KEY, JSON.stringify({ chatFontFamily: 7 }));
+    expect(loadFonts().chatFontFamily).toBe("Helvetica");
   });
 });
 

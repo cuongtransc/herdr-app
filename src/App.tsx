@@ -96,12 +96,17 @@ export default function App() {
   const [paletteOpen, setPaletteOpen] = useState(false);
   const dashboardOpen = useApp((s) => s.dashboardOpen);
   const chatFontSize = useSettings((s) => s.chatFontSize);
+  const chatFontFamily = useSettings((s) => s.chatFontFamily);
+  const chatMonoFamily = useSettings((s) => s.chatMonoFamily);
   const layout = useLayout((s) => s.layout);
 
   const theme = useTheme((s) => s.theme);
   const themePref = useTheme((s) => s.pref);
 
-  useEffect(() => applyChatFont(chatFontSize), [chatFontSize]);
+  useEffect(
+    () => applyChatFont({ chatFontSize, chatFontFamily, chatMonoFamily }),
+    [chatFontSize, chatFontFamily, chatMonoFamily],
+  );
   useEffect(() => applyTheme(theme, themePref), [theme, themePref]);
   useEffect(() => syncSeenToHerdr(), []);
   useEffect(() => guardFileDrops(), []);

@@ -8,7 +8,7 @@ export const machinesList = () => invoke<MachineView[]>("machines_list");
 export const machineConnect = (id: string) => invoke<void>("machine_connect", { id });
 export const machineDisconnect = (id: string) => invoke<void>("machine_disconnect", { id });
 export const sshHosts = () => invoke<string[]>("ssh_hosts");
-export const systemFonts = () => invoke<string[]>("system_fonts");
+export const systemFonts = (monospace = true) => invoke<string[]>("system_fonts", { monospace });
 /** Raw file of an installed font's face (CoreText style name); rejects when not web-loadable. */
 export const fontFace = (family: string, style: string) => invoke<ArrayBuffer>("font_face", { family, style });
 /** Native appearance (vibrancy, traffic lights); `null` follows the system. */

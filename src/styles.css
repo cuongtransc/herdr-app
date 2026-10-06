@@ -77,6 +77,8 @@
   --titlebar: 46px;
   --mono: "JetBrains Mono", ui-monospace, "SF Mono", Menlo, monospace;
   --chat-font: 13.5px; /* user setting, written by applyChatFont */
+  --chat-sans: "Helvetica", -apple-system, BlinkMacSystemFont, sans-serif; /* likewise */
+  --chat-mono: "Source Code Pro", "JetBrains Mono", Menlo, monospace; /* likewise */
 
   color-scheme: dark;
   font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Inter", sans-serif;
@@ -724,6 +726,8 @@ kbd {
 
 /* ---------- Chat lens ---------- */
 .chat-lens { flex: 1; min-height: 0; display: flex; background: var(--surface-0); container-type: inline-size; }
+/* The chat's own fonts (Settings › Fonts): prose here, and every `var(--mono)` inside it becomes the chat code font. */
+.chat-lens { font-family: var(--chat-sans); --mono: var(--chat-mono); }
 .chat-main { flex: 1; min-width: 0; min-height: 0; display: flex; flex-direction: column; position: relative; }
 /* The outline rail takes the right margin of a wide chat, so the column sits nearer the middle. */
 .chat-outline {

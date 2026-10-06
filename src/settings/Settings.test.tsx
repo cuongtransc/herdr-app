@@ -2,7 +2,9 @@ import { fireEvent, render, screen, within } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("../lib/ipc", () => ({
-  systemFonts: vi.fn(async () => ["CaskaydiaCove Nerd Font Mono", "Lilex", "Menlo"]),
+  systemFonts: vi.fn(async (monospace?: boolean) =>
+    monospace === false ? ["Avenir Next", "Helvetica", "Lilex", "Menlo"] : ["CaskaydiaCove Nerd Font Mono", "Lilex", "Menlo"]),
+  fontFace: vi.fn(async () => { throw { code: "not_found" }; }),
 }));
 import { loadLensSettings, useLensSettings } from "./lens";
 import { DEFAULT_QUICK_REPLIES, QUICK_REPLIES_MAX, useQuickReplies } from "./quickReplies";
@@ -154,8 +156,24 @@ describe("Settings fonts", () => {
     expect((screen.getByRole("button", { name: "Increase terminal size" }) as HTMLButtonElement).disabled).toBe(true);
   });
 
+  it("picks the chat font from every installed family and the chat code font from monospace ones", async () => {
+    openSettings();
+    const sans = screen.getByRole("combobox", { name: "Chat font" });
+    expect((sans as HTMLInputElement).placeholder || (sans as HTMLInputElement).value).toContain("Helvetica");
+    fireEvent.focus(sans);
+    fireEvent.mouseDown(await screen.findByRole("option", { name: "Avenir Next" }));
+    expect(useSettings.getState().chatFontFamily).toBe("Avenir Next");
+
+    const mono = screen.getByRole("combobox", { name: "Chat code font" });
+    fireEvent.focus(mono);
+    await screen.findByRole("option", { name: "Menlo" });
+    expect(screen.queryByRole("option", { name: "Avenir Next" })).toBeNull();
+    fireEvent.mouseDown(screen.getByRole("option", { name: "Lilex" }));
+    expect(loadFonts()).toMatchObject({ chatFontFamily: "Avenir Next", chatMonoFamily: "Lilex" });
+  });
+
   it("resets fonts to defaults", () => {
-    useSettings.getState().set({ terminalFontSize: 18, terminalFontFamily: "Menlo" });
+    useSettings.getState().set({ terminalFontSize: 18, terminalFontFamily: "Menlo", chatMonoFamily: "Menlo" });
     openSettings();
     fireEvent.click(screen.getByRole("button", { name: "Reset fonts" }));
     expect(useSettings.getState()).toMatchObject(DEFAULTS);
