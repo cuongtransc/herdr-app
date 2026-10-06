@@ -75,6 +75,7 @@ pub fn run() {
         .setup(|app| {
             init_logging(app.path().app_log_dir()?)?;
             tracing::info!("herdr-app starting");
+            transport::use_runtime_dir_for(&app.config().identifier);
             notify::init(app.handle());
             let dir = app.path().app_data_dir()?;
             std::fs::create_dir_all(&dir)?;

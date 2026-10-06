@@ -37,9 +37,11 @@ fi
 echo 'next: mise run dev'
 """
 
+# Its own identifier (tauri.dev.conf.json): a separate data dir and ssh control sockets, so it
+# runs beside the installed Herdr.app without sharing machines or ending its ssh masters.
 [tasks.dev]
-description = "Run the app with hot reload"
-run = "pnpm tauri dev"
+description = "Run the app with hot reload, apart from the installed app"
+run = "pnpm tauri dev --config src-tauri/tauri.dev.conf.json"
 
 [tasks.build]
 description = "Build the release bundle (Herdr.app)"
