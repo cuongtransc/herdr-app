@@ -1,0 +1,199 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Herdr redesign: sidebar, Agents column, Board entry</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<style>
+body{margin:0;font-family:-apple-system,BlinkMacSystemFont,"SF Pro Text","Helvetica Neue",sans-serif;color:#e6e7eb}
+a{color:#a5a6ff}a:hover{color:#c4c5ff}
+.sec{display:flex;align-items:center;gap:6px;height:24px;padding:0 8px;font-size:11px;font-weight:600;letter-spacing:.04em;text-transform:uppercase;color:#8f929d;border:0;background:none;font-family:inherit;width:100%;text-align:left}
+.row{display:flex;align-items:center;gap:8px;height:28px;padding:0 8px;border:0;border-radius:6px;background:none;color:#e6e7eb;font-family:inherit;font-size:13px;text-align:left;width:100%;box-sizing:border-box}
+.row .lbl{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.sel{background:rgba(255,255,255,.08);font-weight:600}
+.cur{background:rgba(255,255,255,.045)}
+.quiet{color:#8f929d}
+.mach{font-size:11px;color:#8f929d}
+.need{min-width:16px;height:16px;padding:0 5px;box-sizing:border-box;border-radius:999px;background:rgba(240,167,66,.16);color:#f0a742;font-size:11px;font-weight:700;display:grid;place-items:center}
+.kid{margin-left:13px;padding-left:8px;border-left:1px solid rgba(255,255,255,.07);display:flex;flex-direction:column}
+.ws{display:flex;align-items:center;gap:6px;height:24px;padding:0 10px;margin-top:8px;font-size:12px;font-weight:600;color:#a3a6b0;border:0;background:none;font-family:inherit;width:100%;text-align:left}
+.pane{display:flex;align-items:center;gap:8px;height:28px;padding:0 10px;border:0;border-radius:6px;background:none;color:#e6e7eb;font-family:inherit;font-size:13px;width:100%;box-sizing:border-box;text-align:left}
+.pane .lbl{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.fold{display:flex;align-items:center;gap:6px;height:24px;padding:0 10px 0 12px;border:0;background:none;color:#8f929d;font-family:inherit;font-size:12px;width:100%;text-align:left}
+.dot{width:8px;height:8px;border-radius:50%;flex:none}
+</style>
+</helmet>
+<div style="width: 1280px; height: 800px; box-sizing: border-box; display: flex; overflow: hidden; border-radius: 12px; border: 1px solid #2c2d33; background: #1a1b1f; position: relative">
+
+  <div style="position: absolute; top: 9px; left: 78px; display: flex; align-items: center; gap: 6px; z-index: 2">
+    <button aria-label="Hide sidebar" style="width: 28px; height: 28px; display: grid; place-items: center; border: 0; border-radius: 6px; background: none; color: #a3a6b0">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3" y="4" width="18" height="16" rx="2"></rect><path d="M9 4v16"></path></svg>
+    </button>
+    <button aria-label="Board, 2 need you (Shift Command D)" style="display: inline-flex; align-items: center; gap: 6px; height: 28px; padding: 0 8px 0 7px; border: 0; border-radius: 6px; background: none; color: #a3a6b0; font-family: inherit; font-size: 13px; font-weight: 500">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3" y="4" width="5" height="16" rx="1.5"></rect><rect x="10" y="4" width="5" height="11" rx="1.5"></rect><rect x="17" y="4" width="4" height="7" rx="1.5"></rect></svg>
+      Board
+      <span class="need">2</span>
+    </button>
+  </div>
+
+  <nav aria-label="Sessions" style="width: 248px; flex: none; display: flex; flex-direction: column; background: #202125; border-right: 1px solid rgba(255,255,255,.07)">
+    <div style="height: 46px; flex: none; display: flex; align-items: center; gap: 8px; padding: 0 16px; box-sizing: border-box">
+      <span style="width: 12px; height: 12px; border-radius: 50%; background: #ff5f57"></span>
+      <span style="width: 12px; height: 12px; border-radius: 50%; background: #febc2e"></span>
+      <span style="width: 12px; height: 12px; border-radius: 50%; background: #28c840"></span>
+    </div>
+
+    <div style="flex: 1; min-height: 0; display: flex; flex-direction: column; padding: 4px 8px 8px; gap: 2px">
+      <button class="sec" aria-expanded="true">
+        <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M6 9l6 6 6-6"></path></svg>Bookmarks
+      </button>
+      <button class="row sel" aria-current="true"><span class="lbl">ca</span><span class="need">2</span></button>
+      <button class="row"><span class="lbl">w-xb</span><span class="mach">ct-hms-lan</span><span class="need">1</span></button>
+
+      <div style="display: flex; align-items: center; margin-top: 12px">
+        <button class="sec" aria-expanded="true" style="flex: 1">
+          <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M6 9l6 6 6-6"></path></svg>Sessions
+        </button>
+        <div role="group" aria-label="Show sessions" style="display: flex; flex: none; padding: 2px; border-radius: 7px; background: #25262b; font-size: 11.5px">
+          <button aria-pressed="false" style="border: 0; padding: 2px 8px; border-radius: 5px; background: none; color: #8f929d; font-family: inherit; font-size: 11.5px">All</button>
+          <button aria-pressed="true" style="border: 0; padding: 2px 8px; border-radius: 5px; background: #3a3b42; color: #e6e7eb; font-family: inherit; font-size: 11.5px; font-weight: 600">Active 3</button>
+        </div>
+      </div>
+      <button class="row cur"><span class="lbl">ca</span><svg width="11" height="11" viewBox="0 0 24 24" fill="#8f929d"><path d="M12 3l2.7 5.6 6.1.9-4.4 4.3 1 6.1L12 17l-5.4 2.9 1-6.1L3.2 9.5l6.1-.9z"></path></svg><span class="need">2</span></button>
+      <button class="row quiet"><span class="lbl">herdview</span></button>
+
+      <button class="row" aria-expanded="true" style="color: #a3a6b0">
+        <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M6 9l6 6 6-6"></path></svg>
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M3 7a2 2 0 012-2h4l2 2h8a2 2 0 012 2v8a2 2 0 01-2 2H5a2 2 0 01-2-2z"></path></svg>
+        <span class="lbl" style="font-weight: 500">Work · XBIT</span>
+      </button>
+      <div class="kid">
+        <button class="row"><span class="lbl">w-xb</span><svg width="11" height="11" viewBox="0 0 24 24" fill="#8f929d"><path d="M12 3l2.7 5.6 6.1.9-4.4 4.3 1 6.1L12 17l-5.4 2.9 1-6.1L3.2 9.5l6.1-.9z"></path></svg><span class="mach">ct-hms-lan</span><span class="need">1</span></button>
+        <button class="row"><span class="lbl">xb-common</span><span class="mach">ct-hms-lan</span></button>
+      </div>
+
+      <button class="row" aria-expanded="true" style="color: #a3a6b0">
+        <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M6 9l6 6 6-6"></path></svg>
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M3 7a2 2 0 012-2h4l2 2h8a2 2 0 012 2v8a2 2 0 01-2 2H5a2 2 0 01-2-2z"></path></svg>
+        <span class="lbl" style="font-weight: 500">Personal</span>
+      </button>
+      <div class="kid">
+        <button class="row"><span class="lbl">ct</span><span class="need">1</span></button>
+        <button class="row"><span class="lbl">ai-tools</span></button>
+        <button class="row" aria-expanded="true" style="color: #a3a6b0">
+          <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M6 9l6 6 6-6"></path></svg>
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M3 7a2 2 0 012-2h4l2 2h8a2 2 0 012 2v8a2 2 0 01-2 2H5a2 2 0 01-2-2z"></path></svg>
+          <span class="lbl" style="font-weight: 500">Archive</span>
+        </button>
+        <div class="kid">
+          <button class="row quiet"><span class="lbl">ekm</span></button>
+          <button class="row quiet"><span class="lbl">pkm</span></button>
+        </div>
+      </div>
+
+      <div style="flex: 1"></div>
+      <button class="sec" aria-expanded="false">
+        <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M9 6l6 6-6 6"></path></svg>Machines <span style="font-weight: 500; letter-spacing: 0">2</span>
+      </button>
+    </div>
+    <div style="height: 44px; flex: none; display: flex; align-items: center; justify-content: space-between; padding: 0 12px; border-top: 1px solid rgba(255,255,255,.07); color: #8f929d; font-size: 12px">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1.7 1.7 0 00.3 1.8l.1.1a2 2 0 11-2.8 2.8l-.1-.1a1.7 1.7 0 00-1.8-.3 1.7 1.7 0 00-1 1.5V21a2 2 0 11-4 0v-.1a1.7 1.7 0 00-1.1-1.5 1.7 1.7 0 00-1.8.3l-.1.1a2 2 0 11-2.8-2.8l.1-.1a1.7 1.7 0 00.3-1.8 1.7 1.7 0 00-1.5-1H3a2 2 0 110-4h.1a1.7 1.7 0 001.5-1.1 1.7 1.7 0 00-.3-1.8l-.1-.1a2 2 0 112.8-2.8l.1.1a1.7 1.7 0 001.8.3H9a1.7 1.7 0 001-1.5V3a2 2 0 114 0v.1a1.7 1.7 0 001 1.5 1.7 1.7 0 001.8-.3l.1-.1a2 2 0 112.8 2.8l-.1.1a1.7 1.7 0 00-.3 1.8V9a1.7 1.7 0 001.5 1H21a2 2 0 110 4h-.1a1.7 1.7 0 00-1.5 1z"></path></svg>
+      <span>Jump <span style="display: inline-block; padding: 1px 5px; border: 1px solid #3a3b42; border-radius: 4px; font-size: 11px">⌘K</span></span>
+    </div>
+  </nav>
+
+  <aside aria-label="Agents" style="width: 288px; flex: none; display: flex; flex-direction: column; background: #1f2024; border-right: 1px solid rgba(255,255,255,.07)">
+    <div style="height: 46px; flex: none; display: flex; align-items: center; gap: 8px; padding: 0 12px 0 16px; box-sizing: border-box; border-bottom: 1px solid rgba(255,255,255,.07)">
+      <span style="font-weight: 600; font-size: 13px">ca</span>
+      <span style="height: 18px; padding: 0 7px; display: inline-flex; align-items: center; border-radius: 999px; background: rgba(240,167,66,.16); color: #f0a742; font-size: 11px; font-weight: 700">2 need you</span>
+      <span style="flex: 1"></span>
+      <button aria-label="New…" style="width: 26px; height: 26px; display: grid; place-items: center; border: 0; border-radius: 6px; background: none; color: #8f929d">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 5v14M5 12h14"></path></svg>
+      </button>
+    </div>
+
+    <div style="flex: 1; min-height: 0; display: flex; flex-direction: column; padding: 0 6px 8px">
+      <button class="ws" aria-expanded="true">herdr-app</button>
+      <button class="pane" aria-label="Fix login flow, claude, needs input" style="background: rgba(240,167,66,.08)">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#d97757" stroke-width="2.4" stroke-linecap="round"><path d="M12 3v18M3 12h18M5.6 5.6l12.8 12.8M18.4 5.6L5.6 18.4"></path></svg>
+        <span class="lbl" style="font-weight: 600">Fix login flow</span>
+        <span style="font-size: 11px; font-weight: 700; color: #f0a742; letter-spacing: .04em">INPUT</span>
+        <span class="dot" style="background: #f0a742; box-shadow: 0 0 0 3px rgba(240,167,66,.22)"></span>
+      </button>
+      <button class="pane" aria-label="Rewrite parser, pi, working" aria-current="true" style="background: rgba(255,255,255,.08)">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#a3a6b0" stroke-width="2"><rect x="5" y="5" width="14" height="14" rx="2"></rect><path d="M9 9v6M13 9h2v3h-2"></path></svg>
+        <span class="lbl" style="font-weight: 600">Rewrite parser</span>
+        <span class="dot" style="background: #5b9dff"></span>
+      </button>
+      <button class="fold" aria-expanded="false">
+        <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M9 6l6 6-6 6"></path></svg>1 shell
+      </button>
+
+      <button class="ws" aria-expanded="true">docs</button>
+      <button class="pane" aria-label="Update README, claude, done, not seen">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#d97757" stroke-width="2.4" stroke-linecap="round"><path d="M12 3v18M3 12h18M5.6 5.6l12.8 12.8M18.4 5.6L5.6 18.4"></path></svg>
+        <span class="lbl">Update README</span>
+        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#46c37b" stroke-width="3" stroke-linecap="round"><path d="M5 12l5 5 9-10"></path></svg>
+      </button>
+
+      <button class="ws" aria-expanded="true">ct-cli</button>
+      <button class="fold" aria-expanded="false">
+        <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M9 6l6 6-6 6"></path></svg>1 idle · 1 shell
+      </button>
+
+      <button class="ws" aria-expanded="true">xbit-engine</button>
+      <button class="pane" aria-label="Vault settlement, codex, working">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#a3a6b0" stroke-width="2"><path d="M12 3l8 4.5v9L12 21l-8-4.5v-9z"></path></svg>
+        <span class="lbl">Vault settlement</span>
+        <span class="dot" style="background: #5b9dff"></span>
+      </button>
+      <button class="pane" aria-label="cargo watch, shell" style="color: #a3a6b0">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#8f929d" stroke-width="2"><path d="M5 7l5 5-5 5M12 18h7"></path></svg>
+        <span class="lbl">cargo watch</span>
+      </button>
+
+      <button class="ws" aria-expanded="true">notes</button>
+      <button class="fold" aria-expanded="false">
+        <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M9 6l6 6-6 6"></path></svg>1 shell
+      </button>
+
+      <button class="ws" aria-expanded="true">infra</button>
+      <button class="fold" aria-expanded="false">
+        <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M9 6l6 6-6 6"></path></svg>1 idle
+      </button>
+    </div>
+  </aside>
+
+  <main style="flex: 1; min-width: 0; display: flex; flex-direction: column">
+    <div style="height: 46px; flex: none; display: flex; align-items: center; gap: 12px; padding: 0 12px 0 18px; box-sizing: border-box; background: #212226; border-bottom: 1px solid rgba(255,255,255,.07)">
+      <div style="flex: 1; min-width: 0; font-size: 13px; color: #8f929d; white-space: nowrap">local › ca › herdr-app › <span style="color: #e6e7eb; font-weight: 600">Rewrite parser</span></div>
+      <span style="display: inline-flex; align-items: center; gap: 6px; height: 24px; padding: 0 10px; border-radius: 999px; border: 1px solid rgba(91,157,255,.4); color: #5b9dff; font-size: 12px"><span class="dot" style="width: 7px; height: 7px; background: #5b9dff"></span>pi · working</span>
+      <div style="display: flex; padding: 2px; border-radius: 8px; background: #2a2b31; font-size: 12px">
+        <span style="padding: 4px 12px; color: #8f929d">Terminal</span>
+        <span style="padding: 4px 12px; border-radius: 6px; background: #3a3b42; color: #e6e7eb">Chat</span>
+      </div>
+    </div>
+    <div style="flex: 1; min-height: 0; display: flex; flex-direction: column; align-items: center; padding: 28px 24px 24px; gap: 14px; font-family: Helvetica, sans-serif">
+      <div style="width: 100%; max-width: 760px; display: flex; justify-content: flex-end">
+        <div style="max-width: 70%; padding: 10px 14px; border-radius: 14px; background: #2b2c48; border: 1px solid #3d3f6a; font-size: 14px; line-height: 1.5">Rewrite the parser so it streams instead of buffering the whole file.</div>
+      </div>
+      <div style="width: 100%; max-width: 760px; font-size: 14px; line-height: 1.6; color: #d9d9dd">Reading <span style="font-family: 'Source Code Pro', monospace; font-size: 12.5px; padding: 1px 5px; border-radius: 4px; background: #26272d">src/parser/mod.rs</span> and the call sites first.</div>
+      <div style="flex: 1"></div>
+      <div style="width: 100%; max-width: 760px; height: 92px; box-sizing: border-box; border: 1px solid #3a3b42; border-radius: 12px; background: #202125; padding: 12px 14px; color: #8f929d; font-size: 13px">Message the agent…</div>
+    </div>
+  </main>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1280,"height":800}}'>
+class Component extends DCLogic {
+  renderVals() {
+    return {};
+  }
+}
+</script>
+</body>
+</html>
