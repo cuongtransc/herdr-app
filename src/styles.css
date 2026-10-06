@@ -257,8 +257,11 @@ kbd {
 }
 
 /* All | Active above the session list; the footer says what Active leaves out. */
-.section-head .seg { flex: none; margin: 4px 0 0 8px; }
-.seg-sm button { height: 20px; padding: 0 9px; font-size: 11.5px; }
+/* All | Active in a section header: two text buttons at their own width, the chosen one filled. */
+.section-head .seg { flex: none; display: flex; gap: 2px; margin: var(--s-2) var(--s-2) 0 var(--s-4); padding: 0; border: 0; background: none; }
+.section-head .seg-thumb { display: none; }
+.seg-sm button { height: 20px; padding: 0 7px; border-radius: 5px; font-size: var(--fs-xs); }
+.section-head .seg button[aria-pressed="true"] { background: var(--active); color: var(--fg); font-weight: 600; }
 .filter-hidden {
   display: flex; align-items: center; gap: 8px; margin: 8px 0 0; padding: 7px 10px;
   border: 1px dashed var(--line-2); border-radius: var(--r-sm); color: var(--fg-3); font-size: 12px;
@@ -347,7 +350,11 @@ kbd {
 
 /* ---------- Machine tree ---------- */
 .tree, .children { list-style: none; margin: 0; padding: 0; }
-.children { padding-left: 14px; margin-left: 13px; border-left: 1px solid var(--line); }
+/* Each level's text starts under its parent's label: a section's rows under the header text
+   (8 padding + 12 chevron + 6 gap = 26, rows pad 8), a Group's children under the Group's name
+   (8 + 12 chevron + 8 + 14 folder + 8 = 50) with the guide under the chevron. */
+.section-list { padding-left: 18px; }
+.children { padding-left: 28px; margin-left: 13px; border-left: 1px solid var(--line); }
 .machine + .machine { margin-top: 6px; }
 
 .row {
@@ -388,11 +395,12 @@ kbd {
   font-size: var(--fs-xs); font-weight: 700; font-variant-numeric: tabular-nums;
 }
 /* The twin of the selected row in the other section (Bookmarks vs Sessions). */
-.row.current { background: var(--hover); }
-.group > .row .label { font-weight: 600; }
-.group-icon, .star-icon { color: var(--fg-3); }
+.row.current { background: none; color: var(--fg); }
+.group > .row { color: var(--fg-2); }
+.group > .row .label { font-weight: 500; }
+.group-icon, .star-icon { width: 14px; height: 14px; color: var(--fg-3); }
 .section-toggle {
-  display: flex; align-items: center; gap: 6px; width: 100%; padding: 6px 8px 2px; border: 0; background: none;
+  display: flex; align-items: center; gap: 6px; width: 100%; height: var(--row-xs); padding: 0 8px; margin-top: var(--s-2); border: 0; background: none;
   color: var(--fg-3); font-size: 11px; font-weight: 600; letter-spacing: .04em; text-transform: uppercase; cursor: pointer; text-align: left;
 }
 .session.stopped .row { color: var(--fg-3); }
@@ -455,9 +463,9 @@ kbd {
 /* ---------- Agents column rows (docs/design/ui-ux-guidelines.md §7.1) ---------- */
 .agent-cards { list-style: none; margin: 0; padding: 0 6px; display: flex; flex-direction: column; gap: 1px; }
 /* A multi-pane tab: indented under a hairline, no box. */
-.tab-group { margin: 0 0 0 10px; padding-left: 4px; border-left: 1px solid var(--line); }
+.tab-group { margin: 0; padding: 0; }
 .tab-group > .agent-cards { padding: 0; }
-.ws-head { display: flex; align-items: center; gap: var(--s-3); height: var(--row-xs); margin-top: var(--s-4); padding: 0 8px 0 10px; min-width: 0; }
+.ws-head { display: flex; align-items: center; gap: var(--s-3); height: var(--row-xs); margin-top: var(--s-4); padding: 0 12px 0 16px; min-width: 0; }
 .ws-label {
   flex: 0 1 auto; min-width: 0; max-width: 70%; padding: 0; border: 0; background: none; cursor: pointer; text-align: left;
   color: var(--fg-2); font-size: var(--fs-s); font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
