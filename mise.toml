@@ -56,6 +56,17 @@ description = "Build the release bundle and install it into /Applications"
 depends = ["build"]
 run = ["rm -rf /Applications/Herdr.app", "ditto $APP /Applications/Herdr.app"]
 
+# Call it `mise run fmt`: bare `mise fmt` is mise's own mise.toml formatter.
+[tasks.fmt]
+description = "Format the backend in place"
+dir = "src-tauri"
+run = "cargo fmt"
+
+[tasks."fmt:check"]
+description = "Fail when the backend is not formatted"
+dir = "src-tauri"
+run = "cargo fmt --check"
+
 [tasks.typecheck]
 description = "Type-check the frontend"
 run = "pnpm typecheck"
@@ -87,8 +98,8 @@ run = "cargo test -- --ignored --test-threads=1"
 
 # Read-only, runs on pre-commit (.githooks/pre-commit).
 [tasks.ci]
-description = "The gate: typecheck, lint and test, run before claiming done"
-depends = ["typecheck", "lint", "test"]
+description = "The gate: format, typecheck, lint and test must pass"
+depends = ["fmt:check", "typecheck", "lint", "test"]
 run = "echo 'ci passed'"
 
 # Regenerates src-tauri/icons from one square source image. Only needed when the
