@@ -9,6 +9,8 @@ import { applyChatFont, useSettings } from "./settings/store";
 import { applyTheme, useTheme } from "./settings/theme";
 import { Header } from "./main/Header";
 import { LayoutControls } from "./main/LayoutControls";
+import { TriageHud } from "./main/TriageHud";
+import { useTriage } from "./main/triage";
 import { useLayout } from "./settings/layout";
 import { Sidebar } from "./sidebar/Sidebar";
 import { guardFileDrops } from "./sidebar/dnd";
@@ -153,6 +155,10 @@ export default function App() {
         e.preventDefault();
         setPaletteOpen((o) => !o);
       }
+      if (e.metaKey && !e.altKey && !e.ctrlKey && e.key.toLowerCase() === "j") {
+        e.preventDefault();
+        if (!e.repeat) useTriage.getState().step(e.shiftKey ? -1 : 1);
+      }
       if (e.metaKey && !e.altKey && !e.ctrlKey && e.key.toLowerCase() === "b") {
         e.preventDefault();
         if (!e.repeat) useLayout.getState().toggle(e.shiftKey ? "focus" : "sidebar");
@@ -222,6 +228,7 @@ export default function App() {
         )}
       </main>
       {dashboardOpen && <AgentDashboard />}
+      <TriageHud />
       <Toasts />
       {paletteOpen && <Palette onClose={() => setPaletteOpen(false)} />}
     </div>

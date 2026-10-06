@@ -1,0 +1,42 @@
+import { describe, expect, it } from "vitest";
+import type { MachineView, PaneView, SessionView } from "../lib/types";
+import { filterResolved, isActiveSession } from "./activeFilter";
+import type { RNode, RSession } from "./groups";
+
+const pane = (id: string, status: PaneView["status"], agent: string | null = "claude"): PaneView => ({
+  pane_id: id, terminal_id: "t" + id, title: id, cwd: "/x", agent, status,
+});
+const session = (name: string, panes: PaneView[], running = true): SessionView => ({
+  name, running, status: "idle", error: null,
+  workspaces: [{ workspace_id: "w1", label: "ws", number: 1, status: "idle", tabs: [{ tab_id: "w1:t1", label: "1", number: 1, status: "idle", panes }] }],
+});
+const machine = { id: "m", label: "m", kind: "local", state: "connected", error: null, version: "0.9.3", status: "idle", sessions: [] } as MachineView;
+
+describe("isActiveSession", () => {
+  it("keeps a running session with an agent waiting, working, or Done and unseen", () => {
+    expect(isActiveSession(machine, session("a", [pane("p", "blocked")]), {})).toBe(true);
+    expect(isActiveSession(machine, session("a", [pane("p", "working")]), {})).toBe(true);
+    expect(isActiveSession(machine, session("a", [pane("p", "done")]), {})).toBe(true);
+  });
+  it("drops idle, seen-Done, shell-only and stopped sessions", () => {
+    expect(isActiveSession(machine, session("a", [pane("p", "idle")]), {})).toBe(false);
+    expect(isActiveSession(machine, session("a", [pane("p", "done")]), { "m/a/p": true })).toBe(false);
+    expect(isActiveSession(machine, session("a", [pane("p", "blocked", null)]), {})).toBe(false);
+    expect(isActiveSession(machine, session("a", [pane("p", "working")], false), {})).toBe(false);
+    expect(isActiveSession({ ...machine, state: "error" }, session("a", [pane("p", "working")]), {})).toBe(false);
+  });
+});
+
+describe("filterResolved", () => {
+  const s = (key: string): RSession => ({ kind: "session", key, machine, session: session(key, []) });
+  const tree: RNode[] = [
+    { kind: "group", id: "g", label: "G", children: [s("a"), { kind: "group", id: "e", label: "E", children: [s("b")] }] },
+    s("c"),
+  ];
+  it("keeps the order, hides emptied groups and counts the hidden sessions", () => {
+    const r = filterResolved({ tree, bookmarks: [s("b"), s("a")] }, (s) => s.key === "a");
+    expect(r.tree).toEqual([{ kind: "group", id: "g", label: "G", children: [s("a")] }]);
+    expect(r.bookmarks.map((b) => b.key)).toEqual(["a"]);
+    expect(r.hidden).toBe(2);
+  });
+});

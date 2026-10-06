@@ -239,6 +239,18 @@ kbd {
   font-size: 11px; font-weight: 600; letter-spacing: 0.04em; text-transform: uppercase;
 }
 
+/* All | Active above the session list; the footer says what Active leaves out. */
+.session-filter { display: flex; align-items: center; gap: 8px; padding: 2px 0 6px; }
+.session-filter .section-label { flex: 1; padding: 0 8px; }
+.seg-sm button { height: 20px; padding: 0 9px; font-size: 11.5px; }
+.filter-hidden {
+  display: flex; align-items: center; gap: 8px; margin: 8px 0 0; padding: 7px 10px;
+  border: 1px dashed var(--line-2); border-radius: var(--r-sm); color: var(--fg-3); font-size: 12px;
+}
+.filter-hidden span { flex: 1; }
+.link-btn { padding: 0; border: 0; background: none; color: var(--accent); font-size: 12px; cursor: pointer; }
+.link-btn:hover { text-decoration: underline; }
+
 /* ---------- Layout: ⌘B hides the sidebar, ⇧⌘B the Agents column too ---------- */
 .sidebar[hidden], .agents[hidden] { display: none; }
 /* Beside the traffic lights in every layout; above the dashboard. */
@@ -256,10 +268,37 @@ kbd {
 }
 .waiting-pill:hover { background: color-mix(in srgb, var(--amber) 24%, transparent); }
 .waiting-pill .dot { width: 7px; height: 7px; border-radius: 50%; background: var(--amber); }
+/* ⌘J: the queue of agents that need you, shown for a moment after each step. */
+.triage-hud {
+  position: fixed; top: calc(var(--titlebar) + 14px); left: 0; right: 0; margin: 0 auto; z-index: 20; width: 460px; max-width: calc(100vw - 32px);
+  box-sizing: border-box; padding: 10px; display: flex; flex-direction: column; gap: 2px;
+  border: 1px solid var(--line-2); border-radius: 14px; background: var(--surface-3); box-shadow: var(--shadow-panel), 0 18px 48px rgba(0, 0, 0, 0.35);
+  animation: fade-up var(--t) var(--ease); pointer-events: none;
+}
+.triage-head { display: flex; gap: 8px; padding: 2px 6px 6px; color: var(--fg-3); font-size: 11px; font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase; }
+.triage-head > :first-child { flex: 1; }
+.triage-scope { text-transform: none; letter-spacing: 0; font-weight: 500; }
+.triage-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 1px; max-height: 50vh; overflow: hidden; }
+.triage-list li { display: flex; align-items: center; gap: 10px; padding: 7px 10px; border-radius: 8px; }
+.triage-list li.current { background: color-mix(in srgb, var(--amber) 14%, transparent); }
+.triage-list li.done.current { background: color-mix(in srgb, var(--green) 14%, transparent); }
+.triage-list .dot { flex: none; width: 8px; height: 8px; border-radius: 50%; background: var(--amber); }
+.triage-list li.done .dot { background: var(--green); }
+.triage-text { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+.triage-title { font-size: 13px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.triage-list li.current .triage-title { font-weight: 600; }
+.triage-where { font-size: 11.5px; color: var(--fg-3); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.triage-badge { flex: none; font-size: 10.5px; font-weight: 700; color: var(--amber); }
+.triage-list li.done .triage-badge { color: var(--green); }
+.triage-keys { display: flex; gap: 14px; align-items: center; margin-top: 4px; padding: 8px 6px 2px; border-top: 1px solid var(--line); color: var(--fg-3); font-size: 11.5px; }
+.triage-keys .grow { flex: 1; }
+.triage-keys kbd { margin-right: 2px; }
+.triage-hud:not(:has(.triage-list)) .triage-keys { display: none; }
+
 /* The first column left takes the traffic lights and the controls. */
 .app[data-layout="sidebar-hidden"] .agents-head { padding-left: 116px; }
 .app[data-layout="focus"] .header { padding-left: 116px; }
-.app[data-layout="focus"]:has(.waiting-pill) .header { padding-left: 210px; }
+.app[data-layout="focus"]:has(.waiting-pill) .header { padding-left: 270px; }
 .app:not([data-layout="normal"]) .dashboard { left: 0; }
 .app[data-layout="focus"] .dashboard { box-shadow: none; }
 .app:not([data-layout="normal"]) .dash-head { padding-left: 116px; }

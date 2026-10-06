@@ -1,0 +1,92 @@
+import { useMemo } from "react";
+import { create } from "zustand";
+import { paneKey } from "../lib/types";
+import type { MachineView, SessionView } from "../lib/types";
+import { useApp } from "../store/app";
+import { resolve, sessionKey, useLayout } from "./groups";
+import type { RNode, RSession } from "./groups";
+
+/** Shared with the other settings writers: one JSON object, each writer merges its own keys. */
+const SETTINGS_KEY = "herdr-app:settings";
+
+export type SessionFilter = "all" | "active";
+
+function readRaw(): Record<string, unknown> {
+  try {
+    const raw = localStorage.getItem(SETTINGS_KEY);
+    const p = raw ? (JSON.parse(raw) as unknown) : null;
+    return p && typeof p === "object" ? (p as Record<string, unknown>) : {};
+  } catch {
+    return {};
+  }
+}
+
+function save(patch: Record<string, unknown>): void {
+  try {
+    localStorage.setItem(SETTINGS_KEY, JSON.stringify({ ...readRaw(), ...patch }));
+  } catch {
+    /* ignore */
+  }
+}
+
+export const useSessionFilter = create<{ filter: SessionFilter; setFilter: (f: SessionFilter) => void }>((set) => ({
+  filter: readRaw().sessionFilter === "active" ? "active" : "all",
+  setFilter: (filter) => {
+    save({ sessionFilter: filter });
+    set({ filter });
+  },
+}));
+
+/** A running session on a connected machine with an agent waiting, working, or Done and not yet seen. */
+export function isActiveSession(machine: MachineView, session: SessionView, doneSeen: Record<string, true>): boolean {
+  if (machine.state !== "connected" || !session.running) return false;
+  return session.workspaces.some((w) =>
+    w.tabs.some((t) =>
+      t.panes.some((p) => {
+        if (!p.agent) return false;
+        if (p.status === "blocked" || p.status === "working") return true;
+        return p.status === "done" && !doneSeen[paneKey({ machine_id: machine.id, session: session.name, pane_id: p.pane_id })];
+      }),
+    ),
+  );
+}
+
+/** The resolved sidebar with only the sessions `keep` accepts: order kept, emptied groups dropped. */
+export function filterResolved(
+  r: { tree: RNode[]; bookmarks: RSession[] },
+  keep: (s: RSession) => boolean,
+): { tree: RNode[]; bookmarks: RSession[]; hidden: number; kept: number } {
+  let hidden = 0;
+  let kept = 0;
+  const walk = (nodes: RNode[]): RNode[] =>
+    nodes.flatMap((n): RNode[] => {
+      if (n.kind === "session") {
+        if (keep(n)) {
+          kept++;
+          return [n];
+        }
+        hidden++;
+        return [];
+      }
+      const children = walk(n.children);
+      return children.length ? [{ ...n, children }] : [];
+    });
+  const tree = walk(r.tree);
+  return { tree, bookmarks: r.bookmarks.filter(keep), hidden, kept };
+}
+
+/** The sidebar's sessions under the current filter, and how many Active leaves out. */
+export function useSidebarSessions(): { tree: RNode[]; bookmarks: RSession[]; hidden: number; kept: number; active: boolean } {
+  const machines = useApp((s) => s.machines);
+  const order = useApp((s) => s.order);
+  const doneSeen = useApp((s) => s.doneSeen);
+  // A key, not the ref: select() replaces `viewed` with an equal object, which must not re-render the sidebar.
+  const viewedKey = useApp((s) => (s.viewed ? sessionKey(s.viewed.machine_id, s.viewed.session) : null));
+  const layout = useLayout((s) => s.layout);
+  const filter = useSessionFilter((s) => s.filter);
+  return useMemo(() => {
+    const r = resolve(layout, machines, order);
+    const f = filterResolved(r, (s) => s.key === viewedKey || isActiveSession(s.machine, s.session, doneSeen));
+    return filter === "active" ? { ...f, active: true } : { ...f, tree: r.tree, bookmarks: r.bookmarks, active: false };
+  }, [layout, machines, order, doneSeen, viewedKey, filter]);
+}
