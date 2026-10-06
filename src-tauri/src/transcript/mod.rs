@@ -504,23 +504,49 @@ mod tests {
     struct Echo;
     impl Parser for Echo {
         fn push_line(&mut self, line: &str, _: &mut dyn ImageSink) -> ParserOutput {
-            let item = ChatItem::User { ts: None, text: line.into(), images: vec![], skills: vec![] };
-            if line == "RESET" { ParserOutput::Reset(vec![item]) } else { ParserOutput::Append(vec![item]) }
+            let item = ChatItem::User {
+                ts: None,
+                text: line.into(),
+                images: vec![],
+                skills: vec![],
+            };
+            if line == "RESET" {
+                ParserOutput::Reset(vec![item])
+            } else {
+                ParserOutput::Append(vec![item])
+            }
         }
     }
     fn pane(id: &str) -> PaneRef {
-        PaneRef { machine_id: "a".into(), session: "default".into(), pane_id: id.into() }
+        PaneRef {
+            machine_id: "a".into(),
+            session: "default".into(),
+            pane_id: id.into(),
+        }
     }
     fn recorder() -> (Sink, Arc<std::sync::Mutex<Vec<ChatEvent>>>) {
         let got: Arc<std::sync::Mutex<Vec<ChatEvent>>> = Arc::default();
         let g = got.clone();
         (Arc::new(move |e| g.lock().unwrap().push(e)), got)
     }
-    fn open(chats: &ChatManager, p: &PaneRef, path: &std::path::Path) -> Arc<std::sync::Mutex<Vec<ChatEvent>>> {
+    fn open(
+        chats: &ChatManager,
+        p: &PaneRef,
+        path: &std::path::Path,
+    ) -> Arc<std::sync::Mutex<Vec<ChatEvent>>> {
         let (sink, got) = recorder();
         let path: String = path.to_string_lossy().into();
         if !chats.reattach(p, &path, sink.clone()) {
-            chats.insert(p.clone(), path.clone(), spawn_tail(Arc::new(crate::transport::local::LocalTransport), path, Box::new(Echo), sink));
+            chats.insert(
+                p.clone(),
+                path.clone(),
+                spawn_tail(
+                    Arc::new(crate::transport::local::LocalTransport),
+                    path,
+                    Box::new(Echo),
+                    sink,
+                ),
+            );
         }
         got
     }
@@ -534,17 +560,40 @@ mod tests {
         let first = open(&chats, &pane("p1"), &f);
         tokio::time::sleep(std::time::Duration::from_millis(400)).await;
         chats.close(&pane("p1"));
-        assert!(chats.page(&pane("p1"), 2, 10).is_none(), "a parked tail is not open");
+        assert!(
+            chats.page(&pane("p1"), 2, 10).is_none(),
+            "a parked tail is not open"
+        );
         use std::io::Write;
         // A pi-style branch switch while parked.
-        std::fs::OpenOptions::new().append(true).open(&f).unwrap().write_all(b"RESET\n").unwrap();
+        std::fs::OpenOptions::new()
+            .append(true)
+            .open(&f)
+            .unwrap()
+            .write_all(b"RESET\n")
+            .unwrap();
         tokio::time::sleep(std::time::Duration::from_millis(300)).await;
         let second = open(&chats, &pane("p1"), &f);
         tokio::time::sleep(std::time::Duration::from_millis(200)).await;
         let ev = second.lock().unwrap();
-        assert!(matches!(&ev[0], ChatEvent::Reset { items, total: 1 } if items.len() == 1), "{ev:?}");
-        assert_eq!(ev.iter().filter(|e| matches!(e, ChatEvent::Reset { .. })).count(), 1);
-        assert!(!first.lock().unwrap().iter().any(|e| matches!(e, ChatEvent::Reset { total: 1, .. })), "the closed lens got events");
+        assert!(
+            matches!(&ev[0], ChatEvent::Reset { items, total: 1 } if items.len() == 1),
+            "{ev:?}"
+        );
+        assert_eq!(
+            ev.iter()
+                .filter(|e| matches!(e, ChatEvent::Reset { .. }))
+                .count(),
+            1
+        );
+        assert!(
+            !first
+                .lock()
+                .unwrap()
+                .iter()
+                .any(|e| matches!(e, ChatEvent::Reset { total: 1, .. })),
+            "the closed lens got events"
+        );
     }
 
     #[tokio::test]
@@ -559,7 +608,13 @@ mod tests {
         let again = open(&chats, &pane("p1"), &f);
         tokio::time::sleep(std::time::Duration::from_millis(200)).await;
         let ev = again.lock().unwrap();
-        assert_eq!(ev.iter().filter(|e| matches!(e, ChatEvent::Reset { total: 1, .. })).count(), 1, "{ev:?}");
+        assert_eq!(
+            ev.iter()
+                .filter(|e| matches!(e, ChatEvent::Reset { total: 1, .. }))
+                .count(),
+            1,
+            "{ev:?}"
+        );
     }
 
     #[tokio::test]
@@ -573,7 +628,13 @@ mod tests {
         let again = open(&chats, &pane("p1"), &f);
         tokio::time::sleep(std::time::Duration::from_millis(500)).await;
         let ev = again.lock().unwrap();
-        assert_eq!(ev.iter().filter(|e| matches!(e, ChatEvent::Reset { .. })).count(), 1, "{ev:?}");
+        assert_eq!(
+            ev.iter()
+                .filter(|e| matches!(e, ChatEvent::Reset { .. }))
+                .count(),
+            1,
+            "{ev:?}"
+        );
     }
 
     #[tokio::test]
@@ -589,8 +650,14 @@ mod tests {
             chats.close(&pane(id));
         }
         let (sink, _) = recorder();
-        assert!(!chats.reattach(&pane("p1"), &f.to_string_lossy(), sink.clone()), "p1 should have been dropped");
-        assert!(!chats.reattach(&pane("p4"), &g.to_string_lossy(), sink.clone()), "another path must not reattach");
+        assert!(
+            !chats.reattach(&pane("p1"), &f.to_string_lossy(), sink.clone()),
+            "p1 should have been dropped"
+        );
+        assert!(
+            !chats.reattach(&pane("p4"), &g.to_string_lossy(), sink.clone()),
+            "another path must not reattach"
+        );
         assert!(chats.reattach(&pane("p3"), &f.to_string_lossy(), sink));
     }
 
@@ -599,13 +666,29 @@ mod tests {
         struct Gone;
         #[async_trait::async_trait]
         impl crate::transport::Transport for Gone {
-            fn wrap(&self, _: &[String], _: bool) -> Vec<String> { vec!["true".into()] }
-            async fn local_socket(&self, _: &crate::transport::SessionEntry) -> crate::error::AppResult<std::path::PathBuf> { unreachable!() }
-            async fn release_socket(&self, _: &crate::transport::SessionEntry) -> crate::error::AppResult<()> { unreachable!() }
+            fn wrap(&self, _: &[String], _: bool) -> Vec<String> {
+                vec!["true".into()]
+            }
+            async fn local_socket(
+                &self,
+                _: &crate::transport::SessionEntry,
+            ) -> crate::error::AppResult<std::path::PathBuf> {
+                unreachable!()
+            }
+            async fn release_socket(
+                &self,
+                _: &crate::transport::SessionEntry,
+            ) -> crate::error::AppResult<()> {
+                unreachable!()
+            }
         }
         let chats = ChatManager::default();
         let (sink, _) = recorder();
-        chats.insert(pane("p1"), "/x".into(), spawn_tail(Arc::new(Gone), "/x".into(), Box::new(Echo), sink.clone()));
+        chats.insert(
+            pane("p1"),
+            "/x".into(),
+            spawn_tail(Arc::new(Gone), "/x".into(), Box::new(Echo), sink.clone()),
+        );
         chats.close(&pane("p1"));
         tokio::time::sleep(std::time::Duration::from_millis(300)).await;
         assert!(!chats.reattach(&pane("p1"), "/x", sink));
@@ -626,7 +709,14 @@ mod tests {
 
     fn located(path: &std::path::Path, pending: bool) -> Located {
         let path: String = path.to_string_lossy().into();
-        Located { agent: "claude".into(), candidates: vec![path.clone()], path, ambiguous: false, pending, cached: false }
+        Located {
+            agent: "claude".into(),
+            candidates: vec![path.clone()],
+            path,
+            ambiguous: false,
+            pending,
+            cached: false,
+        }
     }
 
     #[tokio::test]
@@ -640,13 +730,27 @@ mod tests {
         tokio::time::sleep(std::time::Duration::from_millis(400)).await;
         chats.close(&pane("p1"));
         let (sink, got) = recorder();
-        assert_eq!(chats.reattach_cached(&pane("p1"), None, sink), Some(located(&f, false)));
+        assert_eq!(
+            chats.reattach_cached(&pane("p1"), None, sink),
+            Some(located(&f, false))
+        );
         tokio::time::sleep(std::time::Duration::from_millis(200)).await;
-        assert!(matches!(&got.lock().unwrap()[0], ChatEvent::Reset { total: 2, .. }));
-        assert!(chats.page(&pane("p1"), 2, 10).is_some(), "reopened, not parked");
+        assert!(matches!(
+            &got.lock().unwrap()[0],
+            ChatEvent::Reset { total: 2, .. }
+        ));
+        assert!(
+            chats.page(&pane("p1"), 2, 10).is_some(),
+            "reopened, not parked"
+        );
         let (sink, _) = recorder();
         let same = f.to_string_lossy();
-        assert!(chats.reattach_cached(&pane("p1"), Some(&same), sink).is_some(), "the chosen path is the tailed one");
+        assert!(
+            chats
+                .reattach_cached(&pane("p1"), Some(&same), sink)
+                .is_some(),
+            "the chosen path is the tailed one"
+        );
     }
 
     #[tokio::test]
@@ -657,15 +761,37 @@ mod tests {
         let chats = ChatManager::default();
         let (sink, _) = recorder();
         open(&chats, &pane("p1"), &f);
-        assert_eq!(chats.reattach_cached(&pane("p1"), None, sink.clone()), None, "never located");
+        assert_eq!(
+            chats.reattach_cached(&pane("p1"), None, sink.clone()),
+            None,
+            "never located"
+        );
         chats.set_located(&pane("p1"), &located(&f, true));
-        assert_eq!(chats.reattach_cached(&pane("p1"), None, sink.clone()), None, "pending: Claude may write elsewhere");
+        assert_eq!(
+            chats.reattach_cached(&pane("p1"), None, sink.clone()),
+            None,
+            "pending: Claude may write elsewhere"
+        );
         chats.set_located(&pane("p1"), &located(&d.path().join("u.jsonl"), false));
-        assert_eq!(chats.reattach_cached(&pane("p1"), None, sink.clone()), None, "a location for another path is ignored");
+        assert_eq!(
+            chats.reattach_cached(&pane("p1"), None, sink.clone()),
+            None,
+            "a location for another path is ignored"
+        );
         chats.set_located(&pane("p1"), &located(&f, false));
-        assert_eq!(chats.reattach_cached(&pane("p1"), Some("/other.jsonl"), sink.clone()), None, "the user chose another file");
-        assert!(chats.page(&pane("p1"), 1, 10).is_some(), "a miss leaves the tail be");
-        assert!(chats.reattach_cached(&pane("p2"), None, sink).is_none(), "no tail for that pane");
+        assert_eq!(
+            chats.reattach_cached(&pane("p1"), Some("/other.jsonl"), sink.clone()),
+            None,
+            "the user chose another file"
+        );
+        assert!(
+            chats.page(&pane("p1"), 1, 10).is_some(),
+            "a miss leaves the tail be"
+        );
+        assert!(
+            chats.reattach_cached(&pane("p2"), None, sink).is_none(),
+            "no tail for that pane"
+        );
     }
 
     #[tokio::test]
@@ -673,14 +799,30 @@ mod tests {
         struct Gone;
         #[async_trait::async_trait]
         impl crate::transport::Transport for Gone {
-            fn wrap(&self, _: &[String], _: bool) -> Vec<String> { vec!["true".into()] }
-            async fn local_socket(&self, _: &crate::transport::SessionEntry) -> crate::error::AppResult<std::path::PathBuf> { unreachable!() }
-            async fn release_socket(&self, _: &crate::transport::SessionEntry) -> crate::error::AppResult<()> { unreachable!() }
+            fn wrap(&self, _: &[String], _: bool) -> Vec<String> {
+                vec!["true".into()]
+            }
+            async fn local_socket(
+                &self,
+                _: &crate::transport::SessionEntry,
+            ) -> crate::error::AppResult<std::path::PathBuf> {
+                unreachable!()
+            }
+            async fn release_socket(
+                &self,
+                _: &crate::transport::SessionEntry,
+            ) -> crate::error::AppResult<()> {
+                unreachable!()
+            }
         }
         let chats = ChatManager::default();
         let (sink, _) = recorder();
         let f = std::path::Path::new("/x");
-        chats.insert(pane("p1"), "/x".into(), spawn_tail(Arc::new(Gone), "/x".into(), Box::new(Echo), sink.clone()));
+        chats.insert(
+            pane("p1"),
+            "/x".into(),
+            spawn_tail(Arc::new(Gone), "/x".into(), Box::new(Echo), sink.clone()),
+        );
         chats.set_located(&pane("p1"), &located(f, false));
         chats.close(&pane("p1"));
         tokio::time::sleep(std::time::Duration::from_millis(300)).await;
@@ -690,8 +832,15 @@ mod tests {
     #[test]
     fn serializes_cached_only_when_set() {
         let f = std::path::Path::new("/x");
-        assert!(serde_json::to_value(located(f, false)).unwrap().get("cached").is_none());
-        let v = serde_json::to_value(Located { cached: true, ..located(f, false) }).unwrap();
+        assert!(serde_json::to_value(located(f, false))
+            .unwrap()
+            .get("cached")
+            .is_none());
+        let v = serde_json::to_value(Located {
+            cached: true,
+            ..located(f, false)
+        })
+        .unwrap();
         assert_eq!(v["cached"], true);
     }
 

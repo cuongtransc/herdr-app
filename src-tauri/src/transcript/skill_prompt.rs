@@ -171,13 +171,22 @@ mod tests {
         assert_eq!(parse_skill_prompt(&unclosed), None);
         let chained_nobody = block("a", "/a/SKILL.md").replace("\n# a\nbody", "");
         assert_eq!(parse_skill_prompt(&chained_nobody), None);
-        assert_eq!(parse_skill_prompt("<skill name=\"x\" location=\"/p\">\n</skill>"), None);
+        assert_eq!(
+            parse_skill_prompt("<skill name=\"x\" location=\"/p\">\n</skill>"),
+            None
+        );
     }
     #[test]
     fn empty_body_with_blank_line_is_accepted() {
         let chained = block("a", "/a/SKILL.md").replace("# a\nbody", "");
-        assert_eq!(parse_skill_prompt(&chained), Some((vec![s("a", "/a/SKILL.md")], "".into())));
+        assert_eq!(
+            parse_skill_prompt(&chained),
+            Some((vec![s("a", "/a/SKILL.md")], "".into()))
+        );
         let legacy = "<skill name=\"x\" location=\"/p\">\n\n</skill>";
-        assert_eq!(parse_skill_prompt(legacy), Some((vec![s("x", "/p")], "".into())));
+        assert_eq!(
+            parse_skill_prompt(legacy),
+            Some((vec![s("x", "/p")], "".into()))
+        );
     }
 }

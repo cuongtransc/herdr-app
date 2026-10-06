@@ -96,7 +96,12 @@ mod mac {
     /// The default center, or `None` for an unbundled binary (`tauri dev`, `cargo test`): there
     /// it returns nil, which the generated binding treats as a bug and panics on.
     fn center() -> Option<Retained<NSUserNotificationCenter>> {
-        unsafe { msg_send![NSUserNotificationCenter::class(), defaultUserNotificationCenter] }
+        unsafe {
+            msg_send![
+                NSUserNotificationCenter::class(),
+                defaultUserNotificationCenter
+            ]
+        }
     }
 
     /// Install the delegate. Must run on the main thread, before the first notification.
