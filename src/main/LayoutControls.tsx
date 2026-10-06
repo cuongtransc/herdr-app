@@ -1,4 +1,4 @@
-import { memo } from "react";
+import { memo, useLayoutEffect, useRef } from "react";
 import { triageQueue } from "../dashboard/triage";
 import { useLayout } from "../settings/layout";
 import { useApp } from "../store/app";
@@ -19,8 +19,19 @@ export const LayoutControls = memo(function LayoutControls() {
   const [waiting, done] = counts.split(":").map(Number);
   const step = useTriage((s) => s.step);
   const shown = layout === "normal";
+  // The first column's titlebar content starts past the traffic lights (78 px) and these controls,
+  // whose width changes with the pill: published to the container as --lead.
+  const ref = useRef<HTMLDivElement>(null);
+  useLayoutEffect(() => {
+    const el = ref.current;
+    const host = el?.parentElement;
+    if (!el || !host || typeof ResizeObserver === "undefined") return;
+    const ro = new ResizeObserver(([e]) => host.style.setProperty("--lead", `${78 + Math.ceil(e.contentRect.width) + 10}px`));
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, []);
   return (
-    <div className="layout-controls">
+    <div className="layout-controls" ref={ref}>
       <button
         type="button"
         className="icon-btn"
