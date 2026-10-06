@@ -2,10 +2,10 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { AgentIcon } from "../agents/AgentIcon";
 import { StatusDot } from "../sidebar/StatusDot";
 import { useApp } from "../store/app";
-import { CloseIcon, DashboardIcon, FilterIcon, FolderIcon, LaptopIcon, SearchIcon, ServerIcon } from "../ui/icons";
+import { CloseIcon, FilterIcon, FolderIcon, LaptopIcon, SearchIcon, ServerIcon } from "../ui/icons";
 import { QuotaColumn } from "./QuotaColumn";
-import { BUCKETS, bucketCounts, dashboardCards, matchesQuery } from "./buckets";
-import type { Bucket, DashCard } from "./buckets";
+import { BUCKETS, dashboardCards, matchesQuery } from "./buckets";
+import type { DashCard } from "./buckets";
 
 function useCards(): DashCard[] {
   const machines = useApp((s) => s.machines);
@@ -15,36 +15,6 @@ function useCards(): DashCard[] {
   return useMemo(() => dashboardCards(machines, order, doneSeen, since), [machines, order, doneSeen, since]);
 }
 
-const ENTRY_BADGES: { id: Exclude<Bucket, "idle">; label: string }[] = [
-  { id: "attention", label: "need you" },
-  { id: "working", label: "working" },
-  { id: "done", label: "done" },
-];
-
-/** The sidebar row that toggles the dashboard, with a count per non-empty column. */
-export function DashboardEntry() {
-  const open = useApp((s) => s.dashboardOpen);
-  const setOpen = useApp((s) => s.setDashboardOpen);
-  const counts = bucketCounts(useCards());
-  // Blocked outranks Done: the row takes one highlight, the more urgent one.
-  const alert = counts.attention > 0 ? " needs-you" : counts.done > 0 ? " has-done" : "";
-  return (
-    <button
-      className={"row dash-entry" + (open ? " active" : "") + alert}
-      aria-pressed={open} onClick={() => setOpen(!open)}>
-      <DashboardIcon className="icon machine-icon" />
-      <span className="label">Agent Dashboard</span>
-      <span className="dash-entry-counts">
-        {ENTRY_BADGES.filter((b) => counts[b.id] > 0).map((b) => (
-          <span key={b.id} className={"dash-count dash-count-" + b.id} aria-label={`${counts[b.id]} ${b.label}`}>
-            <i aria-hidden="true" />
-            {counts[b.id]}
-          </span>
-        ))}
-      </span>
-    </button>
-  );
-}
 
 function Card({ card, onOpen }: { card: DashCard; onOpen: (c: DashCard) => void }) {
   const ssh = card.machine.kind === "ssh";

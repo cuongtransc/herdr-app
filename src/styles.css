@@ -248,7 +248,8 @@ kbd {
 .sidebar-scroll { flex: 1; min-height: 0; overflow-y: auto; padding: 0 8px 8px; display: flex; flex-direction: column; }
 .sidebar-scroll > * { flex-shrink: 0; }
 /* Groups fill the gap so right-clicking anywhere above Machines offers "New group"; Machines sit at the bottom. */
-.sidebar-scroll > .groups-section { flex: 1 0 auto; display: flex; flex-direction: column; }
+.sidebar-scroll > .sessions-section { flex: 1 0 auto; display: flex; flex-direction: column; }
+.sessions-section > .groups-section { flex: 1 0 auto; display: flex; flex-direction: column; }
 .groups-section > .tree-end { flex: 1 0 24px; }
 .section-label {
   padding: 6px 8px 6px; color: var(--fg-3);
@@ -256,8 +257,7 @@ kbd {
 }
 
 /* All | Active above the session list; the footer says what Active leaves out. */
-.session-filter { display: flex; align-items: center; gap: 8px; padding: 2px 0 6px; }
-.session-filter .section-label { flex: 1; padding: 0 8px; }
+.section-head .seg { flex: none; margin: 4px 0 0 8px; }
 .seg-sm button { height: 20px; padding: 0 9px; font-size: 11.5px; }
 .filter-hidden {
   display: flex; align-items: center; gap: 8px; margin: 8px 0 0; padding: 7px 10px;
@@ -276,6 +276,12 @@ kbd {
 }
 /* A disclosure, not a menu: no pressed look while the sidebar shows. */
 .layout-controls .icon-btn[aria-expanded="true"]:not(:hover) { background: none; color: var(--fg-2); }
+.board-btn {
+  display: inline-flex; align-items: center; gap: 6px; height: 28px; padding: 0 8px 0 7px; border: 0; border-radius: var(--r-sm);
+  background: none; color: var(--fg-2); font-size: var(--fs-m); font-weight: 500; cursor: pointer; transition: background var(--t-fast), color var(--t-fast);
+}
+.board-btn:hover { background: var(--hover); color: var(--fg); }
+.board-btn[aria-pressed="true"] { background: var(--active); color: var(--fg); }
 .waiting-pill {
   display: inline-flex; align-items: center; gap: 6px; height: 24px; padding: 0 10px; box-sizing: border-box;
   border: 0; border-radius: 999px; cursor: pointer; font-size: 12px; font-weight: 600;
@@ -372,13 +378,23 @@ kbd {
   padding: 1px 7px; border-radius: 999px; background: var(--hover); color: var(--fg-3); font-size: 11px;
 }
 .row.active .badge { background: var(--surface-0); }
+/* A Session row: name, then (right) the bookmark star in its Group, a remote Machine's name, the needs-you count. */
+.session .row .label { flex: 1; }
+.machine-chip { flex: none; color: var(--fg-3); font-size: var(--fs-xs); }
+.bookmark-mark { width: 11px; height: 11px; color: var(--fg-3); }
+.need {
+  flex: none; min-width: 16px; height: 16px; padding: 0 5px; box-sizing: border-box; display: grid; place-items: center;
+  border-radius: 999px; background: color-mix(in srgb, var(--amber) 14%, transparent); color: var(--amber-text);
+  font-size: var(--fs-xs); font-weight: 700; font-variant-numeric: tabular-nums;
+}
+/* The twin of the selected row in the other section (Bookmarks vs Sessions). */
+.row.current { background: var(--hover); }
 .group > .row .label { font-weight: 600; }
 .group-icon, .star-icon { color: var(--fg-3); }
 .section-toggle {
   display: flex; align-items: center; gap: 6px; width: 100%; padding: 6px 8px 2px; border: 0; background: none;
   color: var(--fg-3); font-size: 11px; font-weight: 600; letter-spacing: .04em; text-transform: uppercase; cursor: pointer; text-align: left;
 }
-.section-toggle .star-icon { width: 12px; height: 12px; }
 .session.stopped .row { color: var(--fg-3); }
 .error { margin: 0; padding: 2px 8px 6px 28px; color: var(--err); font-size: 11.5px; line-height: 1.4; }
 
@@ -1156,38 +1172,6 @@ button.composer-model:disabled { cursor: default; }
 @keyframes slide-in { from { opacity: 0; transform: translateX(16px); } }
 
 /* ---------- Agent Dashboard ---------- */
-.dash-entry { margin-bottom: 6px; border: 1px solid transparent; color: var(--fg); }
-.dash-entry .label { flex: 1; min-width: 0; }
-.dash-entry-counts { display: flex; align-items: center; gap: 6px; flex: none; }
-.dash-count { display: inline-flex; align-items: center; gap: 4px; color: var(--fg-3); font-size: 11px; font-weight: 600; }
-.dash-count i { width: 6px; height: 6px; border-radius: 50%; }
-.dash-count-attention i { background: var(--amber); }
-.dash-count-working i { background: var(--blue); }
-.dash-count-done i { background: var(--green); }
-/* Blocked and unseen Done are what the user acts on: a tinted pill with a bigger, breathing dot. */
-.dash-count-attention, .dash-count-done {
-  --c: var(--amber); height: 16px; padding: 0 5px 0 4px; gap: 4px; box-sizing: border-box; border-radius: 999px;
-  color: var(--c); background: color-mix(in srgb, var(--c) 16%, transparent);
-}
-.dash-count-done { --c: var(--green); }
-.dash-count-attention i, .dash-count-done i { width: 8px; height: 8px; animation: dash-halo 1.6s ease-out infinite; }
-.dash-count-done i { animation-duration: 2.4s; }
-@keyframes dash-halo {
-  0% { box-shadow: 0 0 0 0 color-mix(in srgb, var(--c) 70%, transparent); }
-  70%, 100% { box-shadow: 0 0 0 4px color-mix(in srgb, var(--c) 0%, transparent); }
-}
-/* The whole row lights up like a blocked agent card: amber while an agent needs you, green for
-   unseen Done. */
-.dash-entry.needs-you, .dash-entry.has-done {
-  --c: var(--amber);
-  border-color: color-mix(in srgb, var(--c) 35%, transparent);
-  background: color-mix(in srgb, var(--c) 7%, transparent);
-  box-shadow: 0 0 18px -6px color-mix(in srgb, var(--c) 45%, transparent);
-}
-.dash-entry.has-done { --c: var(--green); }
-.dash-entry.needs-you:hover, .dash-entry.has-done:hover { background: color-mix(in srgb, var(--c) 11%, transparent); }
-.dash-entry.needs-you.active, .dash-entry.has-done.active { background: color-mix(in srgb, var(--c) 12%, var(--surface-3)); }
-
 /* Covers the Agents column and the main area; the sidebar stays usable and the panes underneath
    stay mounted. */
 .dashboard {

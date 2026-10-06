@@ -19,7 +19,6 @@ import { StatusDot } from "./StatusDot";
 import type { MenuItem } from "./ContextMenu";
 import { ActionsProvider, useActions } from "./actions";
 import { forgetSessionFolders, moveSessionFolders } from "../workspaces/folder";
-import { DashboardEntry } from "../dashboard/AgentDashboard";
 import {
   ChevronIcon,
   FolderInputIcon,
@@ -36,7 +35,7 @@ import {
   UnplugIcon,
 } from "../ui/icons";
 import { forgetSessions, renameSessionKey, sessionKey, setBookmarked, useLayout } from "./groups";
-import { useSessionFilter, useSidebarSessions } from "./activeFilter";
+import { needYouCount, useSessionFilter, useSidebarSessions, useViewOrigin } from "./activeFilter";
 import type { RSession } from "./groups";
 import { GroupTree } from "./GroupTree";
 
@@ -50,6 +49,11 @@ export function SessionRow({ node, bookmark, nextKey = null }: { node: RSession;
   const { machine, session, key } = node;
   const machineId = machine.id;
   const viewed = useApp((s) => s.viewed?.machine_id === machineId && s.viewed.session === session.name);
+  // Of a bookmarked Session's two rows, only the one clicked last reads as selected; the other is "current".
+  const section = bookmark ? "bookmarks" : "sessions";
+  const clickedHere = useViewOrigin((s) => s.from === section);
+  const setOrigin = useViewOrigin((s) => s.set);
+  const need = useApp((s) => needYouCount(machine, session, s.doneSeen));
   const view = useApp((s) => s.view);
   const bookmarked = useLayout((s) => s.layout.bookmarks.includes(key));
   const a = useActions();
@@ -107,7 +111,10 @@ export function SessionRow({ node, bookmark, nextKey = null }: { node: RSession;
             },
           ],
     );
-  const open = () => view({ machine_id: machineId, session: session.name });
+  const open = () => {
+    setOrigin(section);
+    view({ machine_id: machineId, session: session.name });
+  };
   const onClick = !online
     ? undefined
     : session.running
@@ -117,17 +124,21 @@ export function SessionRow({ node, bookmark, nextKey = null }: { node: RSession;
     <li className={"session" + (session.running ? "" : " stopped") + (online ? "" : " offline")}>
       <button
         {...dnd}
-        className={"row" + (viewed ? " active" : "") + hl(session.status) + indicatorClass(drag, bookmark ? `bookmark:${key}` : `session:${key}`)}
+        className={"row" + (viewed ? (clickedHere || !bookmarked ? " active" : " current") : "") + hl(session.status) + indicatorClass(drag, bookmark ? `bookmark:${key}` : `session:${key}`)}
+        aria-current={viewed && (clickedHere || !bookmarked) ? "true" : undefined}
         aria-label={session.running ? undefined : `Start ${session.name}`}
         aria-disabled={online ? undefined : true}
         onClick={onClick}
         onContextMenu={onMenu}
       >
         <span className="label">{session.name}</span>
-        <span className="badge">
-          <span className="badge-label">{machine.label}</span>
-          {session.running && <StatusDot status={session.status} />}
-        </span>
+        {bookmarked && !bookmark && <StarIcon className="icon bookmark-mark" aria-label="bookmarked" aria-hidden={undefined} />}
+        {machine.kind !== "local" && (
+          <span className="machine-chip">
+            <span className="badge-label">{machine.label}</span>
+          </span>
+        )}
+        {need > 0 && <span className="need" aria-label={`${need} ${need === 1 ? "needs" : "need"} you`}>{need}</span>}
       </button>
       {session.error && <p className="error">{session.error.message}</p>}
     </li>
@@ -224,8 +235,8 @@ function AddMachine() {
   );
 }
 
-function SectionHeader({ id, label, icon }: { id: string; label: string; icon?: ReactNode }) {
-  const open = useApp((s) => s.expanded[id] ?? true);
+function SectionHeader({ id, label, icon, defaultOpen = true }: { id: string; label: string; icon?: ReactNode; defaultOpen?: boolean }) {
+  const open = useApp((s) => s.expanded[id] ?? defaultOpen);
   const toggle = useApp((s) => s.toggle);
   return (
     <button className="section-toggle" aria-expanded={open} onClick={() => toggle(id, open)}>
@@ -236,19 +247,24 @@ function SectionHeader({ id, label, icon }: { id: string; label: string; icon?: 
   );
 }
 
-/** All | Active: Active leaves out sessions with no agent work (see `isActiveSession`). */
-function SessionFilterBar({ kept }: { kept: number }) {
+/** The Sessions section: its header carries All | Active (Active leaves out sessions with no agent
+ *  work, see `isActiveSession`, in Bookmarks too), then the Groups tree. */
+function SessionsSection({ kept }: { kept: number }) {
   const filter = useSessionFilter((s) => s.filter);
   const setFilter = useSessionFilter((s) => s.setFilter);
+  const open = useApp((s) => s.expanded["sessions"] ?? true);
   return (
-    <div className="session-filter">
-      <span className="section-label">Sessions</span>
-      <div className={"seg seg-sm" + (filter === "active" ? " seg-right" : "")} role="group" aria-label="Show sessions">
+    <section aria-label="Sessions" className="sessions-section">
+      <div className="section-head">
+        <SectionHeader id="sessions" label="Sessions" />
+        <div className={"seg seg-sm" + (filter === "active" ? " seg-right" : "")} role="group" aria-label="Show sessions">
         <span className="seg-thumb" aria-hidden="true" />
         <button type="button" aria-pressed={filter === "all"} onClick={() => setFilter("all")}>All</button>
         <button type="button" aria-pressed={filter === "active"} onClick={() => setFilter("active")}>Active {kept}</button>
+        </div>
       </div>
-    </div>
+      {open && <GroupTree />}
+    </section>
   );
 }
 
@@ -258,10 +274,10 @@ function BookmarksSection({ bookmarks }: { bookmarks: RSession[] }) {
   const dnd = useBookmarksDropDnd();
   return (
     <section aria-label="Bookmarks" className={indicatorClass(drag, "bookmarks").trim()} {...dnd}>
-      <SectionHeader id="bookmarks" label="Bookmarks" icon={<StarIcon className="icon star-icon" />} />
+      <SectionHeader id="bookmarks" label="Bookmarks" />
       {open && (
-        // Indented like a group's sessions.
-        <ul className="tree children">
+        // Flush: Bookmarks are shortcuts, not a Group.
+        <ul className="tree">
           {bookmarks.map((n, i) => <SessionRow key={n.key} node={n} bookmark nextKey={bookmarks[i + 1]?.key ?? null} />)}
         </ul>
       )}
@@ -274,7 +290,9 @@ export const Sidebar = memo(function Sidebar() {
   const machines = useApp((s) => s.machines);
   const order = useApp((s) => s.order);
   const { bookmarks, kept } = useSidebarSessions();
-  const machinesOpen = useApp((s) => s.expanded["machines"] ?? true);
+  // Machines fold by default once there is more than one: the loop rarely needs them.
+  const machinesByDefault = order.length <= 1;
+  const machinesOpen = useApp((s) => s.expanded["machines"] ?? machinesByDefault);
   const [dragging, setDragging] = useState<Drag | null>(null);
   const [indicator, setIndicator] = useState<Indicator | null>(null);
   const dragState = useMemo(() => ({ dragging, setDragging, indicator, setIndicator }), [dragging, indicator]);
@@ -307,13 +325,11 @@ export const Sidebar = memo(function Sidebar() {
   return (
     <ActionsProvider>
       <DragContext.Provider value={dragState}>
-        <DashboardEntry />
-        <SessionFilterBar kept={kept} />
         {(bookmarks.length > 0 || (draggingSession && emptyBookmarksShown)) && <BookmarksSection bookmarks={bookmarks} />}
-        <GroupTree />
+        <SessionsSection kept={kept} />
         <section aria-label="Machines" className="machines-section">
           <div className="section-head">
-            <SectionHeader id="machines" label="Machines" />
+            <SectionHeader id="machines" label="Machines" defaultOpen={machinesByDefault} />
             <AddMachine />
           </div>
           {machinesOpen && (

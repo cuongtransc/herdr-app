@@ -2,7 +2,7 @@ import { memo, useLayoutEffect, useRef } from "react";
 import { triageQueue } from "../dashboard/triage";
 import { useLayout } from "../settings/layout";
 import { useApp } from "../store/app";
-import { SidebarIcon } from "../ui/icons";
+import { BoardIcon, SidebarIcon } from "../ui/icons";
 import { useTriage } from "./triage";
 
 /** Beside the traffic lights whatever the layout: the sidebar toggle and, in focus, the agents that need you (a click steps like ⌘J). */
@@ -11,13 +11,17 @@ export const LayoutControls = memo(function LayoutControls() {
   const toggle = useLayout((s) => s.toggle);
   // "waiting:done" as one string, so the selector's value compares equal between renders.
   const counts = useApp((s) => {
-    if (layout !== "focus") return "0:0";
     const q = triageQueue(s.machines, s.order, s.doneSeen, s.statusSince);
     const waiting = q.filter((c) => c.bucket === "attention").length;
     return `${waiting}:${q.length - waiting}`;
   });
   const [waiting, done] = counts.split(":").map(Number);
   const step = useTriage((s) => s.step);
+  const boardOpen = useApp((s) => s.dashboardOpen);
+  const setBoardOpen = useApp((s) => s.setDashboardOpen);
+  const focus = layout === "focus";
+  // In focus the waiting pill carries the count; the Board shows it otherwise.
+  const need = focus ? 0 : waiting + done;
   const shown = layout === "normal";
   // The first column's titlebar content starts past the traffic lights (78 px) and these controls,
   // whose width changes with the pill: published to the container as --lead.
@@ -43,7 +47,19 @@ export const LayoutControls = memo(function LayoutControls() {
       >
         <SidebarIcon />
       </button>
-      {waiting + done > 0 && (
+      <button
+        type="button"
+        className="board-btn"
+        aria-pressed={boardOpen}
+        aria-label={`Board${need ? `, ${need} ${need === 1 ? "needs" : "need"} you` : ""} (⇧⌘D)`}
+        title="Agent Board: everything by status (⇧⌘D)"
+        onClick={() => setBoardOpen(!boardOpen)}
+      >
+        <BoardIcon />
+        Board
+        {need > 0 && <span className="need" aria-hidden="true">{need}</span>}
+      </button>
+      {focus && waiting + done > 0 && (
         <button
           type="button"
           className="waiting-pill"

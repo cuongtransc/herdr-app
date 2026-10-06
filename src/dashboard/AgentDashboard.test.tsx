@@ -3,7 +3,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 vi.mock("../lib/ipc", () => ({ quotaFetch: vi.fn().mockResolvedValue({ kind: "notSignedIn" }) }));
 import type { MachineView, PaneView } from "../lib/types";
 import { useApp } from "../store/app";
-import { AgentDashboard, DashboardEntry } from "./AgentDashboard";
+import { AgentDashboard } from "./AgentDashboard";
 
 const pane = (id: string, title: string, status: PaneView["status"], agent = "claude"): PaneView => ({
   pane_id: id, terminal_id: "t" + id, title, cwd: "/x", agent, status,
@@ -111,34 +111,3 @@ describe("AgentDashboard", () => {
   });
 });
 
-describe("DashboardEntry", () => {
-  beforeEach(() =>
-    useApp.setState({ machines: { local, box }, order: ["local", "box"], selected: null, viewed: null, doneSeen: {}, dashboardOpen: false }),
-  );
-
-  it("shows per-bucket counts, hiding empty ones, and toggles the dashboard", () => {
-    render(<DashboardEntry />);
-    const btn = screen.getByRole("button", { name: /agent dashboard/i });
-    expect(within(btn).getByLabelText("1 need you")).toBeTruthy();
-    expect(within(btn).getByLabelText("1 working")).toBeTruthy();
-    expect(within(btn).getByLabelText("1 done")).toBeTruthy();
-    act(() => useApp.setState({ doneSeen: { "local/default/c": true } }));
-    expect(within(btn).queryByLabelText(/done/)).toBeNull();
-    fireEvent.click(btn);
-    expect(useApp.getState().dashboardOpen).toBe(true);
-    expect(btn.getAttribute("aria-pressed")).toBe("true");
-  });
-
-  it("highlights the row for a blocked agent first, then for an unseen done one", () => {
-    render(<DashboardEntry />);
-    const btn = screen.getByRole("button", { name: /agent dashboard/i });
-    expect(btn.classList.contains("needs-you")).toBe(true);
-    expect(btn.classList.contains("has-done")).toBe(false);
-    const doneOnly = machine("local", "local", [pane("a", "Fix login", "idle"), pane("c", "Docs", "done")]);
-    act(() => useApp.setState({ machines: { local: doneOnly, box } }));
-    expect(btn.classList.contains("needs-you")).toBe(false);
-    expect(btn.classList.contains("has-done")).toBe(true);
-    act(() => useApp.setState({ doneSeen: { "local/default/c": true } }));
-    expect(btn.classList.contains("has-done")).toBe(false);
-  });
-});

@@ -27,6 +27,51 @@ describe("Sidebar", () => {
     useLayout.setState({ layout: EMPTY_LAYOUT });
     useSessionFilter.setState({ filter: "all" });
   });
+  it("names the machine of remote sessions only", () => {
+    const local = { ...m, id: "local", label: "local", kind: "local" as const };
+    useApp.setState({ machines: { local }, order: ["local"] });
+    render(<Sidebar />);
+    expect(row("default").querySelector(".badge-label")).toBeNull();
+  });
+  it("counts what needs the user on a session row, and nothing when all is calm", () => {
+    const blocked = structuredClone(m);
+    blocked.sessions[0].workspaces[0].tabs[0].panes[0].status = "blocked";
+    useApp.setState({ machines: { box: blocked }, doneSeen: {} });
+    render(<Sidebar />);
+    expect(within(row("default")).getByLabelText("1 needs you")).toBeTruthy();
+    expect(row("ai-radar").querySelector(".need")).toBeNull();
+  });
+  it("puts Bookmarks first as its own section, flush, and lights only the row that was clicked", () => {
+    const k = sessionKey("box", "default");
+    useLayout.setState({ layout: { tree: [work], bookmarks: [k] } });
+    render(<Sidebar />);
+    const sections = screen.getAllByRole("region").map((r) => r.getAttribute("aria-label"));
+    expect(sections.indexOf("Bookmarks")).toBeLessThan(sections.indexOf("Sessions"));
+    const bm = within(screen.getByRole("region", { name: "Bookmarks" })).getByText("default").closest("button")!;
+    expect(bm.closest(".children")).toBeNull();
+    const inTree = within(screen.getByRole("region", { name: "Sessions" })).getByText("default").closest("button")!;
+    fireEvent.click(bm);
+    expect(bm.getAttribute("aria-current")).toBe("true");
+    expect(inTree.getAttribute("aria-current")).toBeNull();
+    expect(inTree.className).toContain("current");
+    expect(inTree.querySelector("[aria-label='bookmarked']")).toBeTruthy();
+    fireEvent.click(inTree);
+    expect(inTree.getAttribute("aria-current")).toBe("true");
+    expect(bm.getAttribute("aria-current")).toBeNull();
+  });
+  it("lists sessions no group holds before the groups", () => {
+    useLayout.setState({ layout: { tree: [work], bookmarks: [] } });
+    render(<Sidebar />);
+    const labels = [...within(screen.getByRole("region", { name: "Sessions" })).getAllByRole("list")[0].children].map((li) => li.textContent);
+    expect(labels[0]).toContain("ai-radar");
+    expect(labels[1]).toContain("Work");
+  });
+  it("folds Machines by default once there is more than one", () => {
+    const local = { ...m, id: "local", label: "local", kind: "local" as const, sessions: [] };
+    useApp.setState({ machines: { box: m, local }, order: ["local", "box"] });
+    render(<Sidebar />);
+    expect(screen.getByRole("button", { name: /Machines/ }).getAttribute("aria-expanded")).toBe("false");
+  });
   it("Active shows only sessions with agent work, keeps the viewed one, and Show brings the rest back", () => {
     render(<Sidebar />);
     expect(row("ai-radar")).toBeTruthy();
@@ -49,8 +94,6 @@ describe("Sidebar", () => {
   it("shows sessions with a machine badge and machines without sessions", () => {
     render(<Sidebar />);
     expect(row("default").querySelector(".badge-label")?.textContent).toBe("devtuf");
-    expect(row("default").querySelector(".badge [aria-label='status working']")).toBeTruthy();
-    expect(row("ai-radar").querySelector(".badge .dot")).toBeNull();
     const machines = screen.getByRole("region", { name: "Machines" });
     expect(within(machines).getByText("devtuf")).toBeTruthy();
     expect(within(machines).queryByText("default")).toBeNull();
@@ -78,14 +121,6 @@ describe("Sidebar", () => {
     fireEvent.click(screen.getByText("default"));
     expect(useApp.getState().viewed).toEqual({ machine_id: "box", session: "default" });
     expect(row("default").className).toContain("active");
-  });
-  it("marks both rows of a bookmarked session in a group active", () => {
-    useLayout.setState({ layout: { tree: [work], bookmarks: [sessionKey("box", "default")] } });
-    render(<Sidebar />);
-    fireEvent.click(screen.getAllByText("default")[0]);
-    const rows = screen.getAllByText("default").map((e) => e.closest("button")!);
-    expect(rows).toHaveLength(2);
-    rows.forEach((r) => expect(r.className).toContain("active"));
   });
   it("selecting a pane views its session", () => {
     useApp.getState().select({ machine_id: "box", session: "default", pane_id: "w1:p1" });
