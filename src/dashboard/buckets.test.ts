@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { MachineView, PaneView } from "../lib/types";
-import { bucketCounts, bucketOf, dashboardCards, matchesQuery } from "./buckets";
+import { bucketCounts, bucketOf, dashboardCards, matchesQuery, waitingCount } from "./buckets";
 
 const pane = (id: string, status: PaneView["status"], extra: Partial<PaneView> = {}): PaneView => ({
   pane_id: id, terminal_id: "t" + id, title: "pane " + id, cwd: "/x", agent: "claude", status, ...extra,
@@ -78,5 +78,18 @@ describe("matchesQuery", () => {
   it("matches title, agent, workspace, session and machine case-insensitively", () => {
     for (const q of ["rewrite", "PI", "herdr-app", "default", "local-label", ""]) expect(matchesQuery(card, q)).toBe(true);
     expect(matchesQuery(card, "nope")).toBe(false);
+  });
+});
+
+describe("waitingCount", () => {
+  it("counts blocked agents in running sessions on connected machines only", () => {
+    const machines = {
+      local: machine("local", [pane("a", "blocked"), pane("b", "working"), pane("c", "blocked", { agent: null })]),
+      box: machine("box", [pane("d", "blocked")]),
+      gone: machine("gone", [pane("e", "blocked")], { state: "error" }),
+    };
+    // Stopped session "old" and the shell pane "c" are left out, as on the dashboard.
+    expect(waitingCount(machines)).toBe(2);
+    expect(waitingCount({})).toBe(0);
   });
 });

@@ -237,6 +237,31 @@ kbd {
   font-size: 11px; font-weight: 600; letter-spacing: 0.04em; text-transform: uppercase;
 }
 
+/* ---------- Layout: ⌘B hides the sidebar, ⇧⌘B the Agents column too ---------- */
+.sidebar[hidden], .agents[hidden] { display: none; }
+/* Beside the traffic lights in every layout; above the dashboard. */
+.layout-controls {
+  position: absolute; top: calc((var(--titlebar) - 28px) / 2); left: 78px; z-index: 6;
+  display: flex; align-items: center; gap: 6px;
+}
+/* A disclosure, not a menu: no pressed look while the sidebar shows. */
+.layout-controls .icon-btn[aria-expanded="true"]:not(:hover) { background: none; color: var(--fg-2); }
+.waiting-pill {
+  display: inline-flex; align-items: center; gap: 6px; height: 24px; padding: 0 10px; box-sizing: border-box;
+  border: 0; border-radius: 999px; cursor: pointer; font-size: 12px; font-weight: 600;
+  color: var(--amber); background: color-mix(in srgb, var(--amber) 15%, transparent);
+  transition: background var(--t-fast);
+}
+.waiting-pill:hover { background: color-mix(in srgb, var(--amber) 24%, transparent); }
+.waiting-pill .dot { width: 7px; height: 7px; border-radius: 50%; background: var(--amber); }
+/* The first column left takes the traffic lights and the controls. */
+.app[data-layout="sidebar-hidden"] .agents-head { padding-left: 116px; }
+.app[data-layout="focus"] .header { padding-left: 116px; }
+.app[data-layout="focus"]:has(.waiting-pill) .header { padding-left: 210px; }
+.app:not([data-layout="normal"]) .dashboard { left: 0; }
+.app[data-layout="focus"] .dashboard { box-shadow: none; }
+.app:not([data-layout="normal"]) .dash-head { padding-left: 116px; }
+
 /* Transparent so the header shows the window vibrancy; each lens paints its own opaque surface. */
 .main { flex: 1; min-width: 0; display: flex; flex-direction: column; background: transparent; }
 .main > .titlebar { background: var(--surface-chrome); border-bottom: 1px solid var(--line); }
