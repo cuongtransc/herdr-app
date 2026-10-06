@@ -209,8 +209,9 @@ These are the agreed directions. Each lands with a mockup and its own PR.
   INPUT. No icon tile, no badge line, no unlabelled "1"/"2" tab digits.
 - **Idle agents and shells** fold into one 24px line per Workspace, "3 idle · 2 shells", which
   expands on click or ←/→. Blocked, working and done-unseen Panes are never folded; neither is the
-  selected Pane. A shell running a foreground command (`cargo watch`) counts as working, not as a
-  shell (open question Q3).
+  selected Pane. A shell whose title is not a shell name (`cargo watch`, a dev server: anything but
+  `zsh`/`bash`/`fish`/`sh`) shows as a normal quiet row, unfolded and with no status mark: herdr
+  reports no status for shells, so claiming "working" would be a guess (Q3).
 - **Order within a Workspace**: needs you, working, done unseen, then the fold line, applied at
   settle points (§2.7). Workspace order stays the user's.
 - **Workspace header**: 24px, label 12px/600 `--fg-2`, the folder's basename only when one is set
@@ -258,6 +259,7 @@ trail after the last (possibly nested) Group with no header, reading as its chil
 
 **Rows.**
 
+- A bookmarked Session keeps its place in its Group too (Q4); that row carries a small star.
 - Machine badge only for remote Machines; local Sessions show none.
 - A Session row shows an amber count when something in it needs the user; nothing otherwise.
 - The Machines section stays at the bottom and folds by default once more than one Machine exists.
@@ -270,18 +272,22 @@ trail after the last (possibly nested) Group with no header, reading as its chil
 | D2 | Status words | IA and visual: words only for exceptions · platform: keep words for accessibility | **Only INPUT** keeps a word; other states get a distinct shape plus an `aria-label` |
 | D3 | Idle mark | platform: a hollow ring · IA and visual: nothing | **Nothing**; idle is the default and the slot keeps titles aligned |
 | D4 | Selection style | visual (1): neutral fill, because `--accent` #7c8cff and `--blue` #5b9dff read alike · visual (2): accent fill and a bar | **Neutral** `--active` fill and weight 600, so "selected" never looks like "working" |
-| D5 | Grouping | IA (1) and visual: keep Workspaces · IA (2): a flat, status-sorted view by default | **Keep Workspaces**, sorted inside by status at settle points; a status-flat view is Q1 |
+| D5 | Grouping | IA (1) and visual: keep Workspaces · IA (2): a flat, status-sorted view by default | **Keep Workspaces**, sorted inside by status at settle points; no status-flat view for now (Q1) |
 | D6 | Folding | IA (2): auto-fold quiet Workspaces · platform: never hide blocked work, no accordion | **User-controlled fold**, persisted; idle Panes and shells are always folded; nothing urgent is ever hidden |
 | D7 | Board entry | IA: a [Sessions \| Board] switcher or a toolbar button · visual: a nav row with a chevron, or the footer | **Toolbar button** in the titlebar cluster: it is visible in focus mode too and cannot be read as a list header |
 | D8 | Dimming | visual: lighter `--fg-3` and opacity · platform: never below 4.5:1 | **Platform**: measured (§3.5); fix the tokens, drop the opacity |
 
-## 9. Open questions for the product owner
+## 9. Product owner decisions (2026-10-07)
 
-- **Q1.** Should level 2 also offer a flat, status-sorted view (all needs-you rows at the top across
-  Workspaces), or is ⌘J plus the Board enough?
-- **Q2.** The Board's name and shortcut: "Board" and ⇧⌘D?
-- **Q3.** Is a shell running a long command (`cargo watch`, a dev server) something to supervise?
-  If so it shows as working; if not it stays folded with the other shells.
-- **Q4.** Should a bookmarked Session still show in its Group (today, per `CONTEXT.md`: "independent
-  of which Group it is in"), or only in Bookmarks? Showing it once removes the duplicate entirely
-  but changes the Bookmark concept; §7.3 assumes it stays in both, with one selected row.
+- **Q1. A flat, status-sorted level 2?** No, not now. ⌘J, the Board and the in-Workspace status
+  order cover the loop; a second view would duplicate the Board and add a toggle. Revisit if the
+  user still scans the column after the compact rows ship.
+- **Q2. The Board's name and shortcut?** "Board", ⇧⌘D. "Dashboard" promises read-only metrics,
+  while the Board is a Kanban to act from. ⌘D stays free because terminals (iTerm) use it to split a
+  pane.
+- **Q3. Long-running shell commands?** Shown as a normal quiet row, not folded, with no status mark
+  (§7.1). herdr gives shells no status, so the app shows that the process runs without claiming
+  how it is doing.
+- **Q4. A bookmarked Session in its Group too?** Yes, as `CONTEXT.md` defines a Bookmark
+  (independent of its Group): Groups stay complete and unbookmarking never moves a Session. Only
+  the clicked row is "selected"; the Group row carries a star (§7.3).
