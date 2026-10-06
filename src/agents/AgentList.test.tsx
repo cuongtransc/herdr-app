@@ -42,26 +42,66 @@ describe("AgentList", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     localStorage.clear();
-    useApp.setState({ machines: { local: m }, order: ["local"], selected: null, viewed: { machine_id: "local", session: "default" } });
+    useApp.setState({ machines: { local: m }, order: ["local"], selected: null, viewed: { machine_id: "local", session: "default" }, expanded: {}, doneSeen: {} });
   });
 
-  it("lists every pane of the viewed session with agent icon and status badge", () => {
+  it("lists the panes that matter as one-line rows named by their status, folding idle agents and plain shells", () => {
     render(<AgentList />);
-    const items = screen.getAllByRole("listitem");
-    expect(items).toHaveLength(4);
-    expect(within(items[0]).getByRole("img", { name: "claude" })).toBeTruthy();
-    expect(within(items[0]).getByText("DONE")).toBeTruthy();
-    expect(within(items[1]).getByRole("img", { name: "codex" })).toBeTruthy();
-    expect(within(items[1]).getByText("INPUT")).toBeTruthy();
-    expect(within(items[2]).getByRole("img", { name: "no agent" })).toBeTruthy();
-    expect(within(items[3]).getByText("IDLE")).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Idempotent payments, claude, done, not seen" })).toBeTruthy();
+    const input = screen.getByRole("button", { name: "Guard export, codex, needs input" });
+    expect(within(input).getByText("INPUT")).toBeTruthy();
+    // A shell running something (its title is not a shell's name) stays, quiet and unmarked.
+    expect(screen.getByRole("button", { name: "Tag v1.4.0, shell" })).toBeTruthy();
+    expect(screen.queryByText("Ship flag")).toBeNull();
+    const fold = screen.getByRole("button", { name: "1 idle" });
+    expect(fold.getAttribute("aria-expanded")).toBe("false");
+    fireEvent.click(fold);
+    expect(screen.getByRole("button", { name: "Ship flag, pi, idle" })).toBeTruthy();
+    expect(screen.queryByText(/^(DONE|IDLE|WORKING)$/)).toBeNull();
+  });
+
+  it("never folds the selected pane", () => {
+    useApp.setState({ selected: { machine_id: "local", session: "default", pane_id: "p4" } });
+    render(<AgentList />);
+    expect(screen.getByRole("button", { name: "Ship flag, pi, idle" }).getAttribute("aria-current")).toBe("true");
+  });
+
+  it("folds a plain shell with the idle agents", () => {
+    const shell = structuredClone(m);
+    shell.sessions[0].workspaces[1].tabs[1].panes[0].title = "zsh";
+    useApp.setState({ machines: { local: shell } });
+    render(<AgentList />);
+    expect(screen.getByRole("button", { name: "1 idle · 1 shell" })).toBeTruthy();
+    expect(screen.queryByText("zsh")).toBeNull();
+  });
+
+  it("folds a workspace from its header, keeping what needs the user counted on it", () => {
+    render(<AgentList />);
+    const head = screen.getByRole("button", { name: "web" });
+    expect(head.getAttribute("aria-expanded")).toBe("true");
+    fireEvent.click(head);
+    expect(screen.getByRole("button", { name: "web, 1 needs you" }).getAttribute("aria-expanded")).toBe("false");
+    expect(screen.queryByText("Guard export")).toBeNull();
+  });
+
+  it("heads the column with what needs the user, not a pane count", () => {
+    render(<AgentList />);
+    expect(screen.getByText("2 need you")).toBeTruthy();
+    expect(document.querySelector(".agents-head .count")).toBeNull();
+  });
+
+  it("starts a stopped session from the column", () => {
+    useApp.setState({ machines: { local: { ...m, sessions: [{ ...m.sessions[0], running: false, workspaces: [] }] } } });
+    render(<AgentList />);
+    expect(screen.getByText("Stopped")).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Start default" })).toBeTruthy();
   });
 
   it("falls back to a monogram for an unknown agent", () => {
     useApp.setState({ viewed: { machine_id: "local", session: "other" } });
     render(<AgentList />);
     expect(screen.getByRole("img", { name: "mystery" }).textContent).toBe("M");
-    expect(screen.getByText("WORKING")).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Backup, mystery, working" })).toBeTruthy();
   });
 
   it("selects a pane on click and marks it active", () => {
@@ -77,13 +117,16 @@ describe("AgentList", () => {
     const w1 = screen.getByRole("group", { name: "checkout-api" });
     expect(within(w1).getByText("checkout-api", { selector: ".ws-folder" })).toBeTruthy();
     expect(within(w1).getByText("Idempotent payments")).toBeTruthy();
-    expect(within(screen.getByRole("group", { name: "web" })).getAllByRole("listitem")).toHaveLength(3);
-    expect(within(screen.getByRole("group", { name: "empty" })).getByText("no folder")).toBeTruthy();
+    expect(within(screen.getByRole("group", { name: "web" })).getAllByRole("listitem")).toHaveLength(2);
+    // An absent folder is not labelled.
+    expect(screen.queryByText("no folder")).toBeNull();
+    expect(screen.getByRole("group", { name: "empty" }).querySelector(".ws-folder")).toBeNull();
     expect(screen.getByRole("button", { name: "New agent in empty" })).toBeTruthy();
   });
 
-  it("boxes the panes of a multi-pane tab together, leaving single-pane tabs bare", () => {
+  it("keeps the panes of a multi-pane tab together, leaving single-pane tabs bare", () => {
     render(<AgentList />);
+    fireEvent.click(screen.getByRole("button", { name: "1 idle" }));
     const tab = screen.getByRole("group", { name: "Tab release" });
     expect(tab.className).toContain("tab-group");
     expect(within(tab).getAllByRole("listitem").map((li) => li.textContent)).toEqual([
@@ -173,7 +216,9 @@ describe("AgentList tab reordering", () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
-    useApp.setState({ machines: { local: m }, order: ["local"], selected: null, viewed: { machine_id: "local", session: "default" } });
+    useApp.setState({ machines: { local: m }, order: ["local"], selected: null, viewed: { machine_id: "local", session: "default" }, doneSeen: {},
+      // The idle "Ship flag" is folded by default; these tests drag onto it.
+      expanded: { "quiet:local/default/w2": true } });
   });
 
   it("moves a tab after the tab it is dropped on", () => {
