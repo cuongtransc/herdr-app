@@ -59,6 +59,27 @@ export function forgetSessionFolders(machineId: string, session: string): void {
   notify();
 }
 
+/** Carry a renamed Session's stored folders over to its new name. */
+export function moveSessionFolders(machineId: string, from: string, to: string): void {
+  const prefix = (s: string) => PREFIX + encodeURIComponent(machineId) + "/" + encodeURIComponent(s) + "/";
+  const [old, next] = [prefix(from), prefix(to)];
+  try {
+    const moved: [string, string][] = [];
+    for (let i = 0; i < localStorage.length; i++) {
+      const key = localStorage.key(i);
+      if (key?.startsWith(old)) moved.push([key, next + key.slice(old.length)]);
+    }
+    for (const [k, nk] of moved) {
+      const v = localStorage.getItem(k);
+      if (v !== null) localStorage.setItem(nk, v);
+      localStorage.removeItem(k);
+    }
+  } catch {
+    /* ignore */
+  }
+  notify();
+}
+
 export function suggestFolder(ws: WorkspaceView): string {
   for (const tab of ws.tabs) {
     for (const pane of tab.panes) {

@@ -5,8 +5,9 @@ vi.mock("../lib/ipc", () => ({
   sessionsRefresh: vi.fn().mockResolvedValue(undefined),
   sessionStart: vi.fn().mockRejectedValue({ code: "timeout", message: "session x did not start within 10s" }),
   sessionDelete: vi.fn().mockResolvedValue(undefined),
+  sessionRename: vi.fn().mockResolvedValue(undefined),
 }));
-import { machineConnect, sessionDelete, sessionsRefresh, sessionStart } from "../lib/ipc";
+import { machineConnect, sessionDelete, sessionRename, sessionsRefresh, sessionStart } from "../lib/ipc";
 import { getFolder, setFolder } from "../workspaces/folder";
 import { useApp } from "../store/app";
 import { EMPTY_LAYOUT, sessionKey, useLayout } from "./groups";
@@ -111,6 +112,49 @@ describe("Sidebar machine actions", () => {
     render(<Sidebar />);
     fireEvent.contextMenu(screen.getByText("x"));
     expect(screen.queryByRole("menuitem", { name: "Delete session…" })).toBeNull();
+  });
+  it("renames a stopped session, carrying its group, bookmark and folders over", async () => {
+    set([local]);
+    setFolder({ machine_id: "local", session: "x", workspace_id: "w1" }, "/srv/x");
+    setFolder({ machine_id: "local", session: "xy", workspace_id: "w1" }, "/srv/xy");
+    const [kx, ky] = [sessionKey("local", "x"), sessionKey("local", "y")];
+    useLayout.setState({ layout: { tree: [{ kind: "group", id: "g", label: "Work", children: [{ kind: "session", key: kx }] }], bookmarks: [kx] } });
+    render(<Sidebar />);
+    fireEvent.contextMenu(screen.getAllByText("x")[0]);
+    fireEvent.click(screen.getByRole("menuitem", { name: "Rename session…" }));
+    fireEvent.change(screen.getByRole("textbox"), { target: { value: "y" } });
+    fireEvent.click(screen.getByRole("button", { name: "Rename" }));
+    expect(sessionRename).toHaveBeenCalledWith("local", "x", "y");
+    await waitFor(() => expect(useLayout.getState().layout.bookmarks).toEqual([ky]));
+    expect(useLayout.getState().layout.tree).toEqual([{ kind: "group", id: "g", label: "Work", children: [{ kind: "session", key: ky }] }]);
+    expect(getFolder({ machine_id: "local", session: "y", workspace_id: "w1" })).toBe("/srv/x");
+    expect(getFolder({ machine_id: "local", session: "x", workspace_id: "w1" })).toBeNull();
+    expect(getFolder({ machine_id: "local", session: "xy", workspace_id: "w1" })).toBe("/srv/xy");
+  });
+  it("keeps everything when the rename fails", async () => {
+    vi.mocked(sessionRename).mockRejectedValueOnce({ code: "herdr_error", message: "could not rename x: y already exists" });
+    set([local]);
+    const kx = sessionKey("local", "x");
+    useLayout.setState({ layout: { tree: [], bookmarks: [kx] } });
+    render(<Sidebar />);
+    fireEvent.contextMenu(screen.getAllByText("x")[0]);
+    fireEvent.click(screen.getByRole("menuitem", { name: "Rename session…" }));
+    fireEvent.change(screen.getByRole("textbox"), { target: { value: "y" } });
+    fireEvent.click(screen.getByRole("button", { name: "Rename" }));
+    expect((await screen.findByRole("alert")).textContent).toContain("already exists");
+    expect(useLayout.getState().layout.bookmarks).toEqual([kx]);
+  });
+  it("offers no Rename for a running session or the default one", () => {
+    set([{ ...local, sessions: [
+      { name: "x", running: true, status: "idle", error: null, workspaces: [] },
+      { name: "default", running: false, status: "unknown", error: null, workspaces: [] },
+    ] }]);
+    render(<Sidebar />);
+    fireEvent.contextMenu(screen.getByText("x"));
+    expect(screen.queryByRole("menuitem", { name: "Rename session…" })).toBeNull();
+    fireEvent.keyDown(document, { key: "Escape" });
+    fireEvent.contextMenu(screen.getByText("default"));
+    expect(screen.queryByRole("menuitem", { name: "Rename session…" })).toBeNull();
   });
   it("bookmarks and unbookmarks a session from its menu", () => {
     set([local]);
