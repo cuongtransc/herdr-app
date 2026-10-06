@@ -276,8 +276,8 @@ function BookmarksSection({ bookmarks }: { bookmarks: RSession[] }) {
     <section aria-label="Bookmarks" className={indicatorClass(drag, "bookmarks").trim()} {...dnd}>
       <SectionHeader id="bookmarks" label="Bookmarks" />
       {open && (
-        // Flush: Bookmarks are shortcuts, not a Group.
-        <ul className="tree">
+        // Under the section header like any section's rows, but not boxed as a Group.
+        <ul className="tree section-list">
           {bookmarks.map((n, i) => <SessionRow key={n.key} node={n} bookmark nextKey={bookmarks[i + 1]?.key ?? null} />)}
         </ul>
       )}

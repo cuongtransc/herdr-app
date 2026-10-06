@@ -249,15 +249,18 @@ trail after the last (possibly nested) Group with no header, reading as its chil
 - **Three sibling sections, one header style**: BOOKMARKS (only when not empty), SESSIONS, MACHINES,
   each an 11px/600 caps label with the same fold chevron. All|Active belongs to the SESSIONS header
   and filters Bookmarks too.
-- **Bookmarks are shortcuts, not a container.** Their rows sit flush (no Group indent), carry no fold
-  chevron of their own beyond the section's, and keep the user's order.
+- **Bookmarks are shortcuts, not a container.** Their rows sit under the section header like any
+  section's rows, without a Group's guide line or fold chevron, and keep the user's order.
+- **Each level starts under its parent's text.** A section's rows start where its header's text does;
+  a Group's children start where the Group's name does, with the guide line under the Group's
+  chevron.
 - **One selected row.** Selecting a Session highlights the row that was clicked. Its twin (the same
   Session in the other section) shows only the quieter "current" mark (`--hover` fill), so two rows
   are never both "selected".
 - **Ungrouped Sessions get a place**: they come first in SESSIONS, before the Groups (or under an
   "Ungrouped" label when Groups exist), never after the last Group where they read as its children.
-- Group nesting is indented 12px per level with a 1px `--line` guide, so depth stays legible past
-  two levels.
+- Group nesting therefore steps one Group label (42px) per level, with a 1px `--line` guide, so
+  depth stays legible past two levels.
 
 **Rows.**
 

@@ -350,7 +350,11 @@ kbd {
 
 /* ---------- Machine tree ---------- */
 .tree, .children { list-style: none; margin: 0; padding: 0; }
-.children { padding-left: 14px; margin-left: 13px; border-left: 1px solid var(--line); }
+/* Each level's text starts under its parent's label: a section's rows under the header text
+   (8 padding + 12 chevron + 6 gap = 26, rows pad 8), a Group's children under the Group's name
+   (8 + 12 chevron + 8 + 14 folder + 8 = 50) with the guide under the chevron. */
+.section-list { padding-left: 18px; }
+.children { padding-left: 28px; margin-left: 13px; border-left: 1px solid var(--line); }
 .machine + .machine { margin-top: 6px; }
 
 .row {

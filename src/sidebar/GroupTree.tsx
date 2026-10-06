@@ -92,7 +92,7 @@ export function GroupTree() {
   };
   return (
     <section aria-label="Groups" className="groups-section" onContextMenu={onMenu}>
-      <ul className="tree">
+      <ul className="tree section-list">
         {tree.map((n) => (n.kind === "group" ? <GroupRow key={n.id} group={n} /> : <SessionRow key={n.key} node={n} />))}
       </ul>
       {active && hidden > 0 && (
