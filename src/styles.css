@@ -296,12 +296,12 @@ kbd {
 .triage-hud:not(:has(.triage-list)) .triage-keys { display: none; }
 
 /* The first column left takes the traffic lights and the controls. */
-.app[data-layout="sidebar-hidden"] .agents-head { padding-left: 116px; }
-.app[data-layout="focus"] .header { padding-left: 116px; }
-.app[data-layout="focus"]:has(.waiting-pill) .header { padding-left: 270px; }
+/* --lead: past the traffic lights and the controls, measured by LayoutControls. */
+.app[data-layout="sidebar-hidden"] .agents-head { padding-left: var(--lead, 116px); }
+.app[data-layout="focus"] .header { padding-left: var(--lead, 116px); }
 .app:not([data-layout="normal"]) .dashboard { left: 0; }
 .app[data-layout="focus"] .dashboard { box-shadow: none; }
-.app:not([data-layout="normal"]) .dash-head { padding-left: 116px; }
+.app:not([data-layout="normal"]) .dash-head { padding-left: var(--lead, 116px); }
 
 /* Transparent so the header shows the window vibrancy; each lens paints its own opaque surface. */
 .main { flex: 1; min-width: 0; display: flex; flex-direction: column; background: transparent; }
