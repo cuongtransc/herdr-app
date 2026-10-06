@@ -120,7 +120,7 @@ describe("App shell", () => {
       expect(machinesNav()).toBeTruthy();
     });
 
-    it("⌘⇧B hides both columns and shows how many agents wait; the pill brings them back", () => {
+    it("⌘⇧B hides both columns and shows how many agents wait; the pill goes to the next one", () => {
       useLayout.setState({ layout: "normal" });
       useApp.setState({ machines: { local: blockedMachine }, order: ["local"], selected: null, dashboardOpen: false });
       render(<App />);
@@ -128,10 +128,10 @@ describe("App shell", () => {
       fireEvent.keyDown(window, { key: "B", metaKey: true, shiftKey: true });
       expect(machinesNav()).toBeNull();
       expect(agentsCol()).toBeNull();
-      fireEvent.click(screen.getByRole("button", { name: "1 agent waiting, show the sidebar" }));
-      expect(machinesNav()).toBeTruthy();
-      expect(agentsCol()).toBeTruthy();
-      expect(useLayout.getState().layout).toBe("normal");
+      fireEvent.click(screen.getByRole("button", { name: "1 waiting: go to the next agent that needs you (⌘J)" }));
+      expect(useApp.getState().selected).toEqual({ machine_id: "local", session: "default", pane_id: "w1:p1" });
+      expect(useLayout.getState().layout).toBe("focus");
+      useApp.setState({ selected: null });
     });
 
     it("the toggle button shows the sidebar again from focus", () => {
@@ -141,6 +141,46 @@ describe("App shell", () => {
       fireEvent.click(screen.getByRole("button", { name: "Show sidebar" }));
       expect(machinesNav()).toBeTruthy();
       expect(agentsCol()).toBeTruthy();
+    });
+  });
+
+  describe("⌘J", () => {
+    const p = (id: string, status: "blocked" | "done" | "working") =>
+      ({ pane_id: id, terminal_id: "t" + id, title: "pane " + id, cwd: null, agent: "claude", status });
+    const m = (id: string, panes: ReturnType<typeof p>[]) => ({
+      id, label: id, kind: "local" as const, state: "connected" as const, error: null, version: "0.9.3", status: "idle" as const,
+      sessions: [{ name: "s", running: true, status: "idle" as const, error: null, workspaces: [
+        { workspace_id: "w1", label: "ws", number: 1, status: "idle" as const, tabs: [
+          { tab_id: "w1:t1", label: "1", number: 1, status: "idle" as const, panes } ] } ] }],
+    });
+    const ref = (machine: string, pane: string) => ({ machine_id: machine, session: "s", pane_id: pane });
+    const hud = () => screen.queryByRole("status", { name: "Needs you" });
+
+    it("walks the agents that need you across machines and shows where it is", () => {
+      useLayout.setState({ layout: "normal" });
+      useApp.setState({
+        machines: { a: m("a", [p("x", "blocked"), p("y", "working")]), b: m("b", [p("z", "blocked")]) },
+        order: ["a", "b"], selected: null, dashboardOpen: false, doneSeen: {}, statusSince: { "b/s/z": 1, "a/s/x": 2 },
+      });
+      render(<App />);
+      fireEvent.keyDown(window, { key: "j", metaKey: true });
+      expect(useApp.getState().selected).toEqual(ref("b", "z"));
+      expect(hud()?.textContent).toContain("1 of 2");
+      fireEvent.keyDown(window, { key: "j", metaKey: true });
+      expect(useApp.getState().selected).toEqual(ref("a", "x"));
+      fireEvent.keyDown(window, { key: "J", metaKey: true, shiftKey: true });
+      expect(useApp.getState().selected).toEqual(ref("b", "z"));
+      fireEvent.keyDown(window, { key: "Escape" });
+      expect(hud()).toBeNull();
+      useApp.setState({ selected: null });
+    });
+
+    it("says so when nothing needs you", () => {
+      useApp.setState({ machines: { a: m("a", [p("y", "working")]) }, order: ["a"], selected: null, dashboardOpen: false });
+      render(<App />);
+      fireEvent.keyDown(window, { key: "j", metaKey: true });
+      expect(hud()?.textContent).toContain("Nothing needs you");
+      expect(useApp.getState().selected).toBeNull();
     });
   });
 });
