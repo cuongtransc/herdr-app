@@ -1,9 +1,11 @@
 import type { ReactNode } from "react";
 import { TILED_MARKS, agentMark } from "./AgentMark";
 
+// Framed, so it never reads as a fold chevron beside the rows that have one.
 const TERMINAL = (
   <svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-    <path d="M5 7l5 5-5 5M12 18h7" />
+    <rect x="3" y="3" width="18" height="18" rx="2" />
+    <path d="M7 11l2-2-2-2M11 13h4" />
   </svg>
 );
 
