@@ -86,6 +86,31 @@ One rolling or calendar period of a Quota (`5h`, `week`, `month`) with a used pe
 **Reset**:
 The moment a Window's used percent goes back to zero.
 
+## UI surfaces
+
+The names to use when talking about the screen, in issues, specs and prompts: each is what the
+user sees, then where it lives.
+
+| Surface | What it is | Code |
+|---|---|---|
+| **Sidebar** | The left column: Bookmarks, Sessions, Machines | `src/sidebar/Sidebar.tsx` |
+| **Session row** | A Session in the Sidebar | `SessionRow` |
+| **Project row** | A Workspace with agent work, under its Session row | `ProjectRows` (`src/sidebar/ProjectRows.tsx`), `sessionProjects` |
+| **Sessions filter** | All \| Active on the Sessions header | `useSessionFilter` (`src/sidebar/activeFilter.ts`) |
+| **Agents column** | The middle column, headed by the Session name and PANES | `src/agents/AgentList.tsx` |
+| **Pane row** | A Pane in the Agents column | `AgentCard` |
+| **Panes filter** | All \| Active on the PANES header | `usePaneFilter` (`src/agents/paneFilter.ts`), `PanesHeader` |
+| **Queue chip** | "1 blocked · 1 review" atop the Agents column | `SessionQueueChip` |
+| **Lane toggle** | "N lanes ›" on an orchestrator's Pane row | `.lane-toggle` in `AgentList.tsx` |
+| **Triage HUD** | The queue shown by ⌘J | `src/main/TriageHud.tsx`, `src/main/triage.ts` |
+| **Agent Board** | The ⇧⌘D overlay, with the Quota column | `src/dashboard/AgentDashboard.tsx`, `QuotaColumn` |
+| **Chat lens** / **Terminal lens** | The main area, as a conversation or the raw terminal | `src/chat/ChatLens.tsx`, `src/terminal/TerminalLens.tsx` |
+| **Composer** / **Composer chips** | The message box and the reply buttons above it | `src/chat/Composer.tsx` |
+
+Status words, everywhere a status is put in words (ui-ux-guidelines §3.1): **Blocked** = `blocked`,
+**In progress** = `working`, **Review** = `done` not yet seen, **Done** = `done` seen or `idle`.
+_Avoid_: INPUT, Needs you, waiting, To do
+
 ## Relationships
 
 - A **Machine** has zero or more **Sessions**
