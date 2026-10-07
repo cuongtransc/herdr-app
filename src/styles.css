@@ -736,7 +736,15 @@ kbd {
 }
 .quick-reply-row input:focus { border-color: var(--accent); box-shadow: var(--ring); }
 .quick-reply-row input::placeholder { color: var(--fg-3); }
-.quick-reply-row .icon-btn:disabled { color: var(--fg-3); opacity: 0.5; background: none; cursor: default; }
+.quick-reply-grip {
+  flex: none; display: grid; place-items: center; width: 18px; height: 28px; padding: 0; margin-right: -2px;
+  border: 0; border-radius: var(--r-sm); background: none; color: var(--fg-3); cursor: grab; touch-action: none;
+  transition: color var(--t-fast);
+}
+.quick-reply-grip:hover { color: var(--fg-2); }
+.quick-reply-grip:focus-visible { outline: none; box-shadow: var(--ring); }
+.quick-reply-row.dragging { position: relative; z-index: 1; border-radius: var(--r-sm); background: var(--surface-2); box-shadow: var(--shadow-pop); }
+.quick-reply-row.dragging .quick-reply-grip { cursor: grabbing; color: var(--fg-2); }
 .setting-row { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
 .setting-row > span { white-space: nowrap; }
 .font-picker { position: relative; width: 220px; min-width: 0; }

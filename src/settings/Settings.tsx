@@ -1,12 +1,12 @@
-import { type CSSProperties, memo, useEffect, useRef, useState } from "react";
+import { type CSSProperties, memo, type PointerEvent, useEffect, useRef, useState } from "react";
 import { create } from "zustand";
 import { notificationsEnabled, setNotificationsEnabled } from "../notify";
-import { ArrowDownIcon, ArrowUpIcon, CloseIcon, GearIcon, SearchIcon } from "../ui/icons";
+import { CloseIcon, GearIcon, GripIcon, SearchIcon } from "../ui/icons";
 import { FontPicker } from "./FontPicker";
 import { NEW_AGENT_LENSES, useLensSettings } from "./lens";
 import { useNewTab } from "./newTab";
 import { AGENTS } from "../agents/openAgentTab";
-import { DEFAULT_QUICK_REPLIES, moveReply, QUICK_REPLIES_MAX, QUICK_REPLY_MAX_CHARS, useQuickReplies } from "./quickReplies";
+import { DEFAULT_QUICK_REPLIES, moveReply, moveReplyTo, QUICK_REPLIES_MAX, QUICK_REPLY_MAX_CHARS, slotAt, useQuickReplies } from "./quickReplies";
 import { CHAT_SIZE, DEFAULTS, TERM_SIZE, useSettings } from "./store";
 import { THEME_PREFS, useTheme } from "./theme";
 
@@ -144,18 +144,54 @@ function ChatSettings() {
     added.current = false;
     list.current?.querySelector<HTMLInputElement>(".quick-reply-row:last-child input")?.focus();
   }, [q.replies.length]);
-  // A row moved with ⌥↑ / ⌥↓ keeps the caret: rows are keyed by position, so focus its new place.
-  const moved = useRef<number | null>(null);
+  // A row moved from the keyboard keeps focus where it was (the field or the grip): rows are keyed by
+  // position, so focus that control at the row's new place.
+  const moved = useRef<{ at: number; selector: string } | null>(null);
   useEffect(() => {
-    if (moved.current === null) return;
-    list.current?.querySelectorAll<HTMLInputElement>(".quick-reply-row input")[moved.current]?.focus();
+    if (!moved.current) return;
+    list.current?.querySelectorAll<HTMLElement>(`.quick-reply-row ${moved.current.selector}`)[moved.current.at]?.focus();
     moved.current = null;
   }, [q.replies]);
-  const move = (i: number, by: -1 | 1) => {
+  const move = (i: number, by: -1 | 1, selector: string) => {
     const next = moveReply(q.replies, i, by);
     if (next === q.replies) return;
-    moved.current = i + by;
+    moved.current = { at: i + by, selector };
     q.setReplies(next);
+  };
+
+  // Dragging by the grip: the row follows the pointer and the list reorders as its middle passes a
+  // neighbour's. Slots are measured once at the press; rows share one height.
+  const [drag, setDrag] = useState<{ at: number; dy: number } | null>(null);
+  const dragging = useRef<{ at: number; grab: number; tops: number[]; mids: number[]; height: number } | null>(null);
+  const startDrag = (i: number, e: PointerEvent<HTMLButtonElement>) => {
+    if (e.button !== 0) return;
+    const rects = [...(list.current?.querySelectorAll<HTMLElement>(".quick-reply-row") ?? [])].map((r) => r.getBoundingClientRect());
+    if (!rects[i]) return;
+    e.preventDefault();
+    e.currentTarget.setPointerCapture?.(e.pointerId);
+    dragging.current = {
+      at: i,
+      grab: e.clientY - rects[i].top,
+      tops: rects.map((r) => r.top),
+      mids: rects.map((r) => r.top + r.height / 2),
+      height: rects[i].height,
+    };
+    setDrag({ at: i, dy: 0 });
+  };
+  const moveDrag = (e: PointerEvent<HTMLButtonElement>) => {
+    const d = dragging.current;
+    if (!d) return;
+    const top = e.clientY - d.grab;
+    const to = slotAt(top + d.height / 2, d.mids);
+    if (to !== d.at) {
+      q.setReplies(moveReplyTo(useQuickReplies.getState().replies, d.at, to));
+      d.at = to;
+    }
+    setDrag({ at: d.at, dy: top - d.tops[d.at] });
+  };
+  const endDrag = () => {
+    dragging.current = null;
+    setDrag(null);
   };
   const isDefault = q.replies.length === DEFAULT_QUICK_REPLIES.length && q.replies.every((r, i) => r === DEFAULT_QUICK_REPLIES[i]);
   return (
@@ -181,10 +217,31 @@ function ChatSettings() {
         <span>Quick replies</span>
         <input type="checkbox" role="switch" checked={q.show} onChange={(e) => q.setShow(e.target.checked)} />
       </label>
-      <p className="note">Buttons above the message box that send a short reply in one click.</p>
+      <p className="note">Buttons above the message box that send a short reply in one click. Drag to reorder, or ⌥↑ / ⌥↓.</p>
       <div className="quick-reply-list" ref={list}>
         {q.replies.map((r, i) => (
-          <div key={i} className="quick-reply-row">
+          <div
+            key={i}
+            className={drag?.at === i ? "quick-reply-row dragging" : "quick-reply-row"}
+            style={drag?.at === i ? { transform: `translateY(${drag.dy}px)` } : undefined}
+          >
+            <button
+              className="quick-reply-grip"
+              aria-label={`Reorder quick reply ${i + 1}`}
+              title="Drag to reorder (↑ / ↓ when focused)"
+              onPointerDown={(e) => startDrag(i, e)}
+              onPointerMove={moveDrag}
+              onPointerUp={endDrag}
+              onPointerCancel={endDrag}
+              onKeyDown={(e) => {
+                if (e.altKey || e.metaKey || e.ctrlKey || e.shiftKey) return;
+                if (e.key !== "ArrowUp" && e.key !== "ArrowDown") return;
+                e.preventDefault();
+                move(i, e.key === "ArrowUp" ? -1 : 1, ".quick-reply-grip");
+              }}
+            >
+              <GripIcon />
+            </button>
             <input
               spellCheck={false}
               autoCorrect="off"
@@ -198,21 +255,9 @@ function ChatSettings() {
                 if (!e.altKey || e.metaKey || e.ctrlKey || e.shiftKey) return;
                 if (e.key !== "ArrowUp" && e.key !== "ArrowDown") return;
                 e.preventDefault();
-                move(i, e.key === "ArrowUp" ? -1 : 1);
+                move(i, e.key === "ArrowUp" ? -1 : 1, "input");
               }}
             />
-            <button className="icon-btn" aria-label={`Move quick reply ${i + 1} up`} title="Move up (⌥↑)" disabled={i === 0} onClick={() => move(i, -1)}>
-              <ArrowUpIcon />
-            </button>
-            <button
-              className="icon-btn"
-              aria-label={`Move quick reply ${i + 1} down`}
-              title="Move down (⌥↓)"
-              disabled={i === q.replies.length - 1}
-              onClick={() => move(i, 1)}
-            >
-              <ArrowDownIcon />
-            </button>
             <button className="icon-btn" aria-label={`Remove quick reply ${i + 1}`} onClick={() => q.setReplies(q.replies.filter((_, j) => j !== i))}>
               <CloseIcon />
             </button>

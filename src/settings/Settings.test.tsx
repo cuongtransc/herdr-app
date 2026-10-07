@@ -110,15 +110,15 @@ describe("Settings quick replies", () => {
     expect(useQuickReplies.getState().replies).toEqual(DEFAULT_QUICK_REPLIES);
   });
 
-  it("reorders replies with the arrow buttons, the ends disabled", () => {
+  it("reorders from the grip with ↑ / ↓, keeping focus on the grip", () => {
     useQuickReplies.setState({ show: true, replies: ["a", "b", "c"] });
     openChat();
-    expect(screen.getByRole<HTMLButtonElement>("button", { name: "Move quick reply 1 up" }).disabled).toBe(true);
-    expect(screen.getByRole<HTMLButtonElement>("button", { name: "Move quick reply 3 down" }).disabled).toBe(true);
-    fireEvent.click(screen.getByRole("button", { name: "Move quick reply 3 up" }));
+    expect(screen.queryByRole("button", { name: /Move quick reply/ })).toBeNull();
+    fireEvent.keyDown(screen.getByRole("button", { name: "Reorder quick reply 3" }), { key: "ArrowUp" });
     expect(useQuickReplies.getState().replies).toEqual(["a", "c", "b"]);
-    fireEvent.click(screen.getByRole("button", { name: "Move quick reply 1 down" }));
-    expect(useQuickReplies.getState().replies).toEqual(["c", "a", "b"]);
+    expect(document.activeElement).toBe(screen.getByRole("button", { name: "Reorder quick reply 2" }));
+    fireEvent.keyDown(screen.getByRole("button", { name: "Reorder quick reply 1" }), { key: "ArrowUp" });
+    expect(useQuickReplies.getState().replies).toEqual(["a", "c", "b"]);
   });
 
   it("moves the reply being edited with ⌥↑ / ⌥↓, and keeps the caret in it", () => {
