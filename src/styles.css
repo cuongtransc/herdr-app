@@ -389,7 +389,8 @@ kbd {
 }
 .row.active .badge { background: var(--surface-0); }
 /* A Session row: name, then (right) the bookmark star in its Group, a remote Machine's name, the needs-you count. */
-.session .row .label { flex: 1; }
+/* The name and its bookmark star share the free space, so the star sits right after the name. */
+.session .row .session-name { flex: 1; min-width: 0; display: flex; align-items: center; gap: 5px; }
 .machine-chip { flex: none; color: var(--fg-3); font-size: var(--fs-xs); }
 .bookmark-mark { width: 11px; height: 11px; color: var(--fg-3); }
 .need {
