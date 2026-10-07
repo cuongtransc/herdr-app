@@ -1,10 +1,10 @@
 import { lazy, Suspense, useEffect, useMemo, useState } from "react";
 import "./fonts/fonts.css";
 import "./styles.css";
-import { machinesList, onMachine, onNotifyActivate, onPaneStatus, sessionStart } from "./lib/ipc";
+import { machinesList, onMachine, onMenuSettings, onNotifyActivate, onPaneStatus, sessionStart } from "./lib/ipc";
 import { notifyPaneStatus } from "./notify";
 import { Palette } from "./palette/Palette";
-import { Settings } from "./settings/Settings";
+import { Settings, useSettingsOpen } from "./settings/Settings";
 import { applyChatFont, useSettings } from "./settings/store";
 import { applyTheme, useTheme } from "./settings/theme";
 import { Header } from "./main/Header";
@@ -132,6 +132,20 @@ export default function App() {
       unlisten?.();
     };
   }, [upsert]);
+
+  // The app menu's Settings… ⌘, (a native menu item, so it works while a terminal or the Composer has focus).
+  useEffect(() => {
+    let cancelled = false;
+    let unlisten: (() => void) | undefined;
+    void onMenuSettings(() => useSettingsOpen.getState().show()).then((u) => {
+      if (cancelled) u();
+      else unlisten = u;
+    });
+    return () => {
+      cancelled = true;
+      unlisten?.();
+    };
+  }, []);
 
   // Notifications: show one per status change, and jump to its pane when clicked.
   useEffect(() => {

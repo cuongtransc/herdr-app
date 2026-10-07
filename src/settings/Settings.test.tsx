@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, within } from "@testing-library/react";
+import { act, fireEvent, render, screen, within } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("../lib/ipc", () => ({
@@ -8,11 +8,12 @@ vi.mock("../lib/ipc", () => ({
 }));
 import { loadLensSettings, useLensSettings } from "./lens";
 import { DEFAULT_QUICK_REPLIES, QUICK_REPLIES_MAX, useQuickReplies } from "./quickReplies";
-import { Settings } from "./Settings";
+import { Settings, useSettingsOpen } from "./Settings";
 import { DEFAULTS, loadFonts, useSettings } from "./store";
 import { useTheme } from "./theme";
 
 beforeEach(() => {
+  useSettingsOpen.setState({ open: false });
   localStorage.clear();
   useSettings.setState({ ...DEFAULTS });
 });
@@ -24,6 +25,17 @@ function openSettings() {
 }
 
 describe("Settings dialog", () => {
+  it("opens when asked from outside (the app menu's Settings… ⌘,), and stays open when asked again", () => {
+    render(<Settings />);
+    act(() => useSettingsOpen.getState().show());
+    expect(screen.getAllByRole("dialog", { name: "Settings" })).toHaveLength(1);
+    act(() => useSettingsOpen.getState().show());
+    expect(screen.getAllByRole("dialog", { name: "Settings" })).toHaveLength(1);
+    fireEvent.keyDown(screen.getByRole("dialog", { name: "Settings" }), { key: "Escape" });
+    expect(screen.queryByRole("dialog", { name: "Settings" })).toBeNull();
+    expect(useSettingsOpen.getState().open).toBe(false);
+  });
+
   it("switches the theme from the Appearance section", () => {
     useTheme.setState({ pref: "dark", theme: "dark" });
     render(<Settings />);
