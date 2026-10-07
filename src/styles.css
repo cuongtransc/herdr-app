@@ -324,7 +324,8 @@ kbd {
 
 /* The first column left takes the traffic lights and the controls. */
 /* --lead: past the traffic lights and the controls, measured by LayoutControls. */
-.app[data-layout="sidebar-hidden"] .agents-head { padding-left: var(--lead, 116px); }
+/* The controls take the Agents column's titlebar row, so its head moves to a row of its own below. */
+.app[data-layout="sidebar-hidden"] .agents-head { height: auto; padding: var(--titlebar) 12px 8px 16px; }
 .app[data-layout="focus"] .header { padding-left: var(--lead, 116px); }
 .app:not([data-layout="normal"]) .dashboard { left: 0; }
 .app[data-layout="focus"] .dashboard { box-shadow: none; }
