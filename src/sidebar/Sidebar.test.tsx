@@ -46,6 +46,17 @@ describe("Sidebar", () => {
     expect(within(tree).getByRole("button", { name: "herdr-app, blocked" })).toBeTruthy();
     expect(row("ai-radar").querySelector(".need")).toBeNull();
   });
+  it("Active keeps a session and its project for 30 minutes after its agent stopped, saying how long ago", () => {
+    const idle = structuredClone(m);
+    idle.sessions[0].workspaces[0].tabs[0].panes[0].status = "idle";
+    useApp.setState({ machines: { box: idle }, doneSeen: {}, statusSince: { "box/default/w1:p1": Date.now() - 12 * 60_000 } });
+    useSessionFilter.setState({ filter: "active" });
+    render(<Sidebar />);
+    const project = screen.getByRole("button", { name: "herdr-app, idle 12m" });
+    expect(project.className).toContain("recent");
+    expect(project.textContent).toBe("herdr-app12m");
+    useApp.setState({ statusSince: {} });
+  });
   it("lists a session's projects under it: Blocked, Review, the lanes of one in progress", () => {
     const s = structuredClone(m);
     const p = (pane_id: string, status: "working" | "blocked" | "done" | "idle") => ({ pane_id, terminal_id: "t" + pane_id, title: pane_id, cwd: "/x", agent: "claude", status });

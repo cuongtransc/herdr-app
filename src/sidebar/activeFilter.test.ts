@@ -65,3 +65,13 @@ describe("useSessionFilter", () => {
     localStorage.removeItem("herdr-app:settings");
   });
 });
+
+describe("isActiveSession, recently active", () => {
+  const MIN = 60_000;
+  it("keeps a session whose agent changed in the last 30 minutes", () => {
+    const s = session("a", [pane("p", "idle")]);
+    expect(isActiveSession(machine, s, {}, { "m/a/p": 100 * MIN - 5 * MIN }, 100 * MIN)).toBe(true);
+    expect(isActiveSession(machine, s, {}, { "m/a/p": 100 * MIN - 31 * MIN }, 100 * MIN)).toBe(false);
+    expect(isActiveSession(machine, s, {}, {}, 100 * MIN)).toBe(false);
+  });
+});

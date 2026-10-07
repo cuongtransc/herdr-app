@@ -1,4 +1,5 @@
 import { useMemo } from "react";
+import { idleLabel, useMinuteClock } from "../agents/paneFilter";
 import type { MachineView, SessionView } from "../lib/types";
 import { useApp } from "../store/app";
 import { CheckIcon } from "../ui/icons";
@@ -21,8 +22,10 @@ function useSelectedWorkspace(machineId: string, session: SessionView): string |
 /** A Session's projects (its Workspaces with agent work; every one under All) as rows under it. */
 export function useProjects(machine: MachineView, session: SessionView): { rows: ProjectRow[]; current: string | null } {
   const doneSeen = useApp((s) => s.doneSeen);
+  const since = useApp((s) => s.statusSince);
+  const now = useMinuteClock();
   const all = useSessionFilter((s) => s.filter === "all");
-  const rows = useMemo(() => sessionProjects(machine, session, doneSeen, all), [machine, session, doneSeen, all]);
+  const rows = useMemo(() => sessionProjects(machine, session, doneSeen, all, since, now), [machine, session, doneSeen, all, since, now]);
   const selectedWs = useSelectedWorkspace(machine.id, session);
   const fromTree = useViewOrigin((s) => s.from === "sessions");
   return { rows, current: fromTree && rows.some((r) => r.id === selectedWs) ? selectedWs : null };
@@ -36,6 +39,8 @@ export function ProjectRows({ rows, current }: { rows: ProjectRow[]; current: st
       {rows.map((r) => {
         const word = WORD[r.state];
         const lanes = r.state === "working" && r.lanes > 0 ? `${r.lanes} ${r.lanes === 1 ? "lane" : "lanes"}` : null;
+        // A project kept for having stopped recently says how long ago, as an idle pane row does.
+        const age = r.idleFor !== undefined ? idleLabel(r.idleFor) : null;
         const open = () => {
           if (!r.target) return;
           setOrigin("sessions");
@@ -47,12 +52,12 @@ export function ProjectRows({ rows, current }: { rows: ProjectRow[]; current: st
               type="button"
               className={"project-row " + r.state + (r.id === current ? " active" : "")}
               aria-current={r.id === current ? "true" : undefined}
-              aria-label={[r.label, word?.toLowerCase(), lanes].filter(Boolean).join(", ")}
+              aria-label={[r.label, word?.toLowerCase(), lanes, age && `idle ${age}`].filter(Boolean).join(", ")}
               onClick={open}
             >
               {r.state === "review" ? <CheckIcon className="icon mark-done" aria-hidden="true" /> : <span className="project-dot" aria-hidden="true" />}
               <span className="label">{r.label}</span>
-              {word ? <span className={"project-word " + r.state}>{word}</span> : lanes && <span className="project-meta">{lanes}</span>}
+              {word ? <span className={"project-word " + r.state}>{word}</span> : (lanes ?? age) && <span className="project-meta">{lanes ?? age}</span>}
             </button>
           </li>
         );

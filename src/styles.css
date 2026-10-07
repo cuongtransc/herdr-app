@@ -410,7 +410,7 @@ kbd {
 .project-row.blocked { background: color-mix(in srgb, var(--amber) 7%, transparent); color: var(--fg); }
 .project-row.active { background: var(--active); color: var(--fg); }
 .project-row.active .label { font-weight: 500; }
-.project-row.quiet { color: var(--fg-3); }
+.project-row.quiet, .project-row.recent { color: var(--fg-3); }
 .project-row .label { flex: 1; }
 .project-dot { flex: 0 0 7px; width: 7px; height: 7px; border-radius: 50%; background: var(--grey); }
 .project-row.blocked .project-dot { background: var(--amber); }
