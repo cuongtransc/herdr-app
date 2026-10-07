@@ -50,25 +50,43 @@ function Body({ entry, now }: { entry: QuotaEntry; now: number }) {
   }
 }
 
-/** One card per Provider with its usage windows; independent of the agent search and filters. */
-export function QuotaColumn() {
-  const slots = useQuota((s) => s.slots);
+/** Fetches the quota while mounted: once now, then on the schedule (`isDue`), skipped while the window is hidden. */
+export function useQuotaPolling(): void {
   const refresh = useQuota((s) => s.refresh);
-  const [now, setNow] = useState(() => Date.now());
-  const busy = QUOTA_PROVIDERS.some((p) => slots[p].inFlight);
-
   useEffect(() => {
     void refresh("shown");
-    const poll = setInterval(() => void refresh("tick"), 30_000);
-    const clock = setInterval(() => setNow(Date.now()), 1_000);
+    const poll = setInterval(() => {
+      if (!document.hidden) void refresh("tick");
+    }, 30_000);
+    const shown = () => {
+      if (!document.hidden) void refresh("shown");
+    };
+    document.addEventListener("visibilitychange", shown);
     return () => {
       clearInterval(poll);
-      clearInterval(clock);
+      document.removeEventListener("visibilitychange", shown);
     };
   }, [refresh]);
+}
 
+/** The current time, every second while mounted: reset countdowns tick. */
+export function useSecondClock(): number {
+  const [now, setNow] = useState(() => Date.now());
+  useEffect(() => {
+    const clock = setInterval(() => setNow(Date.now()), 1_000);
+    return () => clearInterval(clock);
+  }, []);
+  return now;
+}
+
+/** The Quota head (title and refresh) and one card per Provider; `signedInOnly` folds the others into one line. */
+export function QuotaDetail({ now, signedInOnly = false }: { now: number; signedInOnly?: boolean }) {
+  const slots = useQuota((s) => s.slots);
+  const refresh = useQuota((s) => s.refresh);
+  const busy = QUOTA_PROVIDERS.some((p) => slots[p].inFlight);
+  const out = signedInOnly ? QUOTA_PROVIDERS.filter((p) => slots[p].entry.kind === "notSignedIn") : [];
   return (
-    <section className="dash-col dash-col-quota" role="region" aria-label="Quota">
+    <>
       <div className="dash-col-head">
         <span className="dash-col-title">Quota</span>
         <button
@@ -80,7 +98,7 @@ export function QuotaColumn() {
         </button>
       </div>
       <ul className="dash-cards">
-        {QUOTA_PROVIDERS.map((p) => (
+        {QUOTA_PROVIDERS.filter((p) => !out.includes(p)).map((p) => (
           <li key={p} className="dash-quota-card">
             <span className="dash-card-head">
               <AgentIcon agent={PROVIDER_INFO[p].agent} />
@@ -90,6 +108,18 @@ export function QuotaColumn() {
           </li>
         ))}
       </ul>
+      {out.length > 0 && <p className="dash-quota-note quota-out">Not signed in: {out.map((p) => PROVIDER_INFO[p].name).join(", ")}</p>}
+    </>
+  );
+}
+
+/** One card per Provider with its usage windows; independent of the agent search and filters. */
+export function QuotaColumn() {
+  useQuotaPolling();
+  const now = useSecondClock();
+  return (
+    <section className="dash-col dash-col-quota" role="region" aria-label="Quota">
+      <QuotaDetail now={now} />
     </section>
   );
 }

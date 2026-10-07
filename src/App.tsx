@@ -13,6 +13,7 @@ import { TriageHud } from "./main/TriageHud";
 import { useTriage } from "./main/triage";
 import { useLayout } from "./settings/layout";
 import { Sidebar } from "./sidebar/Sidebar";
+import { QuotaStrip } from "./sidebar/QuotaStrip";
 import { guardFileDrops } from "./sidebar/dnd";
 import { AgentList } from "./agents/AgentList";
 import { AgentDashboard } from "./dashboard/AgentDashboard";
@@ -196,6 +197,7 @@ export default function App() {
         <div className="sidebar-scroll">
           <Sidebar />
         </div>
+        <QuotaStrip />
         <Settings />
       </nav>
       <aside className="agents" aria-label="Agents" hidden={layout === "focus"}>
