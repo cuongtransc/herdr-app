@@ -285,7 +285,8 @@ export function ChatLens({ pane, view }: { pane: PaneRef; view: PaneView }) {
                   <WorkBlockView
                     block={row.block}
                     results={results}
-                    open={chosenOpen.get(row.block.id) ?? row.last}
+                    // Folded until opened, the latest turn too: the header's summary says what was done.
+                    open={chosenOpen.get(row.block.id) ?? false}
                     onToggle={toggle}
                     live={live && row.last}
                   />

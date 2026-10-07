@@ -10,6 +10,25 @@ vi.mock("../lib/ipc", () => ({
   completeFiles: vi.fn().mockResolvedValue([]),
   chatGitStatus: vi.fn().mockResolvedValue(null),
 }));
+// jsdom lays nothing out, so the virtualizer renders no rows. A test that needs rows sets
+// `viewport.on`, giving the scroll element a size; the others keep the real (empty) measuring.
+const viewport = vi.hoisted(() => ({ on: false }));
+vi.mock("@tanstack/react-virtual", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@tanstack/react-virtual")>();
+  return {
+    ...actual,
+    useVirtualizer: (opts: Parameters<typeof actual.useVirtualizer>[0]) =>
+      actual.useVirtualizer({
+        ...opts,
+        ...(viewport.on && {
+          observeElementRect: (_v: unknown, cb: (rect: { width: number; height: number }) => void) => {
+            cb({ width: 800, height: 4000 });
+            return () => {};
+          },
+        }),
+      }),
+  };
+});
 let opened: Promise<unknown> = new Promise(() => {});
 const channels = vi.hoisted(() => [] as { onmessage: (ev: unknown) => void }[]);
 const openedPaths = vi.hoisted(() => [] as (string | null)[]);
@@ -42,6 +61,7 @@ const picker = `
 let shown = "";
 
 beforeEach(() => {
+  viewport.on = false;
   localStorage.clear();
   opened = new Promise(() => {});
   channels.length = 0;
@@ -187,5 +207,23 @@ describe("ChatLens", () => {
     expect(lit()).toBe("now the footer");
     fireEvent.wheel(container.querySelector(".chat-scroll")!);
     expect(lit()).toBe("fix the header");
+  });
+
+  it("folds every turn's work by default, the latest one too", async () => {
+    viewport.on = true;
+    opened = Promise.resolve({ agent: "pi", path: "/h/sid.jsonl", ambiguous: false, candidates: ["/h/sid.jsonl"], pending: false });
+    render(<ChatLens pane={pane} view={idlePi} />);
+    await act(async () => {});
+    const items = [
+      { kind: "user", text: "fix the header" },
+      { kind: "tool_call", id: "c1", name: "Bash", input_summary: "git status", input: {} },
+      { kind: "tool_result", call_id: "c1", output: "clean", is_error: false },
+      { kind: "assistant_text", markdown: "done" },
+    ];
+    act(() => channels[channels.length - 1].onmessage({ type: "reset", items, total: items.length }));
+    const head = screen.getByRole("button", { name: /^Worked/ });
+    expect(head.getAttribute("aria-expanded")).toBe("false");
+    fireEvent.click(head);
+    expect(head.getAttribute("aria-expanded")).toBe("true");
   });
 });
