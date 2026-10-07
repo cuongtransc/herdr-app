@@ -519,6 +519,11 @@ kbd {
 /* The mark slot at a row's end; idle and shells keep it empty so titles align. */
 .agent-card .mark { flex: none; width: 8px; height: 8px; border-radius: 50%; }
 .agent-card .mark-working { background: var(--blue); }
+/* An agent whose state herdr cannot read: a question, not an alarm. */
+.agent-card .mark-unknown {
+  flex: none; width: 14px; height: 14px; box-sizing: border-box; display: grid; place-items: center;
+  border: 1px dashed var(--fg-3); border-radius: 50%; color: var(--fg-3); font-size: 9px; font-weight: 700;
+}
 .agent-card .mark-blocked { background: var(--amber); box-shadow: 0 0 0 3px color-mix(in srgb, var(--amber) 22%, transparent); animation: pulse 1.6s ease-in-out infinite; }
 .agent-card .mark-done { flex: none; width: 12px; height: 12px; margin: 0 -2px; color: var(--green); stroke-width: 3; }
 .agent-input { flex: none; color: var(--amber-text); font-size: var(--fs-xs); font-weight: 700; letter-spacing: .04em; }

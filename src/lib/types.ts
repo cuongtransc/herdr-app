@@ -32,6 +32,8 @@ export interface PaneView {
   cwd: string | null;
   agent: string | null;
   status: AgentStatus;
+  /** A shell's: whether a command holds its terminal; null for an agent or before herdr was asked. */
+  busy?: boolean | null;
 }
 
 export interface TabView {

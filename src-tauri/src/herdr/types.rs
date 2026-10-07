@@ -76,6 +76,14 @@ pub struct PaneInfo {
     pub foreground_cwd: Option<String>,
     pub terminal_title_stripped: Option<String>,
     pub agent_status: AgentStatus,
+    /// The agent session herdr recorded, kept even when it lost track of the agent itself.
+    pub agent_session: Option<AgentSession>,
+}
+
+#[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize)]
+#[serde(default)]
+pub struct AgentSession {
+    pub agent: Option<String>,
 }
 
 #[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize)]

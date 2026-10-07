@@ -42,28 +42,31 @@ function tabRuns(entries: PaneEntry[]): PaneEntry[][] {
 }
 
 /** What a row's accessible name says about its status; "" for a shell, which herdr reports none for. */
-function statusWord(status: AgentStatus, seen: boolean): string {
+function statusWord(status: AgentStatus, seen: boolean, agent: boolean): string {
   if (status === "blocked") return "needs input";
   if (status === "working") return "working";
   if (status === "done") return seen ? "done" : "done, not seen";
   if (status === "idle") return "idle";
-  return "";
+  return agent ? "state unknown" : "";
 }
 
-/** A pane's title when it is only the shell's name: such a shell has nothing to watch. */
-const SHELL_NAMES = new Set(["sh", "bash", "zsh", "fish", "nu", "pwsh", "dash", "ksh", "tcsh"]);
-const isPlainShell = (pane: PaneView) => !pane.agent && SHELL_NAMES.has(pane.title.trim().replace(/^-/, ""));
+/** A pane's title when it is only the shell's name ("terminal": herdr names an untitled one). */
+const SHELL_NAMES = new Set(["sh", "bash", "zsh", "fish", "nu", "pwsh", "dash", "ksh", "tcsh", "terminal"]);
+/** A shell with nothing to watch: idle at its prompt, by its process when herdr reported it, else by its title. */
+const isPlainShell = (pane: PaneView) =>
+  !pane.agent && (pane.busy != null ? !pane.busy : SHELL_NAMES.has(pane.title.trim().replace(/^-/, "").toLowerCase()));
 
 /** Where a pane goes in the column (docs/design/ui-ux-guidelines.md §7.1): shown, or folded as idle or shell. */
 function placement(pane: PaneView, seen: boolean): "shown" | "idle" | "shell" {
   if (!pane.agent) return isPlainShell(pane) ? "shell" : "shown";
-  if (pane.status === "blocked" || pane.status === "working") return "shown";
+  // An agent herdr cannot read may be waiting on the user: never hide it.
+  if (pane.status === "blocked" || pane.status === "working" || pane.status === "unknown") return "shown";
   if (pane.status === "done" && !seen) return "shown";
   return "idle";
 }
 
 /** The mark at a row's end: only the states that ask for a look carry one. */
-function StatusMark({ status, seen }: { status: AgentStatus; seen: boolean }) {
+function StatusMark({ status, seen, agent }: { status: AgentStatus; seen: boolean; agent: boolean }) {
   if (status === "blocked")
     return (
       <>
@@ -73,6 +76,12 @@ function StatusMark({ status, seen }: { status: AgentStatus; seen: boolean }) {
     );
   if (status === "working") return <span className="mark mark-working" aria-hidden="true" />;
   if (status === "done" && !seen) return <CheckIcon className="icon mark-done" aria-hidden="true" />;
+  if (status === "unknown" && agent)
+    return (
+      <span className="mark-unknown" title="herdr can't read this agent's state (started through a wrapper?)">
+        ?
+      </span>
+    );
   return <span className="mark" aria-hidden="true" />;
 }
 
@@ -84,7 +93,7 @@ function AgentCard({ machineId, session, entry, reorder, tabRow }: { machineId: 
   const ref = { machine_id: machineId, session, pane_id: pane.pane_id };
   const active = useApp((s) => s.selected !== null && paneKey(s.selected) === paneKey(ref));
   const seen = useApp((s) => !!s.doneSeen[paneKey(ref)]);
-  const word = statusWord(pane.status, seen);
+  const word = statusWord(pane.status, seen, !!pane.agent);
   // The tab's name only when it says more than its number.
   const sub = entry.sub && !/^\d+$/.test(entry.sub) ? entry.sub : "";
   const select = useApp((s) => s.select);
@@ -119,7 +128,7 @@ function AgentCard({ machineId, session, entry, reorder, tabRow }: { machineId: 
       >
         <AgentIcon agent={pane.agent} />
         <span className="agent-card-title">{pane.title}</span>
-        <StatusMark status={pane.status} seen={seen} />
+        <StatusMark status={pane.status} seen={seen} agent={!!pane.agent} />
       </button>
       <button className="agent-card-close" aria-label={`Close ${pane.title}`} title="Close pane" onClick={() => a?.guard(close)}>
         <CloseIcon />
