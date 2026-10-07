@@ -59,11 +59,17 @@ and by how calm it is when nothing needs the user.
 
 | State | Meaning | Colour | Mark in a list row | Word |
 |---|---|---|---|---|
-| blocked | waiting for the user's input | `--amber` | filled dot, pulsing (static under reduced motion) + 7% amber row tint | **INPUT**, in `--amber-text` |
-| working | agent busy | `--blue` | filled dot, no halo | none |
-| done, unseen | finished since last viewed | `--green` | check glyph | none |
-| done, seen / idle | nothing to do | — | none (slot kept so titles align) | none |
+| blocked | waiting for the user's answer or approval | `--amber` | filled dot, pulsing (static under reduced motion) + 7% amber row tint | **Blocked**, in `--amber-text` |
+| working | agent busy | `--blue` | filled dot, no halo | none (*In progress* in counts and accessible names) |
+| done, unseen | finished since last viewed: its result waits for a look | `--green` | check glyph | **Review**, in `--green-text` |
+| done, seen / idle | nothing to do | — | none (slot kept so titles align) | none (*Done* in counts) |
 | shell / unknown | no agent | — | none | none |
+
+- **One vocabulary, the task tracker's**: Blocked · In progress · Review · Done, everywhere a status
+  is put in words (rows, the PANES chip "1 blocked · 1 review", the focus pill, the ⌘J queue, the
+  Board columns, accessible names). A row carries a word only when the user has to act (Blocked,
+  Review). Avoid "INPUT" (a system word: who inputs what?), "Needs you" (long), "waiting" (who waits
+  on whom?) and "To do" (a tracker's *not started*).
 
 - **One encoding per surface.** List row: mark + (for blocked) the word. Header or detail: one pill
   with text (`.agent-status`). Never mark + badge + tint + border + glow on one row (a blocked card
@@ -284,7 +290,16 @@ trail after the last (possibly nested) Group with no header, reading as its chil
 
 - A bookmarked Session keeps its place in its Group too (Q4); that row carries a small star.
 - Machine badge only for remote Machines; local Sessions show none.
-- A Session row shows an amber count when something in it needs the user; nothing otherwise.
+- **A Session is the user's area; its projects show under it.** Under each Session the tree lists its
+  Workspaces with agent work (Blocked, Review, or In progress; every Workspace under All, the quiet
+  ones muted), on the Session's guide line: status dot, name, then the word (Blocked / Review) or
+  the lane count. State is the orchestrator's: a lane's Done is not the user's, a blocked lane is. A
+  click opens the pane behind the row (the one asking, else the orchestrator), and that project row
+  is the lit one.
+- So in the tree the project rows carry what needs the user and the Session row has no count or
+  tint; a Bookmark row (one line, no projects) keeps the amber count.
+- SESSIONS starts on **Active**; the "N hidden · idle or stopped · Show" line lists the rest. Rows
+  keep the user's order: never re-sort by status (spatial memory).
 - The Machines section stays at the bottom and folds by default once more than one Machine exists.
 
 ## 8. Decisions where the review disagreed
