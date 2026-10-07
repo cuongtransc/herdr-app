@@ -72,6 +72,8 @@ export interface MachineView {
   state: MachineState;
   error: AppError | null;
   version: string | null;
+  /** The login user's home folder, once known; optional so older fixtures need not set it. */
+  home?: string | null;
   status: AgentStatus;
   sessions: SessionView[];
 }
@@ -126,7 +128,7 @@ export interface GitStatus {
   untracked: number;
   /** How many files have any change; `changes` lists the first few. */
   changed: number;
-  changes: { code: string; path: string }[];
+  changes: GitChange[];
 }
 
 export interface Located {
@@ -174,3 +176,42 @@ export type CtaQuota =
   | { kind: "missing" }
   | { kind: "ok"; accounts: CtaAccount[]; readAt: number }
   | { kind: "failed"; reason: string };
+
+export interface GitChange {
+  code: string;
+  path: string;
+}
+
+export interface FileEntry {
+  name: string;
+  /** `dirlink` is a symlink to a folder: it expands like a folder. */
+  kind: "file" | "dir" | "symlink" | "dirlink";
+}
+export interface FileContent {
+  kind: "text" | "binary" | "image";
+  text: string | null;
+  truncated: boolean;
+  size: number;
+  mtime: number;
+}
+export interface FileList {
+  paths: string[];
+  capped: boolean;
+  refused: boolean;
+}
+
+/** Git changes under a Files root, paths relative to it; `total` counts past the listed ones. */
+export interface Changed {
+  /** False when the root is not inside a git repository. */
+  repo: boolean;
+  total: number;
+  changes: GitChange[];
+}
+
+export interface FileChange {
+  path: string;
+  isDir: boolean;
+  removed: boolean;
+}
+
+export type WatchEvent = { type: "resync" } | { type: "changes"; changes: FileChange[] } | { type: "error"; message: string };

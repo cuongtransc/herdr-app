@@ -1,11 +1,12 @@
 import { useEffect, useState } from "react";
 import { AgentIcon } from "../agents/AgentIcon";
 import type { QuotaWindow } from "../lib/types";
-import { ctaCards, staleNote } from "../quota/cta";
-import { PROVIDER_INFO, QUOTA_PROVIDERS } from "../quota/entry";
+import { staleNote } from "../quota/cta";
+import { QUOTA_PROVIDERS } from "../quota/entry";
 import type { QuotaEntry } from "../quota/entry";
 import { WARN_PERCENT, elapsedFraction, percent, tone, untilReset, updatedAgo } from "../quota/format";
 import { useQuota } from "../quota/store";
+import { quotaView } from "../quota/view";
 import { RefreshIcon } from "../ui/icons";
 
 function WindowRow({ w, now }: { w: QuotaWindow; now: number }) {
@@ -27,6 +28,7 @@ function WindowRow({ w, now }: { w: QuotaWindow; now: number }) {
   );
 }
 
+/** `showProblemAge` is off for a `cta` card, whose age is its poll time, shown below it. */
 function Body({ entry, now, showProblemAge = true }: { entry: QuotaEntry; now: number; showProblemAge?: boolean }) {
   switch (entry.kind) {
     case "loading":
@@ -51,27 +53,47 @@ function Body({ entry, now, showProblemAge = true }: { entry: QuotaEntry; now: n
   }
 }
 
-/** Quota cards are independent of the agent search and filters. */
-export function QuotaColumn() {
+/** Fetches the quota while mounted: once now, then on the schedule (`isDue`), skipped while the window is hidden. */
+export function useQuotaPolling(): void {
+  const refresh = useQuota((s) => s.refresh);
+  useEffect(() => {
+    void refresh("shown");
+    const poll = setInterval(() => {
+      if (!document.hidden) void refresh("tick");
+    }, 30_000);
+    const shown = () => {
+      if (!document.hidden) void refresh("shown");
+    };
+    document.addEventListener("visibilitychange", shown);
+    return () => {
+      clearInterval(poll);
+      document.removeEventListener("visibilitychange", shown);
+    };
+  }, [refresh]);
+}
+
+/** The current time, every second while mounted: reset countdowns tick. */
+export function useSecondClock(): number {
+  const [now, setNow] = useState(() => Date.now());
+  useEffect(() => {
+    const clock = setInterval(() => setNow(Date.now()), 1_000);
+    return () => clearInterval(clock);
+  }, []);
+  return now;
+}
+
+/** The Quota head (title and refresh) and one card per Provider or `cta` account; `signedInOnly` folds the others into one line. */
+export function QuotaDetail({ now, signedInOnly = false }: { now: number; signedInOnly?: boolean }) {
   const slots = useQuota((s) => s.slots);
   const source = useQuota((s) => s.source);
   const cta = useQuota((s) => s.cta);
   const refresh = useQuota((s) => s.refresh);
-  const [now, setNow] = useState(() => Date.now());
   const busy = cta.inFlight || QUOTA_PROVIDERS.some((p) => slots[p].inFlight);
-
-  useEffect(() => {
-    void refresh("shown");
-    const poll = setInterval(() => void refresh("tick"), 30_000);
-    const clock = setInterval(() => setNow(Date.now()), 1_000);
-    return () => {
-      clearInterval(poll);
-      clearInterval(clock);
-    };
-  }, [refresh]);
-
+  const view = quotaView({ source, cta, slots });
+  const items = view.kind === "items" ? view.items : [];
+  const out = signedInOnly ? items.filter((i) => i.entry.kind === "notSignedIn") : [];
   return (
-    <section className="dash-col dash-col-quota" role="region" aria-label="Quota">
+    <>
       <div className="dash-col-head">
         <span className="dash-col-title">Quota</span>
         <button
@@ -83,41 +105,39 @@ export function QuotaColumn() {
         </button>
       </div>
       <ul className="dash-cards">
-        {source === "cta" && cta.result?.kind === "ok" ? (
-          cta.result.accounts.length === 0 ? (
-            <li className="dash-quota-card">
-              <span className="dash-card-head"><span className="dash-card-title">cta</span></span>
-              <p className="dash-quota-note">no accounts — run cta ledger quota poll</p>
-            </li>
-          ) : ctaCards(cta.result.accounts).map((card) => {
-            const note = staleNote(card.polledAt, now);
-            return (
-              <li key={card.key} className="dash-quota-card">
-                <span className="dash-card-head">
-                  <AgentIcon agent={card.agent} />
-                  <span className="dash-card-title">{card.name}</span>
-                  {card.account !== null && <span className="dash-quota-account">{card.account}</span>}
-                </span>
-                <Body entry={card.entry} now={now} showProblemAge={false} />
-                {note !== null && <p className="dash-quota-note">{note}</p>}
-              </li>
-            );
-          })
-        ) : source === "cta" && cta.result?.kind === "failed" ? (
+        {view.kind === "ctaNote" && (
           <li className="dash-quota-card">
             <span className="dash-card-head"><span className="dash-card-title">cta</span></span>
-            <p className="dash-quota-note">{cta.result.reason}</p>
+            <p className="dash-quota-note">{view.message}</p>
           </li>
-        ) : QUOTA_PROVIDERS.map((p) => (
-          <li key={p} className="dash-quota-card">
-            <span className="dash-card-head">
-              <AgentIcon agent={PROVIDER_INFO[p].agent} />
-              <span className="dash-card-title">{PROVIDER_INFO[p].name}</span>
-            </span>
-            <Body entry={slots[p].entry} now={now} />
-          </li>
-        ))}
+        )}
+        {items.filter((i) => !out.includes(i)).map((i) => {
+          const note = i.fromCta ? staleNote(i.polledAt, now) : null;
+          return (
+            <li key={i.key} className="dash-quota-card">
+              <span className="dash-card-head">
+                <AgentIcon agent={i.agent} />
+                <span className="dash-card-title">{i.name}</span>
+                {i.account !== null && <span className="dash-quota-account">{i.account}</span>}
+              </span>
+              <Body entry={i.entry} now={now} showProblemAge={!i.fromCta} />
+              {note !== null && <p className="dash-quota-note">{note}</p>}
+            </li>
+          );
+        })}
       </ul>
+      {out.length > 0 && <p className="dash-quota-note quota-out">Not signed in: {out.map((i) => i.name).join(", ")}</p>}
+    </>
+  );
+}
+
+/** One card per Provider with its usage windows; independent of the agent search and filters. */
+export function QuotaColumn() {
+  useQuotaPolling();
+  const now = useSecondClock();
+  return (
+    <section className="dash-col dash-col-quota" role="region" aria-label="Quota">
+      <QuotaDetail now={now} />
     </section>
   );
 }

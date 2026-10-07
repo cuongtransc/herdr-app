@@ -116,6 +116,21 @@ pointer targets (§5); no "compact" mode below 24px.
 
 ### 3.5 Contrast (measured, WCAG 2.x)
 
+**Rule: every text colour reads at 4.5:1 or more on every surface it can sit on, in both themes.**
+
+- App UI: each token used as text (`TEXT` in `src/tokens.test.ts`) passes 4.5:1 on `--surface-0`
+  through `--surface-3` and `--surface-code`. A mark colour (`--amber`, `--green`, `--blue`) is for
+  dots and icons; text takes its `-text` variant. The test fails on a new faint token or on text
+  that uses a mark colour.
+- Terminal: xterm's `minimumContrastRatio` is `TERM_MIN_CONTRAST` (4.5) in both themes. Programs
+  pick colours for a dark background (white, light 256-colour greys, truecolor); xterm raises any
+  that fall short against their cell when drawing. Backgrounds keep their colour.
+  `src/terminal/theme.browser.test.ts` checks the drawn colours in Chrome (`mise run test:browser`).
+- Fix a failing colour by moving its lightness just far enough, keeping its hue; leave passing
+  colours alone. Check light mode first: most use is there.
+
+The 2026-10 audit, before the rule:
+
 | Pair | Ratio | Verdict |
 |---|---|---|
 | dark `--fg-3` #6e717c on `--surface-1` / `--surface-0` | 3.34 / 3.54 | fails 4.5 |
@@ -303,6 +318,10 @@ trail after the last (possibly nested) Group with no header, reading as its chil
   stopped, muted with its age (`12m`): the user just looked at it and is likely to return. Rows
   keep the user's order: never re-sort by status (spatial memory).
 - The Machines section stays at the bottom and folds by default once more than one Machine exists.
+- **Quota at the foot**, outside the scroll, under Machines: one line per signed-in Provider with
+  its most pressing window (a warning one, else the fullest) and the time to reset, amber when it
+  warns (§ quota tone: 90% used, or used faster than the window elapses). A click opens the full
+  Quota above it; Providers not signed in fold into one line there.
 
 ## 8. Decisions where the review disagreed
 

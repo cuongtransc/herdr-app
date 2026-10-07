@@ -36,6 +36,9 @@ export function applying(entry: QuotaEntry, outcome: QuotaOutcome, provider: Quo
       return problem(entry, "rate limited");
     case "failed":
       return problem(entry, outcome.reason);
+    default:
+      // A reply of another shape (an older backend, a mocked IPC) must not leave the entry undefined.
+      return problem(entry, "unexpected reply");
   }
 }
 

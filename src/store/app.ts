@@ -1,7 +1,7 @@
 import { create } from "zustand";
 import { paneKey } from "../lib/types";
 import type { MachineView, PaneRef, PaneView, SessionView, TabView, WorkspaceView } from "../lib/types";
-import { pruneFolders } from "../workspaces/folder";
+import { pruneFolders, type WorkspaceRef } from "../workspaces/folder";
 import { shareEqual } from "./share";
 import { forgetMachine, forgetSessions, sessionKey, useLayout } from "../sidebar/groups";
 import { newAgentOnTerminal } from "../settings/lens";
@@ -67,6 +67,9 @@ export interface AppState {
   /** Whether the Agent Dashboard overlay is open. Not persisted. */
   dashboardOpen: boolean;
   setDashboardOpen: (open: boolean) => void;
+  /** The Workspace whose Files overlay is open, if any. Not persisted. */
+  filesOverlay: WorkspaceRef | null;
+  setFilesOverlay: (ref: WorkspaceRef | null) => void;
   /** Done panes the user has looked at (by paneKey); a seen Done pane counts as Idle on the
    *  dashboard. Cleared when the pane leaves done. Not persisted. */
   doneSeen: Record<string, true>;
@@ -90,13 +93,18 @@ export const useApp = create<AppState>((set, get) => ({
   lensOverride: {},
   starting: {},
   dashboardOpen: false,
+  filesOverlay: null,
   doneSeen: {},
   statusSince: {},
   ...load(),
+  setFilesOverlay: (ref) =>
+    set(ref ? { filesOverlay: ref, dashboardOpen: false } : { filesOverlay: null }),
   // Closing returns to the selected pane, so a done one counts as seen then.
   setDashboardOpen: (open) =>
     set((s) => ({
       dashboardOpen: open,
+      // The dashboard and Files share the main area: opening one closes the other.
+      filesOverlay: open ? null : s.filesOverlay,
       doneSeen:
         !open && s.selected && findPane(s.machines, s.selected)?.status === "done"
           ? { ...s.doneSeen, [paneKey(s.selected)]: true }
@@ -143,6 +151,7 @@ export const useApp = create<AppState>((set, get) => ({
     set((s) => ({
       selected: ref,
       dashboardOpen: ref ? false : s.dashboardOpen,
+      filesOverlay: ref ? null : s.filesOverlay,
       viewed: ref ? { machine_id: ref.machine_id, session: ref.session } : s.viewed,
       lastPane: ref ? { ...s.lastPane, [sessionKey(ref.machine_id, ref.session)]: ref } : s.lastPane,
       doneSeen: ref && findPane(s.machines, ref)?.status === "done" ? { ...s.doneSeen, [paneKey(ref)]: true } : s.doneSeen,

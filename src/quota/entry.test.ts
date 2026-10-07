@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import type { QuotaWindow } from "../lib/types";
+import type { QuotaOutcome, QuotaWindow } from "../lib/types";
 import { applying, type QuotaEntry } from "./entry";
 
 const then = 1_789_650_000_000;
@@ -29,5 +29,11 @@ describe("applying", () => {
   });
   it("names the CLI to run", () => {
     expect(applying({ kind: "loading" }, { kind: "signInExpired" }, "opencodeGo")).toEqual({ kind: "problem", message: "sign-in expired — run opencode", last: null });
+  });
+});
+
+describe("applying an unexpected reply", () => {
+  it("records a problem instead of losing the entry: the Sidebar renders it on every screen", () => {
+    expect(applying({ kind: "loading" }, [] as unknown as QuotaOutcome, "claude")).toEqual({ kind: "problem", message: "unexpected reply", last: null });
   });
 });

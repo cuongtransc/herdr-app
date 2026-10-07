@@ -270,11 +270,18 @@ describe("AgentList", () => {
   it("changes the folder from the header menu", () => {
     render(<AgentList />);
     fireEvent.contextMenu(screen.getByText("web", { selector: ".ws-label" }));
-    expect(screen.getAllByRole("menuitem").map((b) => b.textContent)).toEqual(["New claude", "New pi", "New shell", "Change folder…", "Rename workspace…", "Close workspace"]);
+    expect(screen.getAllByRole("menuitem").map((b) => b.textContent)).toEqual(["New claude", "New pi", "New shell", "Browse files", "Change folder…", "Rename workspace…", "Close workspace"]);
     fireEvent.click(screen.getByRole("menuitem", { name: "Change folder…" }));
     fireEvent.change(screen.getByRole("combobox"), { target: { value: "/srv/web" } });
     fireEvent.click(screen.getByRole("button", { name: "Save" }));
     expect(within(screen.getByRole("group", { name: "web" })).getByText("web", { selector: ".ws-folder" })).toBeTruthy();
+  });
+
+  it("opens the workspace's Files from the header menu", () => {
+    render(<AgentList />);
+    fireEvent.contextMenu(screen.getByText("web", { selector: ".ws-label" }));
+    fireEvent.click(screen.getByRole("menuitem", { name: "Browse files" }));
+    expect(useApp.getState().filesOverlay).toEqual({ machine_id: "local", session: "default", workspace_id: "w2" });
   });
 
   it("starts an agent from the header menu in the workspace folder", () => {
@@ -338,6 +345,26 @@ describe("AgentList lanes", () => {
     expect(toggle.getAttribute("aria-expanded")).toBe("false");
     expect(toggle.getAttribute("title")).toBe("1 in progress, 1 done, 1 blocked");
     expect(screen.getByRole("button", { name: "ipscope — Wave 2, claude, blocked" }).closest("li")?.className).toContain("lane-row");
+  });
+
+  it("keeps the lane toggle clear of the row's age and status word: they sit left of its slot", () => {
+    const idle = structuredClone(lanes);
+    idle.sessions[0].workspaces[0].tabs[0].panes[0].status = "idle";
+    useApp.setState({ machines: { local: idle }, statusSince: { "local/default/o": Date.now() - 5 * 60_000 } });
+    const { unmount } = render(<AgentList />);
+    const card = screen.getByRole("button", { name: /^BMF-OMS review/ });
+    const order = [...card.children].map((c) => c.className);
+    const slot = order.findIndex((c) => c.includes("lane-slot"));
+    expect(slot).toBeGreaterThan(order.findIndex((c) => c.includes("row-age")));
+    expect(card.querySelector(".lane-slot")?.textContent).toBe(screen.getByRole("button", { name: "3 lanes" }).textContent);
+    unmount();
+    const blocked = structuredClone(lanes);
+    blocked.sessions[0].workspaces[0].tabs[0].panes[0].status = "blocked";
+    useApp.setState({ machines: { local: blocked } });
+    render(<AgentList />);
+    const b = [...screen.getByRole("button", { name: /^BMF-OMS review/ }).children].map((c) => c.className);
+    expect(b.findIndex((c) => c.includes("lane-slot"))).toBeGreaterThan(b.findIndex((c) => c.includes("agent-input")));
+    expect(b.findIndex((c) => c.includes("lane-slot"))).toBeLessThan(b.findIndex((c) => c.includes("mark-blocked")));
   });
 
   it("opens every lane under the orchestrator, in tab order", () => {

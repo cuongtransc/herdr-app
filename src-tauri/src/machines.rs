@@ -59,7 +59,7 @@ const START_WAIT: Duration = Duration::from_secs(10);
 const START_POLL: Duration = Duration::from_millis(200);
 /// How often a connected ssh Machine's master is checked.
 const HEALTH_EVERY: Duration = Duration::from_secs(15);
-const LOCAL: &str = "local";
+pub const LOCAL: &str = "local";
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub struct MachineConfig {
@@ -294,6 +294,7 @@ impl Machine {
             state: self.state,
             error: self.error.clone(),
             version: self.info.as_ref().map(|i| i.version.clone()),
+            home: self.info.as_ref().map(|i| i.home.clone()),
             status: AgentStatus::rollup(sessions.iter().map(|s| s.status)),
             sessions,
         }
