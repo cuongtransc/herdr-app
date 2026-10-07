@@ -45,13 +45,24 @@ export function normalizeReplies(v: unknown): string[] {
     .map((r) => r.slice(0, QUICK_REPLY_MAX_CHARS));
 }
 
+/** `replies` with the one at `from` moved to `to`, the others closing up; the same list if nothing moves. */
+export function moveReplyTo(replies: string[], from: number, to: number): string[] {
+  if (from === to || from < 0 || from >= replies.length || to < 0 || to >= replies.length) return replies;
+  const next = [...replies];
+  next.splice(to, 0, ...next.splice(from, 1));
+  return next;
+}
+
 /** `replies` with the one at `from` moved one place (`by` -1 up, +1 down); the same list past either end. */
 export function moveReply(replies: string[], from: number, by: -1 | 1): string[] {
-  const to = from + by;
-  if (from < 0 || from >= replies.length || to < 0 || to >= replies.length) return replies;
-  const next = [...replies];
-  [next[from], next[to]] = [next[to], next[from]];
-  return next;
+  return moveReplyTo(replies, from, from + by);
+}
+
+/** The slot a dragged row lands in: the one whose middle (`mids`, in px) is nearest its own middle. */
+export function slotAt(middle: number, mids: number[]): number {
+  let best = 0;
+  for (let i = 1; i < mids.length; i++) if (Math.abs(mids[i] - middle) < Math.abs(mids[best] - middle)) best = i;
+  return best;
 }
 
 /** The replies worth a button: the list without the blank rows still being written. */

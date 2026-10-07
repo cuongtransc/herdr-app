@@ -3,10 +3,12 @@ import {
   DEFAULT_QUICK_REPLIES,
   loadQuickReplies,
   moveReply,
+  moveReplyTo,
   normalizeReplies,
   QUICK_REPLIES_MAX,
   QUICK_REPLY_MAX_CHARS,
   quickReplyButtons,
+  slotAt,
   useQuickReplies,
 } from "./quickReplies";
 
@@ -37,6 +39,24 @@ describe("quick replies", () => {
     expect(moveReply(l, 0, -1)).toBe(l);
     expect(moveReply(l, 2, 1)).toBe(l);
     expect(l).toEqual(["a", "b", "c"]);
+  });
+
+  it("moves a reply to any place, the others closing up", () => {
+    const l = ["a", "b", "c", "d"];
+    expect(moveReplyTo(l, 3, 0)).toEqual(["d", "a", "b", "c"]);
+    expect(moveReplyTo(l, 0, 2)).toEqual(["b", "c", "a", "d"]);
+    expect(moveReplyTo(l, 1, 1)).toBe(l);
+    expect(moveReplyTo(l, 1, 9)).toBe(l);
+    expect(l).toEqual(["a", "b", "c", "d"]);
+  });
+
+  it("puts a dragged row in the slot whose middle its own middle is nearest", () => {
+    const mids = [10, 40, 70];
+    expect(slotAt(-50, mids)).toBe(0);
+    expect(slotAt(24, mids)).toBe(0);
+    expect(slotAt(26, mids)).toBe(1);
+    expect(slotAt(68, mids)).toBe(2);
+    expect(slotAt(500, mids)).toBe(2);
   });
 
   it("offers a button only for the replies with text", () => {
