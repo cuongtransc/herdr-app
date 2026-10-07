@@ -9,12 +9,12 @@ A computer where herdr runs: either `local` or a remote one reached by an SSH ta
 _Avoid_: host, PC, server, remote
 
 **Session**:
-A named persistent herdr session on a Machine; it owns exactly one herdr socket and is either running or stopped.
+A named persistent herdr session on a Machine; it owns exactly one herdr socket and is either running or stopped. The user keeps one per area of work (`w-xb`, `p-ai`), never one per project: herdr means a Session as an isolation boundary with its own server.
 _Avoid_: server, instance
 
 **Workspace**:
-A group of Tabs inside a Session. What the user calls a "space".
-_Avoid_: space, project
+A group of Tabs inside a Session: one repo, task or investigation, as herdr means it. The sidebar lists a Session's Workspaces with agent work under it as its projects; in the code it stays a Workspace.
+_Avoid_: space
 
 **Workspace folder**:
 The folder the app remembers for a Workspace; Agents started from the app's UI run in a new Tab there. herdr itself does not know it.
@@ -29,7 +29,7 @@ A Session the user pinned to the top of the sidebar, independent of which Group 
 _Avoid_: favourite, pin
 
 **Tab**:
-A layout of Panes inside a Workspace.
+A layout of Panes inside a Workspace. Its label says its role: `orch-*` the orchestrator, `lane-<slug>` a worker it dispatched (a lane's git worktree stays a Tab, never a Workspace of its own), `brief-*` a decision, or a one-word purpose for a shell (`dev`, `test`, `server`, `logs`). A bare number is herdr's default and names nothing.
 
 **Pane**:
 One cell of a Tab's layout, identified by `pane_id`; the unit the user selects and views.
