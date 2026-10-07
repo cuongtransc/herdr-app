@@ -1,6 +1,6 @@
 # 0002: Read Quota from Provider APIs with the CLIs' own credentials, never refreshing them, accepting stale numbers for an unused CLI
 
-> Status: Accepted · Date: 2026-10-03
+> Status: Accepted · Date: 2026-10-03 · Amended by [0005](0005-quota-from-cta-with-builtin-fallback.md): applies only on a Mac without `cta`
 
 ## Context
 
