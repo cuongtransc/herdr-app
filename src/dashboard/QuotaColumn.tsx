@@ -27,7 +27,7 @@ function WindowRow({ w, now }: { w: QuotaWindow; now: number }) {
   );
 }
 
-function Body({ entry, now }: { entry: QuotaEntry; now: number }) {
+function Body({ entry, now, showProblemAge = true }: { entry: QuotaEntry; now: number; showProblemAge?: boolean }) {
   switch (entry.kind) {
     case "loading":
       return null;
@@ -39,7 +39,7 @@ function Body({ entry, now }: { entry: QuotaEntry; now: number }) {
       return (
         <>
           <p className="dash-quota-note">
-            {entry.last ? `${entry.message} · ${updatedAgo(entry.last.fetchedAt, now)}` : entry.message}
+            {entry.last && showProblemAge ? `${entry.message} · ${updatedAgo(entry.last.fetchedAt, now)}` : entry.message}
           </p>
           {entry.last && (
             <div className="dash-quota-stale">
@@ -98,7 +98,7 @@ export function QuotaColumn() {
                   <span className="dash-card-title">{card.name}</span>
                   {card.account !== null && <span className="dash-quota-account">{card.account}</span>}
                 </span>
-                <Body entry={card.entry} now={now} />
+                <Body entry={card.entry} now={now} showProblemAge={false} />
                 {note !== null && <p className="dash-quota-note">{note}</p>}
               </li>
             );

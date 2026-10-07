@@ -100,12 +100,53 @@ describe("QuotaColumn", () => {
     expect(within(items[3]).getByText("5%")).toBeTruthy();
   });
 
+  it("shows one stale age for a failed cta account with retained windows", async () => {
+    vi.useFakeTimers({ toFake: ["Date"] });
+    const now = Date.now();
+    ctaMock.mockResolvedValue({ kind: "ok", readAt: now, accounts: [
+      { provider: "claude", account: "a1", polledAt: now - 3 * 3_600_000, status: "http",
+        detail: "HTTP 403", windows: [{ label: "5h", usedPercent: 44, resetsAt: null, durationSecs: 18_000 }] },
+    ] });
+    render(<QuotaColumn />);
+    const col = screen.getByRole("region", { name: "Quota" });
+    await waitFor(() => expect(within(col).getByText("44%")).toBeTruthy());
+    expect(within(col).getByText("HTTP 403")).toBeTruthy();
+    expect(within(col).getAllByText("updated 3h ago")).toHaveLength(1);
+    expect(within(col).getByText("44%").closest(".dash-quota-stale")).toBeTruthy();
+  });
+
+  it("does not invent an age for failed cta windows without a poll timestamp", async () => {
+    ctaMock.mockResolvedValue({ kind: "ok", readAt: Date.now(), accounts: [
+      { provider: "claude", account: "a1", polledAt: null, status: "http",
+        detail: "HTTP 403", windows: [{ label: "5h", usedPercent: 44, resetsAt: null, durationSecs: 18_000 }] },
+    ] });
+    render(<QuotaColumn />);
+    const col = screen.getByRole("region", { name: "Quota" });
+    await waitFor(() => expect(within(col).getByText("44%")).toBeTruthy());
+    expect(within(col).getByText("HTTP 403")).toBeTruthy();
+    expect(within(col).queryByText(/updated/)).toBeNull();
+    expect(within(col).getByText("44%").closest(".dash-quota-stale")).toBeTruthy();
+  });
+
   it("shows a cta failure as one card", async () => {
     ctaMock.mockResolvedValue({ kind: "failed", reason: "cta timed out" });
     render(<QuotaColumn />);
     await waitFor(() => expect(screen.getByText("cta timed out")).toBeTruthy());
     expect(screen.getAllByRole("listitem")).toHaveLength(1);
     expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it("spins while a manual cta refresh is pending", async () => {
+    ctaMock.mockResolvedValue({ kind: "ok", readAt: Date.now(), accounts: [] });
+    render(<QuotaColumn />);
+    await waitFor(() => expect(useQuota.getState().cta.inFlight).toBe(false));
+    let finish!: (result: CtaQuota) => void;
+    ctaMock.mockImplementationOnce(() => new Promise<CtaQuota>((resolve) => { finish = resolve; }));
+    const button = screen.getByRole("button", { name: "Refresh quota" });
+    fireEvent.click(button);
+    expect(button.classList.contains("spinning")).toBe(true);
+    finish({ kind: "ok", readAt: Date.now(), accounts: [] });
+    await waitFor(() => expect(button.classList.contains("spinning")).toBe(false));
   });
 
   it("asks cta to poll when refreshed by hand", async () => {
