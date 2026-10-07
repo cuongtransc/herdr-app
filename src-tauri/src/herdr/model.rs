@@ -114,7 +114,8 @@ fn user_tab_name(label: &str) -> Option<String> {
     let role = ["orch-", "lane-", "brief-"]
         .iter()
         .any(|p| label.starts_with(p));
-    (!label.is_empty() && !numbered && !role).then(|| label.to_string())
+    // The app labels a shell tab it opens unnamed "shell": that names nothing either.
+    (!label.is_empty() && !numbered && !role && label != "shell").then(|| label.to_string())
 }
 
 /// Build the sidebar tree for a live session. Workspaces and tabs are sorted by
@@ -395,8 +396,8 @@ mod tests {
         assert_eq!(tab_label("dev").title, "dev");
     }
     #[test]
-    fn a_tab_number_or_role_tab_is_no_name() {
-        for label in ["1", "12", "orch-app", "lane-fix", "brief-x"] {
+    fn a_tab_number_role_tab_or_the_apps_shell_label_is_no_name() {
+        for label in ["1", "12", "orch-app", "lane-fix", "brief-x", "shell"] {
             assert_eq!(tab_label(label).title, "Terminal", "{label}");
         }
     }
