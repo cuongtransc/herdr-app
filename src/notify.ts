@@ -38,11 +38,12 @@ export function shouldNotify(
   selected: PaneRef | null,
   enabled: boolean,
   role: AlertRole,
+  focused: boolean,
 ): boolean {
   if (!enabled) return false;
   if (ev.status !== "blocked" && ev.status !== "done") return false;
   if (ev.previous === ev.status) return false;
-  if (selected && paneKey(selected) === paneKey(ev.pane)) return false;
+  if (focused && selected && paneKey(selected) === paneKey(ev.pane)) return false;
   return shouldAlert(role, ev.status, "desk").desk;
 }
 
@@ -60,7 +61,8 @@ export async function notifyPaneStatus(
   const tab = session?.workspaces
     .flatMap((w) => w.tabs)
     .find((t) => t.panes.some((p) => p.pane_id === ev.pane.pane_id));
-  if (!shouldNotify(ev, selected, notificationsEnabled(), roleOfLabel(tab?.label))) return;
+  if (ev.status === "done" && !tab) return;
+  if (!shouldNotify(ev, selected, notificationsEnabled(), roleOfLabel(tab?.label), document.hasFocus())) return;
   // shouldNotify lets only blocked/done through, which is exactly what a title can say.
   const status = ev.status === "done" ? "done" : "blocked";
   const pane = tab?.panes.find((p) => p.pane_id === ev.pane.pane_id);

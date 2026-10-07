@@ -9,18 +9,22 @@ const ev = (status: any, previous: any) => ({ pane: ref, status, previous, title
 
 describe("shouldNotify", () => {
   it("notifies on blocked/done for other panes", () => {
-    expect(shouldNotify(ev("blocked", "working"), null, true, "other")).toBe(true);
-    expect(shouldNotify(ev("done", "working"), { ...ref, pane_id: "w2:p1" }, true, "other")).toBe(true);
+    expect(shouldNotify(ev("blocked", "working"), null, true, "other", true)).toBe(true);
+    expect(shouldNotify(ev("done", "working"), { ...ref, pane_id: "w2:p1" }, true, "other", true)).toBe(true);
   });
   it("tells the user a lane is blocked but not that it is done", () => {
-    expect(shouldNotify(ev("blocked", "working"), null, true, "lane")).toBe(true);
-    expect(shouldNotify(ev("done", "working"), null, true, "lane")).toBe(false);
+    expect(shouldNotify(ev("blocked", "working"), null, true, "lane", true)).toBe(true);
+    expect(shouldNotify(ev("done", "working"), null, true, "lane", true)).toBe(false);
+  });
+  it("notifies for the selected pane while the window is unfocused", () => {
+    expect(shouldNotify(ev("blocked", "working"), ref, true, "other", false)).toBe(true);
+    expect(shouldNotify(ev("done", "working"), ref, true, "other", false)).toBe(true);
   });
   it("stays quiet otherwise", () => {
-    expect(shouldNotify(ev("working", "idle"), null, true, "other")).toBe(false);
-    expect(shouldNotify(ev("blocked", "working"), ref, true, "other")).toBe(false);
-    expect(shouldNotify(ev("blocked", "working"), null, false, "other")).toBe(false);
-    expect(shouldNotify(ev("done", "done"), null, true, "other")).toBe(false);
+    expect(shouldNotify(ev("working", "idle"), null, true, "other", true)).toBe(false);
+    expect(shouldNotify(ev("blocked", "working"), ref, true, "other", true)).toBe(false);
+    expect(shouldNotify(ev("blocked", "working"), null, false, "other", true)).toBe(false);
+    expect(shouldNotify(ev("done", "done"), null, true, "other", true)).toBe(false);
   });
 });
 
@@ -48,6 +52,21 @@ describe("notifyPaneStatus", () => {
     await notifyPaneStatus(ev("blocked", "working"), null, {});
     expect(notifyPane).toHaveBeenCalledTimes(1);
     expect(notifyPane).toHaveBeenCalledWith(ref, "Rewrite — Blocked", "local › default › Rewrite");
+  });
+
+  it("notifies for the selected pane when the window loses focus", async () => {
+    const focus = vi.spyOn(document, "hasFocus").mockReturnValue(false);
+    try {
+      await notifyPaneStatus(ev("blocked", "working"), ref, machines("1"));
+      expect(notifyPane).toHaveBeenCalledTimes(1);
+    } finally {
+      focus.mockRestore();
+    }
+  });
+
+  it("does not send Done when the snapshot cannot identify the tab role", async () => {
+    await notifyPaneStatus(ev("done", "working"), null, {});
+    expect(notifyPane).not.toHaveBeenCalled();
   });
 
   it("does not send a lane tab's Done", async () => {

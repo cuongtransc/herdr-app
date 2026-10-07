@@ -124,7 +124,7 @@ export const useApp = create<AppState>((set, get) => ({
       // Unchanged Panes, Tabs and Workspaces keep their objects, so their readers stay quiet.
       const shared = s.machines[v.id] ? shareEqual(s.machines[v.id], v) : v;
       // The dashboard hides the selected pane, so it is not seen while the dashboard is open.
-      const doneSeen = seenAfterSnapshot(s.doneSeen, shared, s.dashboardOpen ? null : s.selected);
+      const doneSeen = seenAfterSnapshot(s.doneSeen, shared, s.dashboardOpen || !document.hasFocus() ? null : s.selected);
       const statusSince = sinceAfterSnapshot(s.statusSince, s.machines[v.id], shared, Date.now());
       return {
         machines: s.machines[v.id] === shared ? s.machines : { ...s.machines, [v.id]: shared },
@@ -225,7 +225,7 @@ function firstPane(machines: Record<string, MachineView>, ref: SessionRef): Pane
 }
 
 /** This machine's seen marks after a snapshot: only panes still done keep theirs, and the
- *  selected pane is seen as soon as it is done. Other machines' marks are untouched. */
+ *  selected pane is seen as soon as it is done while focused. Other machines' marks are untouched. */
 function seenAfterSnapshot(prev: Record<string, true>, v: MachineView, selected: PaneRef | null): Record<string, true> {
   const next: Record<string, true> = {};
   const prefix = v.id + "/";

@@ -373,10 +373,26 @@ describe("AgentList lanes", () => {
     expect(rows()).toEqual([
       "BMF-OMS review, claude, in progress",
       "caps — Wave 2, pi, in progress",
-      "search — Wave 2, pi, review",
+      "search — Wave 2, pi, done",
       "ipscope — Wave 2, claude, blocked",
       "cargo watch, shell",
     ]);
+    const done = screen.getByRole("button", { name: "search — Wave 2, pi, done" });
+    expect(within(done).queryByText("Review")).toBeNull();
+    expect(done.querySelector(".agent-review")).toBeNull();
+    expect(screen.getByRole("button", { name: "3 lanes" }).getAttribute("title")).toBe("1 in progress, 1 done, 1 blocked");
+  });
+
+  it("shows a lane-only Done as plain done, not Review, visually or accessibly", () => {
+    const only = structuredClone(lanes);
+    only.sessions[0].workspaces[0].tabs = [only.sessions[0].workspaces[0].tabs[2]];
+    useApp.setState({ machines: { local: only } });
+    usePaneFilter.setState({ filter: "all" });
+    render(<AgentList />);
+    const row = screen.getByRole("button", { name: "π - lane: search — Wave 2, pi, done" });
+    expect(within(row).queryByText("Review")).toBeNull();
+    expect(row.querySelector(".agent-review")).toBeNull();
+    expect(screen.queryByRole("button", { name: /pi, review/ })).toBeNull();
   });
 
   it("keeps a selected lane in view while folded", () => {

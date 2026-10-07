@@ -45,10 +45,10 @@ function tabRuns(rows: Row[]): Row[][] {
 }
 
 /** What a row's accessible name says about its status; "" for a shell, which herdr reports none for. */
-function statusWord(status: AgentStatus, seen: boolean, agent: boolean): string {
+function statusWord(status: AgentStatus, seen: boolean, agent: boolean, lane: boolean): string {
   if (status === "blocked") return "blocked";
   if (status === "working") return "in progress";
-  if (status === "done") return seen ? "done" : "review";
+  if (status === "done") return seen || lane ? "done" : "review";
   if (status === "idle") return "idle";
   return agent ? "state unknown" : "";
 }
@@ -74,7 +74,7 @@ function laneSummary(lanes: Row[]): string {
 
 /** The mark at a row's end: only the states that ask for a look carry one. `slot` goes between the
  *  word and the mark: the place the lane toggle, laid over the row, covers. */
-function StatusMark({ status, seen, agent, slot }: { status: AgentStatus; seen: boolean; agent: boolean; slot?: ReactNode }) {
+function StatusMark({ status, seen, agent, lane, slot }: { status: AgentStatus; seen: boolean; agent: boolean; lane: boolean; slot?: ReactNode }) {
   if (status === "blocked")
     return (
       <>
@@ -90,7 +90,7 @@ function StatusMark({ status, seen, agent, slot }: { status: AgentStatus; seen: 
         <span className="mark mark-working" aria-hidden="true" />
       </>
     );
-  if (status === "done" && !seen)
+  if (status === "done" && !seen && !lane)
     return (
       <>
         <span className="agent-review">Review</span>
@@ -141,7 +141,8 @@ function AgentCard({
   const ref = { machine_id: machineId, session, pane_id: pane.pane_id };
   const active = useApp((s) => s.selected !== null && paneKey(s.selected) === paneKey(ref));
   const seen = useApp((s) => !!s.doneSeen[paneKey(ref)]);
-  const word = statusWord(pane.status, seen, !!pane.agent);
+  const lane = tabRole(tab.label) === "lane";
+  const word = statusWord(pane.status, seen, !!pane.agent, lane);
   // The tab's name only when it says more than its number.
   const activity = pane.agent ? "" : (pane.activity ?? "");
   const sub = entry.sub && !/^\d+$/.test(entry.sub) ? entry.sub : "";
@@ -193,6 +194,7 @@ function AgentCard({
           status={pane.status}
           seen={seen}
           agent={!!pane.agent}
+          lane={lane}
           // The toggle is a button of its own, so it cannot sit in this one: an invisible twin keeps its room.
           slot={lanes && <span className="lane-toggle lane-slot" aria-hidden="true">{laneToggleText}</span>}
         />

@@ -115,11 +115,32 @@ describe("done-seen tracking", () => {
     useApp.getState().select(p2);
     expect(useApp.getState().doneSeen).toEqual({ "local/default/w1:p2": true });
   });
-  it("marks the selected pane seen when it becomes done", () => {
-    useApp.getState().upsertMachine(withStatus("working"));
-    useApp.getState().select(p2);
-    useApp.getState().upsertMachine(withStatus("done"));
-    expect(useApp.getState().doneSeen).toEqual({ "local/default/w1:p2": true });
+  it("marks the selected pane seen when it becomes done while focused", () => {
+    const focus = vi.spyOn(document, "hasFocus").mockReturnValue(true);
+    try {
+      useApp.getState().upsertMachine(withStatus("working"));
+      useApp.getState().select(p2);
+      useApp.getState().upsertMachine(withStatus("done"));
+      expect(useApp.getState().doneSeen).toEqual({ "local/default/w1:p2": true });
+    } finally {
+      focus.mockRestore();
+    }
+  });
+  it("keeps a newly Done selected pane unseen while the window is unfocused", () => {
+    const focus = vi.spyOn(document, "hasFocus").mockReturnValue(false);
+    try {
+      useApp.getState().upsertMachine(withStatus("working"));
+      useApp.getState().select(p2);
+      useApp.getState().upsertMachine(withStatus("done"));
+      expect(useApp.getState().doneSeen).toEqual({});
+      useApp.getState().upsertMachine(withStatus("done"));
+      expect(useApp.getState().doneSeen).toEqual({});
+      focus.mockReturnValue(true);
+      useApp.getState().upsertMachine(withStatus("done"));
+      expect(useApp.getState().doneSeen).toEqual({ "local/default/w1:p2": true });
+    } finally {
+      focus.mockRestore();
+    }
   });
   it("forgets the seen mark once the pane leaves done", () => {
     useApp.getState().upsertMachine(withStatus("done"));
