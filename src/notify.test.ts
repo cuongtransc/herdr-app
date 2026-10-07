@@ -1,5 +1,8 @@
-import { describe, expect, it } from "vitest";
-import { shouldNotify, statusTitle } from "./notify";
+import { beforeEach, describe, expect, it, vi } from "vitest";
+vi.mock("./lib/ipc", () => ({ notifyPane: vi.fn().mockResolvedValue(undefined) }));
+import { notifyPane } from "./lib/ipc";
+import type { MachineView } from "./lib/types";
+import { notifyPaneStatus, setNotificationsEnabled, shouldNotify, statusTitle } from "./notify";
 
 const ref = { machine_id: "local", session: "default", pane_id: "w1:p1" };
 const ev = (status: any, previous: any) => ({ pane: ref, status, previous, title: "Rewrite" });
@@ -18,6 +21,44 @@ describe("shouldNotify", () => {
     expect(shouldNotify(ev("blocked", "working"), ref, true, "other")).toBe(false);
     expect(shouldNotify(ev("blocked", "working"), null, false, "other")).toBe(false);
     expect(shouldNotify(ev("done", "done"), null, true, "other")).toBe(false);
+  });
+});
+
+describe("notifyPaneStatus", () => {
+  const machines = (label: string): Record<string, MachineView> => ({
+    local: {
+      id: "local", label: "My Mac", kind: "local", state: "connected", error: null, version: "0.9.3", status: "done",
+      sessions: [{ name: "default", running: true, status: "done", error: null, workspaces: [
+        { workspace_id: "w1", label: "work", number: 1, status: "done", tabs: [
+          { tab_id: "w1:t1", label, number: 1, status: "done", panes: [
+            { pane_id: ref.pane_id, terminal_id: "t1", title: "Rewrite", cwd: "/x", agent: "claude", status: "done" },
+          ] },
+        ] },
+      ] }],
+    },
+  });
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    localStorage.clear();
+    setNotificationsEnabled(true);
+  });
+
+  it("sends Blocked as other when the snapshot is missing, falling back to the event title", async () => {
+    await notifyPaneStatus(ev("blocked", "working"), null, {});
+    expect(notifyPane).toHaveBeenCalledTimes(1);
+    expect(notifyPane).toHaveBeenCalledWith(ref, "Rewrite — Blocked", "local › default › Rewrite");
+  });
+
+  it("does not send a lane tab's Done", async () => {
+    await notifyPaneStatus(ev("done", "working"), null, machines("lane-caps"));
+    expect(notifyPane).not.toHaveBeenCalled();
+  });
+
+  it("sends a non-lane tab's Done with the agent and Review title", async () => {
+    await notifyPaneStatus(ev("done", "working"), null, machines("1"));
+    expect(notifyPane).toHaveBeenCalledTimes(1);
+    expect(notifyPane).toHaveBeenCalledWith(ref, "claude — Review", "My Mac › default › Rewrite");
   });
 });
 

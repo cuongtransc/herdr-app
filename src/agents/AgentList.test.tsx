@@ -385,6 +385,39 @@ describe("AgentList lanes", () => {
     expect(rows()).toContain("caps — Wave 2, pi, in progress");
   });
 
+  it("leaves an unseen Done lane out of a folded workspace's needs-you badge in All", () => {
+    const idle = structuredClone(lanes);
+    const ws = idle.sessions[0].workspaces[0];
+    ws.tabs[0].panes[0].status = "idle";
+    ws.tabs = [ws.tabs[0], ws.tabs[2]];
+    useApp.setState({ machines: { local: idle } });
+    usePaneFilter.setState({ filter: "all" });
+    render(<AgentList />);
+    fireEvent.click(screen.getByRole("button", { name: "bmf-oms" }));
+    expect(screen.getByRole("button", { name: "bmf-oms" }).getAttribute("aria-expanded")).toBe("false");
+    expect(screen.getByRole("group", { name: "bmf-oms" }).querySelector(".need")).toBeNull();
+  });
+
+  it("counts a blocked lane but not an unseen Done lane on a folded workspace", () => {
+    usePaneFilter.setState({ filter: "all" });
+    render(<AgentList />);
+    fireEvent.click(screen.getByRole("button", { name: "bmf-oms" }));
+    expect(screen.getByRole("button", { name: "bmf-oms, 1 needs you" }).getAttribute("aria-expanded")).toBe("false");
+    expect(screen.getByRole("group", { name: "bmf-oms" }).querySelector(".need")?.textContent).toBe("1");
+  });
+
+  it.each([false, true])("counts a non-lane's Done only when unseen on a folded workspace (seen: %s)", (seen) => {
+    const done = structuredClone(lanes);
+    done.sessions[0].workspaces[0].tabs[0].panes[0].status = "done";
+    useApp.setState({ machines: { local: done }, doneSeen: seen ? { "local/default/o": true } : {} });
+    usePaneFilter.setState({ filter: "all" });
+    render(<AgentList />);
+    fireEvent.click(screen.getByRole("button", { name: "bmf-oms" }));
+    const label = seen ? "bmf-oms, 1 needs you" : "bmf-oms, 2 need you";
+    expect(screen.getByRole("button", { name: label }).getAttribute("aria-expanded")).toBe("false");
+    expect(screen.getByRole("group", { name: "bmf-oms" }).querySelector(".need")?.textContent).toBe(seen ? "1" : "2");
+  });
+
   it("leaves a lane's done to the orchestrator: the head chip counts only what waits on the user", () => {
     render(<AgentList />);
     expect(screen.getByRole("button", { name: /go to the next one/ }).textContent).toBe("1 blocked");

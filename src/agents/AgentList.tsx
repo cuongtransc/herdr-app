@@ -236,7 +236,7 @@ function WorkspaceGroup({ machineId, session, workspace: ws, rows: all, active }
   const lanes = orch && { rows: laneRows, open: lanesOpen, toggle: () => toggle(lanesKey, lanesOpen) };
   const need = entries.filter((e) => {
     if (!e.pane.agent) return false;
-    return e.pane.status === "blocked" || (e.pane.status === "done" && !doneSeen[keyOf(e)]);
+    return e.pane.status === "blocked" || (e.pane.status === "done" && tabRole(e.tab.label) !== "lane" && !doneSeen[keyOf(e)]);
   }).length;
   const reorder = useTabReorder(
     ws.tabs.map((t) => t.tab_id),
