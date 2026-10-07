@@ -1,12 +1,12 @@
 import { type CSSProperties, memo, useEffect, useRef, useState } from "react";
 import { create } from "zustand";
 import { notificationsEnabled, setNotificationsEnabled } from "../notify";
-import { CloseIcon, GearIcon, SearchIcon } from "../ui/icons";
+import { ArrowDownIcon, ArrowUpIcon, CloseIcon, GearIcon, SearchIcon } from "../ui/icons";
 import { FontPicker } from "./FontPicker";
 import { NEW_AGENT_LENSES, useLensSettings } from "./lens";
 import { useNewTab } from "./newTab";
 import { AGENTS } from "../agents/openAgentTab";
-import { DEFAULT_QUICK_REPLIES, QUICK_REPLIES_MAX, QUICK_REPLY_MAX_CHARS, useQuickReplies } from "./quickReplies";
+import { DEFAULT_QUICK_REPLIES, moveReply, QUICK_REPLIES_MAX, QUICK_REPLY_MAX_CHARS, useQuickReplies } from "./quickReplies";
 import { CHAT_SIZE, DEFAULTS, TERM_SIZE, useSettings } from "./store";
 import { THEME_PREFS, useTheme } from "./theme";
 
@@ -144,6 +144,19 @@ function ChatSettings() {
     added.current = false;
     list.current?.querySelector<HTMLInputElement>(".quick-reply-row:last-child input")?.focus();
   }, [q.replies.length]);
+  // A row moved with ⌥↑ / ⌥↓ keeps the caret: rows are keyed by position, so focus its new place.
+  const moved = useRef<number | null>(null);
+  useEffect(() => {
+    if (moved.current === null) return;
+    list.current?.querySelectorAll<HTMLInputElement>(".quick-reply-row input")[moved.current]?.focus();
+    moved.current = null;
+  }, [q.replies]);
+  const move = (i: number, by: -1 | 1) => {
+    const next = moveReply(q.replies, i, by);
+    if (next === q.replies) return;
+    moved.current = i + by;
+    q.setReplies(next);
+  };
   const isDefault = q.replies.length === DEFAULT_QUICK_REPLIES.length && q.replies.every((r, i) => r === DEFAULT_QUICK_REPLIES[i]);
   return (
     <>
@@ -181,7 +194,25 @@ function ChatSettings() {
               maxLength={QUICK_REPLY_MAX_CHARS}
               placeholder="Reply text"
               onChange={(e) => q.setReplies(q.replies.map((x, j) => (j === i ? e.target.value : x)))}
+              onKeyDown={(e) => {
+                if (!e.altKey || e.metaKey || e.ctrlKey || e.shiftKey) return;
+                if (e.key !== "ArrowUp" && e.key !== "ArrowDown") return;
+                e.preventDefault();
+                move(i, e.key === "ArrowUp" ? -1 : 1);
+              }}
             />
+            <button className="icon-btn" aria-label={`Move quick reply ${i + 1} up`} title="Move up (⌥↑)" disabled={i === 0} onClick={() => move(i, -1)}>
+              <ArrowUpIcon />
+            </button>
+            <button
+              className="icon-btn"
+              aria-label={`Move quick reply ${i + 1} down`}
+              title="Move down (⌥↓)"
+              disabled={i === q.replies.length - 1}
+              onClick={() => move(i, 1)}
+            >
+              <ArrowDownIcon />
+            </button>
             <button className="icon-btn" aria-label={`Remove quick reply ${i + 1}`} onClick={() => q.setReplies(q.replies.filter((_, j) => j !== i))}>
               <CloseIcon />
             </button>

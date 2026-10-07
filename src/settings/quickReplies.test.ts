@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, it } from "vitest";
 import {
   DEFAULT_QUICK_REPLIES,
   loadQuickReplies,
+  moveReply,
   normalizeReplies,
   QUICK_REPLIES_MAX,
   QUICK_REPLY_MAX_CHARS,
@@ -27,6 +28,15 @@ describe("quick replies", () => {
     expect(normalizeReplies(Array.from({ length: 20 }, (_, i) => `r${i}`))).toHaveLength(QUICK_REPLIES_MAX);
     expect(normalizeReplies("continue")).toEqual(DEFAULT_QUICK_REPLIES);
     expect(normalizeReplies([])).toEqual([]);
+  });
+
+  it("moves a reply one place up or down, and leaves the list alone past either end", () => {
+    const l = ["a", "b", "c"];
+    expect(moveReply(l, 2, -1)).toEqual(["a", "c", "b"]);
+    expect(moveReply(l, 0, 1)).toEqual(["b", "a", "c"]);
+    expect(moveReply(l, 0, -1)).toBe(l);
+    expect(moveReply(l, 2, 1)).toBe(l);
+    expect(l).toEqual(["a", "b", "c"]);
   });
 
   it("offers a button only for the replies with text", () => {
