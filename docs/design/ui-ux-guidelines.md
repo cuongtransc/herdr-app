@@ -303,6 +303,10 @@ trail after the last (possibly nested) Group with no header, reading as its chil
   stopped, muted with its age (`12m`): the user just looked at it and is likely to return. Rows
   keep the user's order: never re-sort by status (spatial memory).
 - The Machines section stays at the bottom and folds by default once more than one Machine exists.
+- **Quota at the foot**, outside the scroll, under Machines: one line per signed-in Provider with
+  its most pressing window (a warning one, else the fullest) and the time to reset, amber when it
+  warns (§ quota tone: 90% used, or used faster than the window elapses). A click opens the full
+  Quota above it; Providers not signed in fold into one line there.
 
 ## 8. Decisions where the review disagreed
 
