@@ -311,7 +311,7 @@ export function ChatLens({ pane, view }: { pane: PaneRef; view: PaneView }) {
       {view.status === "blocked" || picker.open ? (
         <PromptPanel pane={pane} view={view} fallback={view.status === "blocked"} asked={asked} />
       ) : (
-        <Composer pane={pane} agent={view.agent} status={view.status} onPiModel={() => setModelFor(key)} meta={state.meta} />
+        <Composer pane={pane} agent={view.agent} status={view.status} untracked={view.untracked} onPiModel={() => setModelFor(key)} meta={state.meta} />
       )}
     </div>
     <ChatOutline entries={entries} current={current} onJump={jumpTo} />

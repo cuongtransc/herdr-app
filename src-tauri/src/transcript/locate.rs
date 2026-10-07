@@ -143,6 +143,14 @@ async fn claude_session_anywhere(
 
 /// Whether herdr detected a Claude agent but has not reported its session yet: herdr learns
 /// the id from Claude's SessionStart hook, shortly after the agent shows up in the pane.
+/// An `agent.get`-shaped value for an agent herdr's agent API does not know (one started through
+/// a wrapper), from the session `pane.get` still carries; None without a session.
+pub fn agent_from_pane(pane_get: &Value) -> Option<Value> {
+    let session = &pane_get["pane"]["agent_session"];
+    let agent = session["agent"].as_str()?;
+    Some(serde_json::json!({ "agent": { "agent": agent, "agent_session": session } }))
+}
+
 pub fn awaiting_session(agent_get: &Value) -> bool {
     agent_get["agent"]["agent"] == "claude" && agent_get["agent"]["agent_session"].is_null()
 }
@@ -331,6 +339,7 @@ mod tests {
             agent: Some("claude".into()),
             status: Default::default(),
             busy: None,
+            untracked: false,
         };
         let got = locate(
             &crate::transport::local::LocalTransport,
@@ -381,6 +390,7 @@ mod tests {
             agent: Some("claude".into()),
             status: Default::default(),
             busy: None,
+            untracked: false,
         };
         (home, info, pane)
     }
@@ -470,5 +480,21 @@ mod tests {
         ));
         assert!(!awaiting_session(&json!({"agent":{"agent":"pi"}})));
         assert!(!awaiting_session(&Value::Null));
+    }
+
+    #[test]
+    fn reads_an_untracked_agent_from_its_pane() {
+        // `pane.get` of an agent started through a wrapper: herdr kept its session, not the agent.
+        let pane_get = json!({"pane": {"pane_id": "w1:pW", "agent_status": "unknown",
+            "agent_session": {"agent": "claude", "kind": "id", "source": "herdr:claude", "value": "7e10"}}});
+        let agent_get = agent_from_pane(&pane_get).unwrap();
+        assert_eq!(agent_get["agent"]["agent"], "claude");
+        assert_eq!(agent_get["agent"]["agent_session"]["value"], "7e10");
+        assert!(!awaiting_session(&agent_get));
+        assert_eq!(
+            agent_from_pane(&json!({"pane": {"pane_id": "w1:p1"}})),
+            None,
+            "no session: nothing to read"
+        );
     }
 }

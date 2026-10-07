@@ -34,6 +34,8 @@ export interface PaneView {
   status: AgentStatus;
   /** A shell's: whether a command holds its terminal; null for an agent or before herdr was asked. */
   busy?: boolean | null;
+  /** An agent herdr's agent API does not know (started through a wrapper): driven as a pane. */
+  untracked?: boolean;
 }
 
 export interface TabView {

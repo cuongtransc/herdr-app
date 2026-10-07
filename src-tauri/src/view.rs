@@ -64,6 +64,8 @@ pub struct PaneView {
     pub status: AgentStatus,
     /// A shell's: whether a command holds its terminal; None for an agent or when unread.
     pub busy: Option<bool>,
+    /// An agent herdr's agent API does not know (started through a wrapper): drive it as a pane.
+    pub untracked: bool,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
