@@ -54,9 +54,10 @@ describe("AgentList", () => {
 
   it("shows, in Active, the panes that need a look as one-line rows named by their status", () => {
     render(<AgentList />);
-    expect(screen.getByRole("button", { name: "Idempotent payments, claude, done, not seen" })).toBeTruthy();
-    const input = screen.getByRole("button", { name: "Guard export, codex, needs input" });
-    expect(within(input).getByText("INPUT")).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Idempotent payments, claude, review" })).toBeTruthy();
+    expect(within(screen.getByRole("button", { name: "Idempotent payments, claude, review" })).getByText("Review")).toBeTruthy();
+    const input = screen.getByRole("button", { name: "Guard export, codex, blocked" });
+    expect(within(input).getByText("Blocked")).toBeTruthy();
     // A shell running something (its title is not a shell's name) stays, unmarked.
     expect(screen.getByRole("button", { name: "Tag v1.4.0, shell" })).toBeTruthy();
     // Idle with no recent change: hidden, and no per-workspace fold line names it.
@@ -70,9 +71,9 @@ describe("AgentList", () => {
     const seg = screen.getByRole("group", { name: "Show panes" });
     expect(within(seg).getByRole("button", { name: "Active 3" }).getAttribute("aria-pressed")).toBe("true");
     fireEvent.click(within(seg).getByRole("button", { name: "All" }));
-    expect(rowsOf("web")).toEqual(["Guard export, codex, needs input", "Tag v1.4.0, shell", "Ship flag, pi, idle"]);
+    expect(rowsOf("web")).toEqual(["Guard export, codex, blocked", "Tag v1.4.0, shell", "Ship flag, pi, idle"]);
     expect(screen.getByRole("button", { name: "Ship flag, pi, idle" }).className).toContain("quiet");
-    expect(screen.getByRole("button", { name: "Guard export, codex, needs input" }).className).not.toContain("quiet");
+    expect(screen.getByRole("button", { name: "Guard export, codex, blocked" }).className).not.toContain("quiet");
     expect(JSON.parse(localStorage.getItem("herdr-app:settings")!).paneFilter).toBe("all");
   });
 
@@ -91,7 +92,7 @@ describe("AgentList", () => {
 
   it("names a pane's tab only in its tooltip", () => {
     render(<AgentList />);
-    const guard = screen.getByRole("button", { name: "Guard export, codex, needs input" });
+    const guard = screen.getByRole("button", { name: "Guard export, codex, blocked" });
     expect(guard.querySelector(".agent-card-sub")).toBeNull();
     expect(guard.getAttribute("title")).toBe("ui · /x");
   });
@@ -166,12 +167,12 @@ describe("AgentList", () => {
   it("heads the column with what waits and what is done, and steps through them in this session", () => {
     render(<AgentList />);
     expect(document.querySelector(".agents-head .count")).toBeNull();
-    const chip = screen.getByRole("button", { name: "1 waiting, 1 done: go to the next one in this session" });
-    expect(chip.textContent).toBe("1 waiting · 1 done");
+    const chip = screen.getByRole("button", { name: "1 blocked, 1 review: go to the next one in this session" });
+    expect(chip.textContent).toBe("1 blocked · 1 review");
     // Waiting for input first, then Done and unseen.
     fireEvent.click(chip);
     expect(useApp.getState().selected).toEqual({ machine_id: "local", session: "default", pane_id: "p2" });
-    fireEvent.click(screen.getByRole("button", { name: /waiting/ }));
+    fireEvent.click(screen.getByRole("button", { name: /in this session/ }));
     expect(useApp.getState().selected).toEqual({ machine_id: "local", session: "default", pane_id: "p1" });
   });
 
@@ -186,7 +187,7 @@ describe("AgentList", () => {
     useApp.setState({ viewed: { machine_id: "local", session: "other" } });
     render(<AgentList />);
     expect(screen.getByRole("img", { name: "mystery" }).textContent).toBe("M");
-    expect(screen.getByRole("button", { name: "Backup, mystery, working" })).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Backup, mystery, in progress" })).toBeTruthy();
   });
 
   it("selects a pane on click and marks it active", () => {
@@ -311,21 +312,21 @@ describe("AgentList lanes", () => {
 
   it("folds lanes under their orchestrator, surfacing only a lane that needs input", () => {
     render(<AgentList />);
-    expect(rows()).toEqual(["BMF-OMS review, claude, working", "ipscope — Wave 2, claude, needs input", "cargo watch, shell"]);
+    expect(rows()).toEqual(["BMF-OMS review, claude, in progress", "ipscope — Wave 2, claude, blocked", "cargo watch, shell"]);
     const toggle = screen.getByRole("button", { name: "3 lanes" });
     expect(toggle.getAttribute("aria-expanded")).toBe("false");
-    expect(toggle.getAttribute("title")).toBe("1 working, 1 done, 1 needs input");
-    expect(screen.getByRole("button", { name: "ipscope — Wave 2, claude, needs input" }).closest("li")?.className).toContain("lane-row");
+    expect(toggle.getAttribute("title")).toBe("1 in progress, 1 done, 1 blocked");
+    expect(screen.getByRole("button", { name: "ipscope — Wave 2, claude, blocked" }).closest("li")?.className).toContain("lane-row");
   });
 
   it("opens every lane under the orchestrator, in tab order", () => {
     render(<AgentList />);
     fireEvent.click(screen.getByRole("button", { name: "3 lanes" }));
     expect(rows()).toEqual([
-      "BMF-OMS review, claude, working",
-      "caps — Wave 2, pi, working",
-      "search — Wave 2, pi, done, not seen",
-      "ipscope — Wave 2, claude, needs input",
+      "BMF-OMS review, claude, in progress",
+      "caps — Wave 2, pi, in progress",
+      "search — Wave 2, pi, review",
+      "ipscope — Wave 2, claude, blocked",
       "cargo watch, shell",
     ]);
   });
@@ -333,12 +334,12 @@ describe("AgentList lanes", () => {
   it("keeps a selected lane in view while folded", () => {
     useApp.setState({ selected: { machine_id: "local", session: "default", pane_id: "l1" } });
     render(<AgentList />);
-    expect(rows()).toContain("caps — Wave 2, pi, working");
+    expect(rows()).toContain("caps — Wave 2, pi, in progress");
   });
 
   it("leaves a lane's done to the orchestrator: the head chip counts only what waits on the user", () => {
     render(<AgentList />);
-    expect(screen.getByRole("button", { name: /go to the next one/ }).textContent).toBe("1 waiting");
+    expect(screen.getByRole("button", { name: /go to the next one/ }).textContent).toBe("1 blocked");
     expect(screen.getByRole("button", { name: "Active 3" })).toBeTruthy();
   });
 });

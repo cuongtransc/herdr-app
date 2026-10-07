@@ -6,10 +6,10 @@ import type { AgentStatus, MachineView, PaneRef, PaneView, SessionView, Workspac
 export type Bucket = "attention" | "working" | "done" | "idle";
 
 export const BUCKETS: { id: Bucket; label: string }[] = [
-  { id: "attention", label: "Needs you" },
-  { id: "working", label: "Working" },
-  { id: "done", label: "Done" },
-  { id: "idle", label: "Idle" },
+  { id: "attention", label: "Blocked" },
+  { id: "working", label: "In progress" },
+  { id: "done", label: "Review" },
+  { id: "idle", label: "Done" },
 ];
 
 export interface DashCard {
@@ -63,7 +63,7 @@ export function dashboardCards(
   return cards.map((c) => (c.bucket === "done" || c.bucket === "idle" ? sorted[c.bucket][next[c.bucket]++] : c));
 }
 
-/** Agents waiting for input, counted as the dashboard's "Needs you" column. */
+/** Agents waiting for input, counted as the dashboard's "Blocked" column. */
 export function waitingCount(machines: Record<string, MachineView>): number {
   let n = 0;
   for (const machine of Object.values(machines)) {

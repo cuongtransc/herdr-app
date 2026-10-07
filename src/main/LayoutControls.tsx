@@ -64,12 +64,12 @@ export const LayoutControls = memo(function LayoutControls() {
         <button
           type="button"
           className="waiting-pill"
-          aria-label={`${[waiting && `${waiting} waiting`, done && `${done} done`].filter(Boolean).join(", ")}: go to the next agent that needs you (⌘J)`}
-          title="Next agent that needs you (⌘J)"
+          aria-label={`${[waiting && `${waiting} blocked`, done && `${done} review`].filter(Boolean).join(", ")}: go to the next one (⌘J)`}
+          title="Next Blocked or Review (⌘J)"
           onClick={() => step(1)}
         >
           <span className="dot" aria-hidden="true" />
-          {[waiting && `${waiting} waiting`, done && `${done} done`].filter(Boolean).join(" · ")}
+          {[waiting && `${waiting} blocked`, done && `${done} review`].filter(Boolean).join(" · ")}
         </button>
       )}
     </div>

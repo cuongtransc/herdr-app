@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import type { MachineView, PaneView, SessionView } from "../lib/types";
 import { filterResolved, isActiveSession, needYouCount } from "./activeFilter";
 import type { RNode, RSession } from "./groups";
@@ -51,5 +51,17 @@ describe("filterResolved", () => {
     expect(r.tree).toEqual([{ kind: "group", id: "g", label: "G", children: [s("a")] }]);
     expect(r.bookmarks.map((b) => b.key)).toEqual(["a"]);
     expect(r.hidden).toBe(2);
+  });
+});
+
+describe("useSessionFilter", () => {
+  it("starts on Active unless the user chose All", async () => {
+    vi.resetModules();
+    localStorage.removeItem("herdr-app:settings");
+    expect((await import("./activeFilter")).useSessionFilter.getState().filter).toBe("active");
+    vi.resetModules();
+    localStorage.setItem("herdr-app:settings", JSON.stringify({ sessionFilter: "all" }));
+    expect((await import("./activeFilter")).useSessionFilter.getState().filter).toBe("all");
+    localStorage.removeItem("herdr-app:settings");
   });
 });

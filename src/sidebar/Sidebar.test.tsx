@@ -33,13 +33,44 @@ describe("Sidebar", () => {
     render(<Sidebar />);
     expect(row("default").querySelector(".badge-label")).toBeNull();
   });
-  it("counts what needs the user on a session row, and nothing when all is calm", () => {
+  it("counts what needs the user on a bookmarked session; in the tree its project rows say it", () => {
     const blocked = structuredClone(m);
     blocked.sessions[0].workspaces[0].tabs[0].panes[0].status = "blocked";
     useApp.setState({ machines: { box: blocked }, doneSeen: {} });
+    useLayout.setState({ layout: { tree: [], bookmarks: [sessionKey("box", "default")] } });
     render(<Sidebar />);
-    expect(within(row("default")).getByLabelText("1 needs you")).toBeTruthy();
+    const bm = within(screen.getByRole("region", { name: "Bookmarks" })).getByText("default").closest("button")!;
+    expect(within(bm).getByLabelText("1 needs you")).toBeTruthy();
+    const tree = screen.getByRole("region", { name: "Sessions" });
+    expect(within(tree).getByText("default").closest("button")!.querySelector(".need")).toBeNull();
+    expect(within(tree).getByRole("button", { name: "herdr-app, blocked" })).toBeTruthy();
     expect(row("ai-radar").querySelector(".need")).toBeNull();
+  });
+  it("lists a session's projects under it: Blocked, Review, the lanes of one in progress", () => {
+    const s = structuredClone(m);
+    const p = (pane_id: string, status: "working" | "blocked" | "done" | "idle") => ({ pane_id, terminal_id: "t" + pane_id, title: pane_id, cwd: "/x", agent: "claude", status });
+    const t = (label: string, pane: ReturnType<typeof p>) => ({ tab_id: label, label, number: 1, status: pane.status, panes: [pane] });
+    s.sessions[0].workspaces = [
+      { workspace_id: "w1", label: "herdr-app", number: 1, status: "working", tabs: [t("orch-ux", p("o", "idle")), t("lane-a", p("a", "working")), t("lane-b", p("b", "working"))] },
+      { workspace_id: "w2", label: "ccpoke", number: 2, status: "blocked", tabs: [t("1", p("c", "blocked"))] },
+      { workspace_id: "w3", label: "history", number: 3, status: "done", tabs: [t("1", p("h", "done"))] },
+      { workspace_id: "w4", label: "journal", number: 4, status: "idle", tabs: [t("1", p("j", "idle"))] },
+    ];
+    useApp.setState({ machines: { box: s }, doneSeen: {} });
+    useSessionFilter.setState({ filter: "active" });
+    render(<Sidebar />);
+    const tree = screen.getByRole("region", { name: "Sessions" });
+    const rows = within(tree).getAllByRole("button", { name: /^(herdr-app|ccpoke|history|journal)/ });
+    expect(rows.map((b) => b.textContent)).toEqual(["herdr-app2 lanes", "ccpokeBlocked", "historyReview"]);
+    fireEvent.click(rows[1]);
+    expect(useApp.getState().selected).toEqual({ machine_id: "box", session: "default", pane_id: "c" });
+    expect(rows[1].getAttribute("aria-current")).toBe("true");
+    expect(within(tree).getByText("default").closest("button")!.getAttribute("aria-current")).toBeNull();
+    fireEvent.click(rows[0]);
+    expect(useApp.getState().selected?.pane_id).toBe("o");
+    // All lists the quiet projects too.
+    fireEvent.click(screen.getByRole("button", { name: /^All/ }));
+    expect(within(tree).getByRole("button", { name: "journal" }).className).toContain("quiet");
   });
   it("puts Bookmarks first as its own section, flush, and lights only the row that was clicked", () => {
     const k = sessionKey("box", "default");
@@ -57,7 +88,9 @@ describe("Sidebar", () => {
     // The star travels with the name, not with the right-hand chips.
     expect(inTree.querySelector(".session-name > [aria-label='bookmarked']")).toBeTruthy();
     fireEvent.click(inTree);
-    expect(inTree.getAttribute("aria-current")).toBe("true");
+    // In the tree the project holding the opened pane is the lit row.
+    expect(screen.getByRole("button", { name: "herdr-app" }).getAttribute("aria-current")).toBe("true");
+    expect(inTree.getAttribute("aria-current")).toBeNull();
     expect(bm.getAttribute("aria-current")).toBeNull();
   });
   it("lists sessions no group holds before the groups", () => {
@@ -98,7 +131,7 @@ describe("Sidebar", () => {
     const machines = screen.getByRole("region", { name: "Machines" });
     expect(within(machines).getByText("devtuf")).toBeTruthy();
     expect(within(machines).queryByText("default")).toBeNull();
-    expect(screen.queryByText("herdr-app")).toBeNull();
+    expect(within(machines).queryByText("herdr-app")).toBeNull();
     expect(screen.queryByRole("region", { name: "Bookmarks" })).toBeNull();
   });
   it("renders sessions inside their group and collapses it", () => {
@@ -121,7 +154,8 @@ describe("Sidebar", () => {
     render(<Sidebar />);
     fireEvent.click(screen.getByText("default"));
     expect(useApp.getState().viewed).toEqual({ machine_id: "box", session: "default" });
-    expect(row("default").className).toContain("active");
+    // The pane it opened is in herdr-app: that project's row is the one lit.
+    expect(screen.getByRole("button", { name: "herdr-app" }).className).toContain("active");
   });
   it("selecting a pane views its session", () => {
     useApp.getState().select({ machine_id: "box", session: "default", pane_id: "w1:p1" });

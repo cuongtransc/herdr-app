@@ -11,6 +11,7 @@ import { machineConnect, sessionDelete, sessionRename, sessionsRefresh, sessionS
 import { getFolder, setFolder } from "../workspaces/folder";
 import { useApp } from "../store/app";
 import { EMPTY_LAYOUT, sessionKey, useLayout } from "./groups";
+import { useSessionFilter } from "./activeFilter";
 import { Sidebar } from "./Sidebar";
 import type { MachineView } from "../lib/types";
 
@@ -24,7 +25,10 @@ const set = (machines: MachineView[]) => {
 };
 
 describe("Sidebar machine actions", () => {
-  beforeEach(() => vi.clearAllMocks());
+  beforeEach(() => {
+    vi.clearAllMocks();
+    useSessionFilter.setState({ filter: "all" });
+  });
   it("offers Retry for the local machine in error", () => {
     set([{ ...local, state: "error", error: { code: "herdr_not_found", message: "herdr was not found" }, sessions: [] }]);
     render(<Sidebar />);
