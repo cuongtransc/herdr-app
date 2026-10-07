@@ -485,12 +485,17 @@ kbd {
 /* A workspace's "+" shows on hover or keyboard focus; the column head's stays. */
 .ws-head .ws-add { opacity: 0; transition: opacity var(--t-fast); }
 .ws-head:hover .ws-add, .ws-head:focus-within .ws-add { opacity: 1; }
-.ws-quiet {
-  display: flex; align-items: center; gap: var(--s-3); width: calc(100% - 12px); height: var(--row-xs); margin: 0 6px; padding: 0 10px;
-  border: 0; border-radius: var(--r-sm); background: none; color: var(--fg-3); font-size: var(--fs-s); cursor: pointer; text-align: left;
+/* PANES  All | Active N under the column head: the Sessions section's header, not scrolled with the list. */
+.panes-head { flex: none; padding: 0 var(--s-2) 0 var(--s-4); }
+.panes-head .section-label {
+  flex: 1; min-width: 0; height: var(--row-xs); margin-top: var(--s-2); padding: 0 8px; display: flex; align-items: center;
+  color: var(--fg-3); font-size: 11px; font-weight: 600; letter-spacing: .04em; text-transform: uppercase;
 }
-.ws-quiet:hover { background: var(--hover); color: var(--fg-2); }
-.ws-quiet .chev { width: 10px; height: 10px; }
+/* A pane Active leaves out, shown in All: quiet text. */
+.agent-card.quiet .agent-card-title { color: var(--fg-3); font-weight: 400; }
+.agent-card.quiet.active .agent-card-title { color: var(--fg); }
+/* How long an agent Active keeps has been idle. */
+.row-age { flex: none; color: var(--fg-3); font-size: var(--fs-xs); font-variant-numeric: tabular-nums; }
 .agents-head .need-chip {
   flex: none; height: 20px; padding: 0 8px; display: inline-flex; align-items: center; gap: 4px; border: 0; border-radius: 999px;
   background: var(--hover); color: var(--fg-3); font-size: var(--fs-xs); font-weight: 700; cursor: pointer; white-space: nowrap;

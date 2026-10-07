@@ -214,13 +214,20 @@ copy of §7.1–§7.3; a Design-canvas `.dc.html`, sample data; screenshots are 
 
 - **Rows**: one line, 28px. `[16px agent mark] title … [mark slot]`; blocked adds the amber tint and
   INPUT. No icon tile, no badge line, no unlabelled "1"/"2" tab digits.
-- **Idle agents and shells** fold into one 24px line per Workspace, "3 idle · 2 shells", which
-  expands on click or ←/→. Blocked, working and done-unseen Panes are never folded; neither is the
-  selected Pane. A shell whose title is not a shell name (`cargo watch`, a dev server: anything but
-  `zsh`/`bash`/`fish`/`sh`) shows as a normal quiet row, unfolded and with no status mark: herdr
-  reports no status for shells, so claiming "working" would be a guess (Q3).
-- **Order within a Workspace**: needs you, working, done unseen, then the fold line, applied at
-  settle points (§2.7). Workspace order stays the user's.
+- **PANES All | Active N**: under the column head, the Sessions section's header and vocabulary,
+  never scrolled away. Active (the default, persisted) keeps what needs a look: blocked, working,
+  done-unseen, an agent whose state herdr cannot read (`?`), an agent idle for under 30 minutes
+  (with its idle time, `12m`, so a Pane just looked at does not vanish), a shell running a command,
+  and the selected Pane. It leaves out idle shells and agents idle longer; a Workspace left with
+  nothing goes too (an empty one stays, to add to). All shows every Pane in order, the ones Active
+  leaves out in quiet text. No per-Workspace fold line: a control that scrolls away cannot be found
+  in a long list.
+- **Shells** are read by their process (herdr `pane.process_info`): idle when the shell itself holds
+  the terminal, else running, named by the command when untitled. Before the first read the title
+  decides (`zsh`, `bash`, … and herdr's "Terminal" mean idle). A running shell shows as a normal row
+  with no status mark: herdr reports no status for shells, so claiming "working" would be a guess
+  (Q3).
+- **Order within a Workspace**: the user's tab order; Active only leaves rows out.
 - **Workspace header**: 24px, label 12px/600 `--fg-2`, the folder's basename only when one is set
   (never "no folder"), a worst-status dot plus count when folded, "+" on hover/focus only. The header
   is a button that folds the Workspace; fold state persists per Workspace, and a fold never hides a

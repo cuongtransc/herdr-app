@@ -5,6 +5,7 @@ import { herdrCall } from "../lib/ipc";
 import { useApp } from "../store/app";
 import { setFolder } from "../workspaces/folder";
 import { AgentList, workspaceGroups } from "./AgentList";
+import { usePaneFilter } from "./paneFilter";
 import type { MachineView, PaneView } from "../lib/types";
 
 const pane = (id: string, title: string, agent: string | null, status: PaneView["status"]): PaneView => ({
@@ -42,47 +43,80 @@ describe("AgentList", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     localStorage.clear();
-    useApp.setState({ machines: { local: m }, order: ["local"], selected: null, viewed: { machine_id: "local", session: "default" }, expanded: {}, doneSeen: {} });
+    useApp.setState({ machines: { local: m }, order: ["local"], selected: null, viewed: { machine_id: "local", session: "default" }, expanded: {}, doneSeen: {}, statusSince: {} });
+    usePaneFilter.setState({ filter: "active" });
   });
 
-  it("lists the panes that matter as one-line rows named by their status, folding idle agents and plain shells", () => {
+  const ago = (ms: number) => Date.now() - ms;
+  const MIN = 60_000;
+  const rowsOf = (group: string) =>
+    [...screen.getByRole("group", { name: group }).querySelectorAll(".agent-card")].map((b) => b.getAttribute("aria-label"));
+
+  it("shows, in Active, the panes that need a look as one-line rows named by their status", () => {
     render(<AgentList />);
     expect(screen.getByRole("button", { name: "Idempotent payments, claude, done, not seen" })).toBeTruthy();
     const input = screen.getByRole("button", { name: "Guard export, codex, needs input" });
     expect(within(input).getByText("INPUT")).toBeTruthy();
-    // A shell running something (its title is not a shell's name) stays, quiet and unmarked.
+    // A shell running something (its title is not a shell's name) stays, unmarked.
     expect(screen.getByRole("button", { name: "Tag v1.4.0, shell" })).toBeTruthy();
+    // Idle with no recent change: hidden, and no per-workspace fold line names it.
     expect(screen.queryByText("Ship flag")).toBeNull();
-    const fold = screen.getByRole("button", { name: "1 idle" });
-    expect(fold.getAttribute("aria-expanded")).toBe("false");
-    fireEvent.click(fold);
-    expect(screen.getByRole("button", { name: "Ship flag, pi, idle" })).toBeTruthy();
+    expect(document.querySelector(".ws-quiet")).toBeNull();
     expect(screen.queryByText(/^(DONE|IDLE|WORKING)$/)).toBeNull();
   });
 
-  it("opens the folded panes under their line, and names a pane's tab only in its tooltip", () => {
+  it("heads the panes with All | Active N, Active by default, like the Sessions section", () => {
     render(<AgentList />);
-    fireEvent.click(screen.getByRole("button", { name: "1 idle" }));
-    const web = screen.getByRole("group", { name: "web" });
-    const order = [...web.querySelectorAll(".agent-card, .ws-quiet")].map((b) => b.getAttribute("aria-label") ?? b.textContent);
-    expect(order).toEqual(["Guard export, codex, needs input", "Tag v1.4.0, shell", "1 idle", "Ship flag, pi, idle"]);
+    const seg = screen.getByRole("group", { name: "Show panes" });
+    expect(within(seg).getByRole("button", { name: "Active 3" }).getAttribute("aria-pressed")).toBe("true");
+    fireEvent.click(within(seg).getByRole("button", { name: "All" }));
+    expect(rowsOf("web")).toEqual(["Guard export, codex, needs input", "Tag v1.4.0, shell", "Ship flag, pi, idle"]);
+    expect(screen.getByRole("button", { name: "Ship flag, pi, idle" }).className).toContain("quiet");
+    expect(screen.getByRole("button", { name: "Guard export, codex, needs input" }).className).not.toContain("quiet");
+    expect(JSON.parse(localStorage.getItem("herdr-app:settings")!).paneFilter).toBe("all");
+  });
+
+  it("keeps an agent idle under 30 minutes in Active, with its idle time", () => {
+    useApp.setState({ statusSince: { "local/default/p4": ago(12 * MIN) } });
+    render(<AgentList />);
+    const row = screen.getByRole("button", { name: "Ship flag, pi, idle" });
+    expect(within(row).getByText("12m").getAttribute("title")).toBe("Idle for 12m");
+  });
+
+  it("hides an agent idle for more than 30 minutes", () => {
+    useApp.setState({ statusSince: { "local/default/p4": ago(31 * MIN) } });
+    render(<AgentList />);
+    expect(screen.queryByText("Ship flag")).toBeNull();
+  });
+
+  it("names a pane's tab only in its tooltip", () => {
+    render(<AgentList />);
     const guard = screen.getByRole("button", { name: "Guard export, codex, needs input" });
     expect(guard.querySelector(".agent-card-sub")).toBeNull();
     expect(guard.getAttribute("title")).toBe("ui · /x");
   });
 
-  it("never folds the selected pane", () => {
+  it("never hides the selected pane", () => {
     useApp.setState({ selected: { machine_id: "local", session: "default", pane_id: "p4" } });
     render(<AgentList />);
     expect(screen.getByRole("button", { name: "Ship flag, pi, idle" }).getAttribute("aria-current")).toBe("true");
   });
 
-  it("folds a plain shell with the idle agents", () => {
+  it("hides a workspace whose panes are all hidden, but not an empty one", () => {
+    useApp.setState({ viewed: { machine_id: "local", session: "other" } });
+    const quiet = structuredClone(m);
+    quiet.sessions[1].workspaces[0].tabs[0].panes[0].status = "idle";
+    useApp.setState({ machines: { local: quiet } });
+    render(<AgentList />);
+    expect(screen.queryByRole("group", { name: "infra" })).toBeNull();
+    expect(screen.getByRole("button", { name: "Active 0" })).toBeTruthy();
+  });
+
+  it("hides a plain shell", () => {
     const shell = structuredClone(m);
     shell.sessions[0].workspaces[1].tabs[1].panes[0].title = "zsh";
     useApp.setState({ machines: { local: shell } });
     render(<AgentList />);
-    expect(screen.getByRole("button", { name: "1 idle · 1 shell" })).toBeTruthy();
     expect(screen.queryByText("zsh")).toBeNull();
   });
 
@@ -96,12 +130,12 @@ describe("AgentList", () => {
     expect(row.querySelector(".mark-unknown")?.getAttribute("title")).toMatch(/can't read/);
   });
 
-  it("folds an untitled shell (herdr's \"Terminal\") like a named one", () => {
+  it("hides an untitled shell (herdr's \"Terminal\") like a named one", () => {
     const shell = structuredClone(m);
     shell.sessions[0].workspaces[1].tabs[1].panes[0].title = "Terminal";
     useApp.setState({ machines: { local: shell } });
     render(<AgentList />);
-    expect(screen.getByRole("button", { name: "1 idle · 1 shell" })).toBeTruthy();
+    expect(screen.queryByText("Terminal")).toBeNull();
   });
 
   it("reads a shell's state from its process, not its title, once herdr reported it", () => {
@@ -111,7 +145,7 @@ describe("AgentList", () => {
     Object.assign(pane, { title: "Tag v1.4.0", busy: false });
     useApp.setState({ machines: { local: shell } });
     const { unmount } = render(<AgentList />);
-    expect(screen.getByRole("button", { name: "1 idle · 1 shell" })).toBeTruthy();
+    expect(screen.queryByText("Tag v1.4.0")).toBeNull();
     unmount();
     // Running a command though untitled.
     Object.assign(pane, { title: "Terminal", busy: true });
@@ -270,9 +304,9 @@ describe("AgentList tab reordering", () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
-    useApp.setState({ machines: { local: m }, order: ["local"], selected: null, viewed: { machine_id: "local", session: "default" }, doneSeen: {},
-      // The idle "Ship flag" is folded by default; these tests drag onto it.
-      expanded: { "quiet:local/default/w2": true } });
+    useApp.setState({ machines: { local: m }, order: ["local"], selected: null, viewed: { machine_id: "local", session: "default" }, doneSeen: {}, expanded: {}, statusSince: {} });
+    // The idle "Ship flag" is hidden in Active; these tests drag onto it.
+    usePaneFilter.setState({ filter: "all" });
   });
 
   it("moves a tab after the tab it is dropped on", () => {
