@@ -13,3 +13,32 @@ export function modelLabel(meta: ChatMeta | undefined): string | null {
   const parts = [meta?.model, meta?.effort, tokens].filter((p): p is string => !!p);
   return parts.length > 0 ? parts.join(" · ") : null;
 }
+
+/** Context windows by Model id prefix, from the largest contexts seen in Claude transcripts
+ *  (opus/sonnet 5.x and opus 4.8 ran past 200k, opus-5-5 to 946k). Unknown Models get no meter. */
+const WINDOWS: [RegExp, number][] = [
+  [/^claude-haiku-/, 200_000],
+  [/^claude-(opus|sonnet)-(4-8|5)/, 1_000_000],
+];
+
+export type ContextLevel = "low" | "mid" | "warn" | "crit";
+
+export interface ContextMeter {
+  tokens: number;
+  window: number;
+  pct: number;
+  /** Under 50%: the count only; 50–75: the share; 75–90: amber; 90 and up: red. */
+  level: ContextLevel;
+}
+
+/** How full the Model's context is, or null when the count or the Model's window is unknown. */
+export function contextMeter(meta: ChatMeta | undefined): ContextMeter | null {
+  const tokens = meta?.context_tokens;
+  const model = meta?.model;
+  if (!tokens || !model) return null;
+  const window = WINDOWS.find(([re]) => re.test(model))?.[1];
+  if (!window) return null;
+  const pct = Math.round((tokens / window) * 100);
+  const level: ContextLevel = pct >= 90 ? "crit" : pct >= 75 ? "warn" : pct >= 50 ? "mid" : "low";
+  return { tokens, window, pct, level };
+}

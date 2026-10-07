@@ -62,6 +62,26 @@ describe("Composer", () => {
     expect(herdrCall).toHaveBeenCalledWith("devtuf", "default", "pane.send_keys", { pane_id: "w1:p1", keys: ["esc"] });
     expect(vi.mocked(herdrCall).mock.calls.some((c) => String(c[2]).startsWith("agent."))).toBe(false);
   });
+  it("shows the context used once it passes half the window, warning from 75% with a /compact reply", () => {
+    const meta = (context_tokens: number) => ({ model: "claude-opus-5-5", effort: "high", context_tokens });
+    const { rerender } = render(<Composer pane={pane} agent="claude" meta={meta(300_000)} />);
+    expect(screen.getByText(/claude-opus-5-5 · high · 300k/)).toBeTruthy();
+    expect(screen.queryByRole("button", { name: "/compact" })).toBeNull();
+    rerender(<Composer pane={pane} agent="claude" meta={meta(620_000)} />);
+    const mid = document.querySelector(".composer-model")!;
+    expect(mid.textContent).toBe("claude-opus-5-5 · high · 62%");
+    expect(mid.className).toContain("ctx-mid");
+    expect(screen.queryByRole("button", { name: "/compact" })).toBeNull();
+    rerender(<Composer pane={pane} agent="claude" meta={meta(820_000)} />);
+    const warn = document.querySelector(".composer-model")!;
+    expect(warn.className).toContain("ctx-warn");
+    expect(warn.getAttribute("title")).toBe("820k of 1M (82%) · compact at a natural break: /compact");
+    fireEvent.click(screen.getByRole("button", { name: "/compact" }));
+    expect(herdrCall).toHaveBeenCalledWith("devtuf", "default", "agent.prompt", { target: "w1:p1", text: "/compact" });
+    rerender(<Composer pane={pane} agent="claude" meta={meta(950_000)} />);
+    expect(document.querySelector(".composer-model")!.className).toContain("ctx-crit");
+    expect(screen.getByRole("button", { name: "/compact" }).className).toContain("ctx-crit");
+  });
   it("moves the caret to the line's start and end with Home and End", () => {
     render(<Composer pane={pane} agent="claude" />);
     const box = screen.getByRole<HTMLTextAreaElement>("textbox");
