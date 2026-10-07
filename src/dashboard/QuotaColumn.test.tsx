@@ -1,18 +1,21 @@
 import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-vi.mock("../lib/ipc", () => ({ quotaFetch: vi.fn() }));
-import { quotaFetch } from "../lib/ipc";
-import type { QuotaOutcome, QuotaProvider } from "../lib/types";
-import { initialSlots, useQuota } from "../quota/store";
+vi.mock("../lib/ipc", () => ({ quotaFetch: vi.fn(), quotaCta: vi.fn() }));
+import { quotaCta, quotaFetch } from "../lib/ipc";
+import type { CtaQuota, QuotaOutcome, QuotaProvider } from "../lib/types";
+import { initialQuota, useQuota } from "../quota/store";
 import { QuotaColumn } from "./QuotaColumn";
 
 const fetchMock = vi.mocked(quotaFetch);
+const ctaMock = vi.mocked(quotaCta);
 const card = (name: string) => screen.getByText(name).closest("li") as HTMLElement;
 
 describe("QuotaColumn", () => {
   beforeEach(() => {
     fetchMock.mockReset();
-    useQuota.setState({ slots: initialSlots() });
+    ctaMock.mockReset();
+    ctaMock.mockResolvedValue({ kind: "missing" });
+    useQuota.setState(initialQuota());
   });
   afterEach(() => {
     vi.useRealTimers();
@@ -66,5 +69,51 @@ describe("QuotaColumn", () => {
     await waitFor(() => expect(useQuota.getState().slots.grok.inFlight).toBe(false));
     fireEvent.click(screen.getByRole("button", { name: "Refresh quota" }));
     await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(8));
+  });
+
+  it("shows one card per cta account, labels multiple accounts and unknown Providers", async () => {
+    const now = Date.now();
+    const board: CtaQuota = { kind: "ok", readAt: now, accounts: [
+      { provider: "claude", account: "0bb1535b-bb5a", polledAt: now, status: "ok", detail: "",
+        windows: [{ label: "5h", usedPercent: 44, resetsAt: null, durationSecs: 18_000 }] },
+      { provider: "claude", account: "955f5fbe-a050", polledAt: now - 3 * 3_600_000, status: "ok", detail: "",
+        windows: [{ label: "week", usedPercent: 93, resetsAt: null, durationSecs: 604_800 }] },
+      { provider: "opencode-go", account: "sha256:008e8aa1", polledAt: now, status: "http",
+        detail: "HTTP 403 from opencode.ai/zen/go/v1/usage", windows: [] },
+      { provider: "kimi", account: "k1", polledAt: now, status: "ok", detail: "",
+        windows: [{ label: "month", usedPercent: 5, resetsAt: null, durationSecs: null }] },
+    ] };
+    ctaMock.mockResolvedValue(board);
+    render(<QuotaColumn />);
+    const col = screen.getByRole("region", { name: "Quota" });
+    await waitFor(() => expect(within(col).getByText("44%")).toBeTruthy());
+    expect(fetchMock).not.toHaveBeenCalled();
+    const items = within(col).getAllByRole("listitem");
+    expect(items).toHaveLength(4);
+    expect(items[0].textContent).toContain("0bb1535b");
+    expect(items[1].textContent).toContain("955f5fbe");
+    expect(within(items[1]).getByText("updated 3h ago")).toBeTruthy();
+    expect(within(items[0]).queryByText(/updated/)).toBeNull();
+    expect(within(items[2]).getByText("HTTP 403 from opencode.ai/zen/go/v1/usage")).toBeTruthy();
+    expect(items[2].textContent).not.toContain("008e8aa1");
+    expect(within(items[3]).getByText("kimi")).toBeTruthy();
+    expect(within(items[3]).getByText("5%")).toBeTruthy();
+  });
+
+  it("shows a cta failure as one card", async () => {
+    ctaMock.mockResolvedValue({ kind: "failed", reason: "cta timed out" });
+    render(<QuotaColumn />);
+    await waitFor(() => expect(screen.getByText("cta timed out")).toBeTruthy());
+    expect(screen.getAllByRole("listitem")).toHaveLength(1);
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it("asks cta to poll when refreshed by hand", async () => {
+    ctaMock.mockResolvedValue({ kind: "ok", readAt: 1, accounts: [] });
+    render(<QuotaColumn />);
+    await waitFor(() => expect(screen.getByText("no accounts — run cta ledger quota poll")).toBeTruthy());
+    await waitFor(() => expect(useQuota.getState().cta.inFlight).toBe(false));
+    fireEvent.click(screen.getByRole("button", { name: "Refresh quota" }));
+    await waitFor(() => expect(ctaMock).toHaveBeenLastCalledWith(true));
   });
 });

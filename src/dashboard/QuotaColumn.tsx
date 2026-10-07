@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { AgentIcon } from "../agents/AgentIcon";
 import type { QuotaWindow } from "../lib/types";
+import { ctaCards, staleNote } from "../quota/cta";
 import { PROVIDER_INFO, QUOTA_PROVIDERS } from "../quota/entry";
 import type { QuotaEntry } from "../quota/entry";
 import { WARN_PERCENT, elapsedFraction, percent, tone, untilReset, updatedAgo } from "../quota/format";
@@ -50,12 +51,14 @@ function Body({ entry, now }: { entry: QuotaEntry; now: number }) {
   }
 }
 
-/** One card per Provider with its usage windows; independent of the agent search and filters. */
+/** Quota cards are independent of the agent search and filters. */
 export function QuotaColumn() {
   const slots = useQuota((s) => s.slots);
+  const source = useQuota((s) => s.source);
+  const cta = useQuota((s) => s.cta);
   const refresh = useQuota((s) => s.refresh);
   const [now, setNow] = useState(() => Date.now());
-  const busy = QUOTA_PROVIDERS.some((p) => slots[p].inFlight);
+  const busy = cta.inFlight || QUOTA_PROVIDERS.some((p) => slots[p].inFlight);
 
   useEffect(() => {
     void refresh("shown");
@@ -80,7 +83,32 @@ export function QuotaColumn() {
         </button>
       </div>
       <ul className="dash-cards">
-        {QUOTA_PROVIDERS.map((p) => (
+        {source === "cta" && cta.result?.kind === "ok" ? (
+          cta.result.accounts.length === 0 ? (
+            <li className="dash-quota-card">
+              <span className="dash-card-head"><span className="dash-card-title">cta</span></span>
+              <p className="dash-quota-note">no accounts — run cta ledger quota poll</p>
+            </li>
+          ) : ctaCards(cta.result.accounts).map((card) => {
+            const note = staleNote(card.polledAt, now);
+            return (
+              <li key={card.key} className="dash-quota-card">
+                <span className="dash-card-head">
+                  <AgentIcon agent={card.agent} />
+                  <span className="dash-card-title">{card.name}</span>
+                  {card.account !== null && <span className="dash-quota-account">{card.account}</span>}
+                </span>
+                <Body entry={card.entry} now={now} />
+                {note !== null && <p className="dash-quota-note">{note}</p>}
+              </li>
+            );
+          })
+        ) : source === "cta" && cta.result?.kind === "failed" ? (
+          <li className="dash-quota-card">
+            <span className="dash-card-head"><span className="dash-card-title">cta</span></span>
+            <p className="dash-quota-note">{cta.result.reason}</p>
+          </li>
+        ) : QUOTA_PROVIDERS.map((p) => (
           <li key={p} className="dash-quota-card">
             <span className="dash-card-head">
               <AgentIcon agent={PROVIDER_INFO[p].agent} />
