@@ -45,9 +45,9 @@ function tabRuns(rows: Row[]): Row[][] {
 
 /** What a row's accessible name says about its status; "" for a shell, which herdr reports none for. */
 function statusWord(status: AgentStatus, seen: boolean, agent: boolean): string {
-  if (status === "blocked") return "needs input";
-  if (status === "working") return "working";
-  if (status === "done") return seen ? "done" : "done, not seen";
+  if (status === "blocked") return "blocked";
+  if (status === "working") return "in progress";
+  if (status === "done") return seen ? "done" : "review";
   if (status === "idle") return "idle";
   return agent ? "state unknown" : "";
 }
@@ -64,10 +64,10 @@ interface Row {
   role: "orch" | "lane" | null;
 }
 
-/** "1 working, 1 done, 1 needs input" over some lanes. */
+/** "1 in progress, 1 done, 1 blocked" over some lanes. */
 function laneSummary(lanes: Row[]): string {
   const n = (s: AgentStatus) => lanes.filter((r) => r.entry.pane.status === s).length;
-  const parts: [number, string][] = [[n("working"), "working"], [n("done"), "done"], [n("blocked"), "needs input"], [n("idle"), "idle"]];
+  const parts: [number, string][] = [[n("working"), "in progress"], [n("done"), "done"], [n("blocked"), "blocked"], [n("idle"), "idle"]];
   return parts.filter(([c]) => c > 0).map(([c, w]) => `${c} ${w}`).join(", ");
 }
 
@@ -76,12 +76,18 @@ function StatusMark({ status, seen, agent }: { status: AgentStatus; seen: boolea
   if (status === "blocked")
     return (
       <>
-        <span className="agent-input">INPUT</span>
+        <span className="agent-input">Blocked</span>
         <span className="mark mark-blocked" aria-hidden="true" />
       </>
     );
   if (status === "working") return <span className="mark mark-working" aria-hidden="true" />;
-  if (status === "done" && !seen) return <CheckIcon className="icon mark-done" aria-hidden="true" />;
+  if (status === "done" && !seen)
+    return (
+      <>
+        <span className="agent-review">Review</span>
+        <CheckIcon className="icon mark-done" aria-hidden="true" />
+      </>
+    );
   if (status === "unknown" && agent)
     return (
       <span className="mark-unknown" title="herdr can't read this agent's state (started through a wrapper?)">
@@ -285,7 +291,7 @@ function sessionQueue(s: ReturnType<typeof useApp.getState>, machineId: string, 
   return triageQueue({ [machineId]: machine }, [machineId], s.doneSeen, s.statusSince).filter((c) => c.ref.session === session);
 }
 
-/** "1 waiting · 2 done" for the viewed session: a click selects the next of them, waiting first. */
+/** "1 blocked · 2 review" for the viewed session: a click selects the next of them, Blocked first. */
 function SessionQueueChip({ machineId, session }: { machineId: string; session: string }) {
   // "waiting:done" as one string, so the selector's value compares equal between renders.
   const counts = useApp((s) => {
@@ -295,7 +301,7 @@ function SessionQueueChip({ machineId, session }: { machineId: string; session: 
   });
   const [waiting, done] = counts.split(":").map(Number);
   if (!waiting && !done) return null;
-  const parts = [waiting && `${waiting} waiting`, done && `${done} done`].filter(Boolean) as string[];
+  const parts = [waiting && `${waiting} blocked`, done && `${done} review`].filter(Boolean) as string[];
   const next = () => {
     const s = useApp.getState();
     const q = sessionQueue(s, machineId, session);
@@ -307,12 +313,12 @@ function SessionQueueChip({ machineId, session }: { machineId: string; session: 
       type="button"
       className="need-chip"
       aria-label={`${parts.join(", ")}: go to the next one in this session`}
-      title="Go to the next agent that needs you in this session"
+      title="Next Blocked or Review in this session"
       onClick={next}
     >
-      {waiting > 0 && <span className="need-waiting">{waiting} waiting</span>}
+      {waiting > 0 && <span className="need-waiting">{waiting} blocked</span>}
       {waiting > 0 && done > 0 && " · "}
-      {done > 0 && <span className="need-done">{done} done</span>}
+      {done > 0 && <span className="need-done">{done} review</span>}
     </button>
   );
 }

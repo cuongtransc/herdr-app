@@ -3,6 +3,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 vi.mock("../lib/ipc", () => ({ sessionStart: vi.fn().mockResolvedValue(undefined) }));
 import { useApp } from "../store/app";
 import { sessionKey, useLayout } from "./groups";
+import { useSessionFilter } from "./activeFilter";
 import type { GroupNode } from "./groups";
 import { Sidebar } from "./Sidebar";
 import type { MachineView } from "../lib/types";
@@ -27,6 +28,7 @@ const drag = (from: HTMLElement, to: HTMLElement) => {
 
 describe("Sidebar drag and drop", () => {
   beforeEach(() => {
+    useSessionFilter.setState({ filter: "all" });
     useApp.setState({ machines: { local }, order: ["local"], selected: null, viewed: null, expanded: {} });
     useLayout.setState({ layout: { tree: [{ kind: "group", id: "a", label: "A", children: [] }], bookmarks: [] } });
   });

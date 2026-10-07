@@ -26,9 +26,9 @@ export function TriageHud() {
   if (!hud) return null;
   const { entries, at, shownAt } = hud;
   return (
-    <div className="triage-hud" role="status" aria-label="Needs you">
+    <div className="triage-hud" role="status" aria-label="Queue">
       <div className="triage-head">
-        <span>{entries.length ? `Needs you · ${at + 1} of ${entries.length}` : "Nothing needs you"}</span>
+        <span>{entries.length ? `Queue · ${at + 1} of ${entries.length}` : "Nothing blocked or to review"}</span>
         {entries.length > 0 && <span className="triage-scope">all machines</span>}
       </div>
       {entries.length > 0 && (
@@ -40,7 +40,7 @@ export function TriageHud() {
                 <span className="triage-title">{e.title}</span>
                 <span className="triage-where">{e.where}{e.agent && ` · ${e.agent}`}</span>
               </span>
-              <span className="triage-badge">{(e.waiting ? "INPUT" : "DONE") + age(e.since, shownAt)}</span>
+              <span className="triage-badge">{(e.waiting ? "BLOCKED" : "REVIEW") + age(e.since, shownAt)}</span>
             </li>
           ))}
         </ol>

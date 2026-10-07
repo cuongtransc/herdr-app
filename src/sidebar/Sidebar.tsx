@@ -38,6 +38,7 @@ import { forgetSessions, renameSessionKey, sessionKey, setBookmarked, useLayout 
 import { needYouCount, useSessionFilter, useSidebarSessions, useViewOrigin } from "./activeFilter";
 import type { RSession } from "./groups";
 import { GroupTree } from "./GroupTree";
+import { ProjectRows, useProjects } from "./ProjectRows";
 
 const hl = (status: string) => (status === "blocked" ? " blocked" : "");
 
@@ -54,8 +55,12 @@ export function SessionRow({ node, bookmark, nextKey = null }: { node: RSession;
   const clickedHere = useViewOrigin((s) => s.from === section);
   const setOrigin = useViewOrigin((s) => s.set);
   const need = useApp((s) => needYouCount(machine, session, s.doneSeen));
+  // In the tree a Session lists its projects, which carry what needs the user; a Bookmark stays one line.
+  const projects = useProjects(machine, session);
+  const tree = !bookmark;
   const view = useApp((s) => s.view);
   const bookmarked = useLayout((s) => s.layout.bookmarks.includes(key));
+  const lit = viewed && (clickedHere || !bookmarked) && !(tree && projects.current);
   const a = useActions();
   const drag = useDragState();
   const treeDnd = useTreeRowDnd({ kind: "session", key }, `session:${key}`);
@@ -124,8 +129,8 @@ export function SessionRow({ node, bookmark, nextKey = null }: { node: RSession;
     <li className={"session" + (session.running ? "" : " stopped") + (online ? "" : " offline")}>
       <button
         {...dnd}
-        className={"row" + (viewed ? (clickedHere || !bookmarked ? " active" : " current") : "") + hl(session.status) + indicatorClass(drag, bookmark ? `bookmark:${key}` : `session:${key}`)}
-        aria-current={viewed && (clickedHere || !bookmarked) ? "true" : undefined}
+        className={"row" + (lit ? " active" : viewed && !(tree && projects.current) ? " current" : "") + (tree ? "" : hl(session.status)) + indicatorClass(drag, bookmark ? `bookmark:${key}` : `session:${key}`)}
+        aria-current={lit ? "true" : undefined}
         aria-label={session.running ? undefined : `Start ${session.name}`}
         aria-disabled={online ? undefined : true}
         onClick={onClick}
@@ -140,8 +145,9 @@ export function SessionRow({ node, bookmark, nextKey = null }: { node: RSession;
             <span className="badge-label">{machine.label}</span>
           </span>
         )}
-        {need > 0 && <span className="need" aria-label={`${need} ${need === 1 ? "needs" : "need"} you`}>{need}</span>}
+        {!tree && need > 0 && <span className="need" aria-label={`${need} ${need === 1 ? "needs" : "need"} you`}>{need}</span>}
       </button>
+      {tree && projects.rows.length > 0 && <ProjectRows rows={projects.rows} current={projects.current} />}
       {session.error && <p className="error">{session.error.message}</p>}
     </li>
   );

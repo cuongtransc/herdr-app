@@ -129,11 +129,11 @@ describe("App shell", () => {
       useLayout.setState({ layout: "normal" });
       useApp.setState({ machines: { local: blockedMachine }, order: ["local"], selected: null, dashboardOpen: false });
       render(<App />);
-      expect(screen.queryByRole("button", { name: /waiting/ })).toBeNull();
+      expect(screen.queryByRole("button", { name: /go to the next one \(⌘J\)/ })).toBeNull();
       fireEvent.keyDown(window, { key: "B", metaKey: true, shiftKey: true });
       expect(machinesNav()).toBeNull();
       expect(agentsCol()).toBeNull();
-      fireEvent.click(screen.getByRole("button", { name: "1 waiting: go to the next agent that needs you (⌘J)" }));
+      fireEvent.click(screen.getByRole("button", { name: "1 blocked: go to the next one (⌘J)" }));
       expect(useApp.getState().selected).toEqual({ machine_id: "local", session: "default", pane_id: "w1:p1" });
       expect(useLayout.getState().layout).toBe("focus");
       useApp.setState({ selected: null });
@@ -159,7 +159,7 @@ describe("App shell", () => {
           { tab_id: "w1:t1", label: "1", number: 1, status: "idle" as const, panes } ] } ] }],
     });
     const ref = (machine: string, pane: string) => ({ machine_id: machine, session: "s", pane_id: pane });
-    const hud = () => screen.queryByRole("status", { name: "Needs you" });
+    const hud = () => screen.queryByRole("status", { name: "Queue" });
 
     it("walks the agents that need you across machines and shows where it is", () => {
       useLayout.setState({ layout: "normal" });
@@ -184,7 +184,7 @@ describe("App shell", () => {
       useApp.setState({ machines: { a: m("a", [p("y", "working")]) }, order: ["a"], selected: null, dashboardOpen: false });
       render(<App />);
       fireEvent.keyDown(window, { key: "j", metaKey: true });
-      expect(hud()?.textContent).toContain("Nothing needs you");
+      expect(hud()?.textContent).toContain("Nothing blocked or to review");
       expect(useApp.getState().selected).toBeNull();
     });
   });

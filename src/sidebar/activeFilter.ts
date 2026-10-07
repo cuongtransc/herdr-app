@@ -31,7 +31,8 @@ function save(patch: Record<string, unknown>): void {
 }
 
 export const useSessionFilter = create<{ filter: SessionFilter; setFilter: (f: SessionFilter) => void }>((set) => ({
-  filter: readRaw().sessionFilter === "active" ? "active" : "all",
+  // Active by default: a Session with no agent work is a line to read past (ui-ux-guidelines §7.3).
+  filter: readRaw().sessionFilter === "all" ? "all" : "active",
   setFilter: (filter) => {
     save({ sessionFilter: filter });
     set({ filter });

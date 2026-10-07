@@ -30,7 +30,7 @@ describe("AgentDashboard", () => {
     render(<AgentDashboard />);
     fireEvent.change(screen.getByPlaceholderText(/search/i), { target: { value: "zzz-no-match" } });
     expect(screen.getByRole("region", { name: "Quota" })).toBeTruthy();
-    expect(within(column(/needs you/i)).getByText("None")).toBeTruthy();
+    expect(within(column(/blocked/i)).getByText("None")).toBeTruthy();
   });
 
   it("keeps the Quota column when filters hide every agent", () => {
@@ -41,25 +41,25 @@ describe("AgentDashboard", () => {
     fireEvent.click(screen.getByRole("checkbox", { name: /^pi/ }));
     expect(screen.getByText("0 of 4 shown")).toBeTruthy();
     expect(screen.getByRole("region", { name: "Quota" })).toBeTruthy();
-    expect(within(column(/needs you/i)).getByText("None")).toBeTruthy();
+    expect(within(column(/blocked/i)).getByText("None")).toBeTruthy();
   });
 
-  it("sorts agents into Needs you, Working, Done and Idle with counts", () => {
+  it("sorts agents into Blocked, In progress, Review and Done with counts", () => {
     render(<AgentDashboard />);
     expect(screen.getByText("4 total")).toBeTruthy();
-    expect(within(column(/needs you/i)).getByText("Fix login")).toBeTruthy();
-    expect(within(column(/working/i)).getByText("Rewrite parser")).toBeTruthy();
-    expect(within(column(/done/i)).getByText("Docs")).toBeTruthy();
-    expect(within(column(/idle/i)).getByText("Deploy")).toBeTruthy();
-    expect(within(column(/idle/i)).getByText("devtuf")).toBeTruthy();
-    expect(within(column(/working/i)).getByText("1")).toBeTruthy();
+    expect(within(column(/blocked/i)).getByText("Fix login")).toBeTruthy();
+    expect(within(column(/in progress/i)).getByText("Rewrite parser")).toBeTruthy();
+    expect(within(column(/review/i)).getByText("Docs")).toBeTruthy();
+    expect(within(column(/^done/i)).getByText("Deploy")).toBeTruthy();
+    expect(within(column(/^done/i)).getByText("devtuf")).toBeTruthy();
+    expect(within(column(/in progress/i)).getByText("1")).toBeTruthy();
   });
 
   it("shows a seen Done agent as Idle", () => {
     useApp.setState({ doneSeen: { "local/default/c": true } });
     render(<AgentDashboard />);
-    expect(within(column(/idle/i)).getByText("Docs")).toBeTruthy();
-    expect(within(column(/done/i)).getByText("None")).toBeTruthy();
+    expect(within(column(/^done/i)).getByText("Docs")).toBeTruthy();
+    expect(within(column(/review/i)).getByText("None")).toBeTruthy();
   });
 
   it("filters by search text", () => {
