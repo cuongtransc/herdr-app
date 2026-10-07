@@ -520,6 +520,10 @@ kbd {
 .agent-card.blocked .agent-card-title { font-weight: 600; }
 .agent-card.blocked.active { background: color-mix(in srgb, var(--amber) 7%, var(--active)); }
 .agent-card-title { flex: 1; min-width: 0; font-size: var(--fs-m); font-weight: 500; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+/* A shell's name keeps its width; what it runs takes the ellipsis. */
+.agent-card-title.has-activity { flex: 0 0 auto; max-width: 70%; }
+.agent-card-activity { flex: 1 1 0; min-width: 0; font-size: var(--fs-m); color: var(--fg-3); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.agent-card-activity::before { content: "· "; }
 .agent-card.shell .agent-card-title { color: var(--fg-2); font-weight: 400; }
 /* The mark slot at a row's end; idle and shells keep it empty so titles align. */
 .agent-card .mark { flex: none; width: 8px; height: 8px; border-radius: 50%; }
@@ -798,6 +802,12 @@ kbd {
 .seg-option .agent-tile svg { width: 12px; height: 12px; }
 .seg-option .agent-tile-bare svg { width: 100%; height: 100%; }
 .dialog-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.tab-name { display: flex; flex-direction: column; gap: 6px; }
+.tab-name label { color: var(--fg-2); font-size: 12px; font-weight: 500; }
+.tab-name .chips { display: flex; flex-wrap: wrap; gap: 6px; }
+.tab-name .chip { padding: 2px 8px; border: 1px solid var(--line-2); border-radius: 999px; background: none; color: var(--fg-2); font: inherit; font-size: 12px; cursor: pointer; }
+.tab-name .chip:hover { border-color: var(--accent); color: var(--fg); }
+.tab-name .chip:focus-visible { border-color: var(--accent); box-shadow: var(--ring); outline: none; }
 .agent-pick { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
 .agent-pick button {
   display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 8px;
@@ -844,6 +854,7 @@ kbd {
 .hit:hover { background: var(--hover); }
 .hit.active { background: var(--accent-soft); box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--accent) 25%, transparent); }
 .hit .agent { margin-left: 0; padding: 1px 6px; border-radius: 4px; background: var(--active); }
+.hit .activity { min-width: 0; color: var(--fg-3); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .subtitle { margin-left: auto; color: var(--fg-3); font-size: 11.5px; white-space: nowrap; }
 .palette-foot {
   display: flex; gap: 16px; padding: 8px 16px; border-top: 1px solid var(--line);

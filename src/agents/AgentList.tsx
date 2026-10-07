@@ -119,6 +119,7 @@ function AgentCard({
   const seen = useApp((s) => !!s.doneSeen[paneKey(ref)]);
   const word = statusWord(pane.status, seen, !!pane.agent);
   // The tab's name only when it says more than its number.
+  const activity = pane.agent ? "" : (pane.activity ?? "");
   const sub = entry.sub && !/^\d+$/.test(entry.sub) ? entry.sub : "";
   const select = useApp((s) => s.select);
   const a = useActions();
@@ -143,7 +144,7 @@ function AgentCard({
       <button
         {...reorder.source(tab.tab_id)}
         className={"agent-card" + (active ? " active" : "") + (pane.status === "blocked" ? " blocked" : "") + (pane.agent ? "" : " shell") + (quiet ? " quiet" : "")}
-        aria-label={`${title}, ${pane.agent ?? "shell"}${word ? `, ${word}` : ""}`}
+        aria-label={`${title}${activity ? ` · ${activity}` : ""}, ${pane.agent ?? "shell"}${word ? `, ${word}` : ""}`}
         aria-current={active ? "true" : undefined}
         onClick={() => select(ref)}
         onContextMenu={(e) => a?.menu(e, items)}
@@ -151,7 +152,8 @@ function AgentCard({
         title={[sub, pane.cwd].filter(Boolean).join(" · ") || undefined}
       >
         <AgentIcon agent={pane.agent} />
-        <span className="agent-card-title">{title}</span>
+        <span className={"agent-card-title" + (activity ? " has-activity" : "")}>{title}</span>
+        {activity && <span className="agent-card-activity">{activity}</span>}
         {!quiet && idleFor !== null && (
           <span className="row-age" title={`Idle for ${idleLabel(idleFor)}`}>
             {idleLabel(idleFor)}

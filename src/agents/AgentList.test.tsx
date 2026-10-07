@@ -154,6 +154,27 @@ describe("AgentList", () => {
     expect(screen.getByRole("button", { name: "Terminal, shell" })).toBeTruthy();
   });
 
+  it("shows what a shell does after its name, muted, and names it in the row's label", () => {
+    const shell = structuredClone(m);
+    Object.assign(shell.sessions[0].workspaces[1].tabs[1].panes[0], { title: "dev", activity: "pnpm vite --port 1441", busy: true });
+    useApp.setState({ machines: { local: shell } });
+    render(<AgentList />);
+    const row = screen.getByRole("button", { name: "dev · pnpm vite --port 1441, shell" });
+    expect(within(row).getByText("dev").className).toContain("has-activity");
+    const activity = within(row).getByText("pnpm vite --port 1441");
+    expect(activity.className).toBe("agent-card-activity");
+    expect(activity.previousElementSibling?.textContent).toBe("dev");
+  });
+
+  it("shows no activity for a shell without one, or for an agent", () => {
+    const shell = structuredClone(m);
+    Object.assign(shell.sessions[0].workspaces[1].tabs[1].panes[0], { title: "dev", activity: null, busy: true });
+    useApp.setState({ machines: { local: shell } });
+    const { container } = render(<AgentList />);
+    expect(screen.getByRole("button", { name: "dev, shell" })).toBeTruthy();
+    expect(container.querySelector(".agent-card-activity")).toBeNull();
+  });
+
   it("folds a workspace from its header, keeping what needs the user counted on it", () => {
     render(<AgentList />);
     const head = screen.getByRole("button", { name: "web" });

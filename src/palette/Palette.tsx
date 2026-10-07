@@ -63,6 +63,7 @@ export function Palette({ onClose }: { onClose: () => void }) {
               <button className={"hit" + (i === active ? " active" : "")} onClick={() => choose(i)}>
                 <StatusDot status={h.status} />
                 <span className="title mono">{h.title}</span>
+                {h.activity && <span className="activity mono">{h.activity}</span>}
                 {h.agent && <span className="agent">{h.agent}</span>}
                 <span className="subtitle">{h.subtitle}</span>
               </button>

@@ -59,6 +59,8 @@ pub struct PaneView {
     pub pane_id: String,
     pub terminal_id: String,
     pub title: String,
+    /// A shell's: what it does now (its terminal title, else the command it runs), shown after the title.
+    pub activity: Option<String>,
     pub cwd: Option<String>,
     pub agent: Option<String>,
     pub status: AgentStatus,
