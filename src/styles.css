@@ -736,6 +736,7 @@ kbd {
 }
 .quick-reply-row input:focus { border-color: var(--accent); box-shadow: var(--ring); }
 .quick-reply-row input::placeholder { color: var(--fg-3); }
+.quick-reply-row .icon-btn:disabled { color: var(--fg-3); opacity: 0.5; background: none; cursor: default; }
 .setting-row { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
 .setting-row > span { white-space: nowrap; }
 .font-picker { position: relative; width: 220px; min-width: 0; }

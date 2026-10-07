@@ -45,6 +45,15 @@ export function normalizeReplies(v: unknown): string[] {
     .map((r) => r.slice(0, QUICK_REPLY_MAX_CHARS));
 }
 
+/** `replies` with the one at `from` moved one place (`by` -1 up, +1 down); the same list past either end. */
+export function moveReply(replies: string[], from: number, by: -1 | 1): string[] {
+  const to = from + by;
+  if (from < 0 || from >= replies.length || to < 0 || to >= replies.length) return replies;
+  const next = [...replies];
+  [next[from], next[to]] = [next[to], next[from]];
+  return next;
+}
+
 /** The replies worth a button: the list without the blank rows still being written. */
 export function quickReplyButtons(replies: string[]): string[] {
   return replies.filter((r) => r.trim() !== "");

@@ -110,6 +110,30 @@ describe("Settings quick replies", () => {
     expect(useQuickReplies.getState().replies).toEqual(DEFAULT_QUICK_REPLIES);
   });
 
+  it("reorders replies with the arrow buttons, the ends disabled", () => {
+    useQuickReplies.setState({ show: true, replies: ["a", "b", "c"] });
+    openChat();
+    expect(screen.getByRole<HTMLButtonElement>("button", { name: "Move quick reply 1 up" }).disabled).toBe(true);
+    expect(screen.getByRole<HTMLButtonElement>("button", { name: "Move quick reply 3 down" }).disabled).toBe(true);
+    fireEvent.click(screen.getByRole("button", { name: "Move quick reply 3 up" }));
+    expect(useQuickReplies.getState().replies).toEqual(["a", "c", "b"]);
+    fireEvent.click(screen.getByRole("button", { name: "Move quick reply 1 down" }));
+    expect(useQuickReplies.getState().replies).toEqual(["c", "a", "b"]);
+  });
+
+  it("moves the reply being edited with ⌥↑ / ⌥↓, and keeps the caret in it", () => {
+    useQuickReplies.setState({ show: true, replies: ["a", "b", "c"] });
+    openChat();
+    fireEvent.keyDown(screen.getByRole("textbox", { name: "Quick reply 2" }), { key: "ArrowUp", altKey: true });
+    expect(useQuickReplies.getState().replies).toEqual(["b", "a", "c"]);
+    expect(document.activeElement).toBe(screen.getByRole("textbox", { name: "Quick reply 1" }));
+    fireEvent.keyDown(screen.getByRole("textbox", { name: "Quick reply 1" }), { key: "ArrowDown", altKey: true });
+    expect(useQuickReplies.getState().replies).toEqual(["a", "b", "c"]);
+    expect(document.activeElement).toBe(screen.getByRole("textbox", { name: "Quick reply 2" }));
+    fireEvent.keyDown(screen.getByRole("textbox", { name: "Quick reply 2" }), { key: "ArrowUp" });
+    expect(useQuickReplies.getState().replies).toEqual(["a", "b", "c"]);
+  });
+
   it("stops adding at the limit", () => {
     useQuickReplies.setState({ replies: Array.from({ length: QUICK_REPLIES_MAX }, (_, i) => `r${i}`) });
     openChat();
