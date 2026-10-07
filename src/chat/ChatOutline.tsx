@@ -1,12 +1,27 @@
 import { useEffect, useRef, useState, type KeyboardEvent, type PointerEvent } from "react";
+import { ChevronIcon } from "../ui/icons";
 import type { OutlineEntry } from "./outline";
-import { clampOutlineWidth, loadOutlineWidth, OUTLINE_DEFAULT, OUTLINE_MAX, OUTLINE_MIN, saveOutlineWidth } from "./outlineWidth";
+import {
+  clampOutlineWidth,
+  loadOutlineCollapsed,
+  loadOutlineWidth,
+  OUTLINE_DEFAULT,
+  OUTLINE_MAX,
+  OUTLINE_MIN,
+  saveOutlineCollapsed,
+  saveOutlineWidth,
+} from "./outlineWidth";
 
 /** The rail beside a wide chat: one line per user turn, the one being read highlighted.
  *  Shown even before the first turn, so the chat column doesn't shift when it arrives. */
 export function ChatOutline({ entries, current, onJump }: { entries: OutlineEntry[]; current: number; onJump: (row: number) => void }) {
   const listRef = useRef<HTMLOListElement>(null);
   const [width, setWidth] = useState(loadOutlineWidth);
+  const [collapsed, setCollapsed] = useState(loadOutlineCollapsed);
+  const collapse = (to: boolean) => {
+    saveOutlineCollapsed(to);
+    setCollapsed(to);
+  };
   // Where a drag of the left edge began: the rail sits at the right, so moving left widens it.
   const drag = useRef<{ x: number; width: number } | null>(null);
   // Keep the highlighted turn in the rail's own view as the chat scrolls past it.
@@ -39,6 +54,15 @@ export function ChatOutline({ entries, current, onJump }: { entries: OutlineEntr
     saveOutlineWidth(resize(width + step));
   };
 
+  if (collapsed)
+    return (
+      <nav className="chat-outline collapsed" aria-label="Conversation outline">
+        <button type="button" className="chat-outline-toggle" aria-expanded={false} aria-label="Show outline" title="Show outline" onClick={() => collapse(false)}>
+          <ChevronIcon className="icon flip" />
+        </button>
+      </nav>
+    );
+
   return (
     <nav className="chat-outline" aria-label="Conversation outline" style={{ width }}>
       <div
@@ -57,7 +81,12 @@ export function ChatOutline({ entries, current, onJump }: { entries: OutlineEntr
         onDoubleClick={() => saveOutlineWidth(resize(OUTLINE_DEFAULT))}
         onKeyDown={onKeyDown}
       />
-      <div className="chat-outline-head">Outline</div>
+      <div className="chat-outline-head">
+        <span>Outline</span>
+        <button type="button" className="chat-outline-toggle" aria-expanded={true} aria-label="Hide outline" title="Hide outline" onClick={() => collapse(true)}>
+          <ChevronIcon className="icon" />
+        </button>
+      </div>
       {entries.length === 0 && <p className="chat-outline-empty">Your prompts will appear here.</p>}
       <ol ref={listRef}>
         {entries.map((e, i) => (

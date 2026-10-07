@@ -32,3 +32,16 @@ export function saveOutlineWidth(px: number): void {
     /* ignore */
   }
 }
+
+/** Whether the outline rail is collapsed to a strip, the same in every pane. */
+export function loadOutlineCollapsed(): boolean {
+  return readRaw().outlineCollapsed === true;
+}
+
+export function saveOutlineCollapsed(collapsed: boolean): void {
+  try {
+    localStorage.setItem(SETTINGS_KEY, JSON.stringify({ ...readRaw(), outlineCollapsed: collapsed }));
+  } catch {
+    /* ignore */
+  }
+}

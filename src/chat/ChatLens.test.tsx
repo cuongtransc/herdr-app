@@ -170,7 +170,7 @@ describe("ChatLens", () => {
     ];
     act(() => channels[channels.length - 1].onmessage({ type: "reset", items, total: items.length }));
     const nav = screen.getByRole("navigation", { name: "Conversation outline" });
-    expect([...nav.querySelectorAll("button")].map((b) => b.textContent)).toEqual(["fix the header", "now the footer"]);
+    expect([...nav.querySelectorAll("ol button")].map((b) => b.textContent)).toEqual(["fix the header", "now the footer"]);
   });
 
   it("keeps the turn picked in the outline lit until the transcript is scrolled", () => {
