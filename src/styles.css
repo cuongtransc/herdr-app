@@ -1087,6 +1087,15 @@ kbd {
 .composer textarea:focus-visible { box-shadow: none; }
 .composer-bar { display: flex; align-items: center; gap: 8px; }
 .composer-model { margin-left: auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--fg-3); font-size: 11.5px; }
+/* Context used (modelLabel.ts contextMeter): a ring plus the number, so colour is never the only
+   signal; amber from 75%, red from 90%, as the /compact reply beside the quick replies. */
+.composer-model.ctx { display: inline-flex; align-items: center; gap: 4px; }
+.composer-model .ctx-n { display: inline-flex; align-items: center; gap: 4px; font-variant-numeric: tabular-nums; }
+.ctx-ring { flex: none; width: 12px; height: 12px; }
+.composer-model.ctx-warn .ctx-n { color: var(--amber-text); font-weight: 600; }
+.composer-model.ctx-crit .ctx-n { color: var(--err-fg); font-weight: 600; }
+.composer-quick-reply.compact.ctx-warn { color: var(--amber-text); border-color: color-mix(in srgb, var(--amber) 55%, transparent); }
+.composer-quick-reply.compact.ctx-crit { color: var(--err-fg); border-color: color-mix(in srgb, var(--err) 55%, transparent); }
 .composer-git {
   min-width: 0; display: flex; align-items: center; gap: 4px;
   overflow: hidden; white-space: nowrap; color: var(--fg-3); font-size: 11.5px;

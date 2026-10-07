@@ -10,7 +10,7 @@ import { dirSuggestions } from "../lib/pathInput";
 import { readDraft, useDraft } from "./drafts";
 import { usePaneImages, type Attachment } from "./draftImages";
 import { activeTrigger, applyCompletion } from "./mentions";
-import { modelLabel } from "./modelLabel";
+import { contextMeter, formatTokens, modelLabel, type ContextMeter } from "./modelLabel";
 import { ModelMenu } from "./ModelMenu";
 import { useClaudeSuggestion } from "./useClaudeSuggestion";
 import { useCompletions } from "./useCompletions";
@@ -38,6 +38,26 @@ const SLASH_AGENTS = new Set(["claude", "pi", "codex"]);
 
 // pi's /model opens a picker in the terminal; `/model <name>` may switch without one.
 const PI_MODEL_RE = /^\/model(\s|$)/;
+
+/** "820k of 1M (82%)", with what to do from 75%. */
+function meterTitle(m: ContextMeter): string {
+  const base = `${formatTokens(m.tokens)} of ${formatTokens(m.window)} (${m.pct}%)`;
+  if (m.level === "crit") return `${base} · auto-compact is near: /compact now`;
+  if (m.level === "warn") return `${base} · compact at a natural break: /compact`;
+  return base;
+}
+
+/** A ring filled to `pct`, beside the number so colour is never the only signal. */
+function ContextRing({ pct }: { pct: number }) {
+  const c = 2 * Math.PI * 6;
+  return (
+    <svg className="ctx-ring" viewBox="0 0 16 16" aria-hidden="true">
+      <circle cx="8" cy="8" r="6" fill="none" stroke="currentColor" strokeOpacity=".25" strokeWidth="2.5" />
+      <circle cx="8" cy="8" r="6" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"
+        strokeDasharray={`${(Math.min(pct, 100) / 100) * c} ${c}`} transform="rotate(-90 8 8)" />
+    </svg>
+  );
+}
 
 const bracketedPaste = (text: string) => `\x1b[200~${text}\x1b[201~`;
 
@@ -118,7 +138,24 @@ export function Composer({
   // not while a send is on its way: Claude's box would still show the old suggestion.
   const { suggestion, clear: clearSuggestion } = useClaudeSuggestion(pane, agent, status, text === "" && !sending);
   const offered = text === "" ? suggestion : null;
-  const label = modelLabel(meta);
+  // Past half the window the share replaces the raw count; from 75% it warns (modelLabel.ts).
+  const meter = contextMeter(meta);
+  const full = meter && meter.level !== "low" ? meter : null;
+  const label = modelLabel(full && meta ? { ...meta, context_tokens: null } : meta);
+  const compact = full && (full.level === "warn" || full.level === "crit") ? full.level : null;
+  const modelClass = "composer-model" + (full ? ` ctx ctx-${full.level}` : "");
+  const modelTitle = full ? meterTitle(full) : "Model · reasoning effort · context tokens";
+  const modelBody = full ? (
+    <>
+      {label ? `${label} · ` : ""}
+      <span className="ctx-n">
+        <ContextRing pct={full.pct} />
+        {`${full.pct}%`}
+      </span>
+    </>
+  ) : (
+    label
+  );
   // Where the model menu opens from; null while it is closed.
   const [menuAt, setMenuAt] = useState<DOMRect | null>(null);
   const showQuick = useQuickReplies((s) => s.show);
@@ -259,9 +296,19 @@ export function Composer({
   return (
     <div className="composer">
       <div className="composer-top">
-        {showQuick && quickReplies.length > 0 && (
+        {((showQuick && quickReplies.length > 0) || compact) && (
           <div className="composer-quick" role="group" aria-label="Quick replies">
-            {quickReplies.map((reply, i) => (
+            {compact && (
+              <button
+                className={`composer-quick-reply compact ctx-${compact}`}
+                title="Send /compact: summarise the conversation to free context"
+                disabled={sending}
+                onClick={() => sendQuick("/compact")}
+              >
+                /compact
+              </button>
+            )}
+            {showQuick && quickReplies.map((reply, i) => (
               <button key={`${i}:${reply}`} className="composer-quick-reply" title={`Send “${reply}”`} disabled={sending} onClick={() => sendQuick(reply)}>
                 {reply}
               </button>
@@ -374,19 +421,19 @@ export function Composer({
             // Claude takes /model and /effort with an argument; only while idle, since a turn would
             // queue them and a blocked prompt would take the text as its answer.
             <button
-              className="composer-model"
-              title="Model · reasoning effort · context tokens"
+              className={modelClass}
+              title={modelTitle}
               aria-haspopup="menu"
               aria-expanded={menuAt !== null}
               disabled={status === "working" || status === "blocked"}
               onClick={(e) => setMenuAt(e.currentTarget.getBoundingClientRect())}
             >
-              {label ?? "Model"}
+              {modelBody ?? "Model"}
             </button>
           ) : (
-            label && (
-              <span className="composer-model" title="Model · reasoning effort · context tokens">
-                {label}
+            modelBody && (
+              <span className={modelClass} title={modelTitle}>
+                {modelBody}
               </span>
             )
           )}
