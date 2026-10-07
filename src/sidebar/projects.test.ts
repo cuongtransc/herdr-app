@@ -66,3 +66,25 @@ describe("sessionProjects", () => {
     expect(sessionProjects({ ...machine, state: "error" }, session([ws("w", [tab("1", pane("working"))])]), {}, true)).toEqual([]);
   });
 });
+
+describe("sessionProjects, recently active", () => {
+  const MIN = 60_000;
+  const now = 100 * MIN;
+  it("keeps a project whose agent went idle or was seen Done in the last 30 minutes, with its age", () => {
+    const idle = pane("idle");
+    const seen = pane("done");
+    const old = pane("idle");
+    const s = session([ws("a", [tab("1", idle)]), ws("b", [tab("1", seen)]), ws("c", [tab("1", old)])]);
+    const since = { ["m/s/" + idle.pane_id]: now - 12 * MIN, ["m/s/" + seen.pane_id]: now - 2 * MIN, ["m/s/" + old.pane_id]: now - 31 * MIN };
+    expect(sessionProjects(machine, s, { ["m/s/" + seen.pane_id]: true }, false, since, now)).toEqual([
+      { id: "a", label: "a", state: "recent", lanes: 0, target: ref(idle), idleFor: 12 * MIN },
+      { id: "b", label: "b", state: "recent", lanes: 0, target: ref(seen), idleFor: 2 * MIN },
+    ]);
+  });
+  it("does not keep a project for its lane going idle", () => {
+    const orch = pane("idle");
+    const lane = pane("done");
+    const s = session([ws("w", [tab("orch-x", orch), tab("lane-y", lane)])]);
+    expect(sessionProjects(machine, s, {}, false, { ["m/s/" + lane.pane_id]: now - MIN }, now)).toEqual([]);
+  });
+});

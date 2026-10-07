@@ -298,7 +298,9 @@ trail after the last (possibly nested) Group with no header, reading as its chil
   is the lit one.
 - So in the tree the project rows carry what needs the user and the Session row has no count or
   tint; a Bookmark row (one line, no projects) keeps the amber count.
-- SESSIONS starts on **Active**; the "N hidden · idle or stopped · Show" line lists the rest. Rows
+- SESSIONS starts on **Active**; the "N hidden · idle or stopped · Show" line lists the rest.
+  Like PANES, Active keeps a Session and a project for 30 minutes after its agent (not a lane)
+  stopped, muted with its age (`12m`): the user just looked at it and is likely to return. Rows
   keep the user's order: never re-sort by status (spatial memory).
 - The Machines section stays at the bottom and folds by default once more than one Machine exists.
 
