@@ -1080,11 +1080,12 @@ button.composer-model:disabled { cursor: default; }
 }
 .composer-image-remove {
   position: absolute; top: 3px; right: 3px; display: grid; place-items: center; width: 18px; height: 18px; padding: 0;
-  border: 0; border-radius: 50%; background: rgba(0, 0, 0, 0.6); color: #fff; cursor: pointer; opacity: 0;
-  transition: opacity var(--t-fast);
+  border: 0; border-radius: 50%; background: rgba(0, 0, 0, 0.6); color: #fff; cursor: pointer; opacity: 0.85;
+  transition: opacity var(--t-fast), background var(--t-fast);
 }
 .composer-image-remove svg { width: 11px; height: 11px; }
-.composer-image:hover .composer-image-remove, .composer-image-remove:focus-visible { opacity: 1; }
+/* Always shown (a hover-only × on a 56px thumbnail went unnoticed); full strength on hover or focus. */
+.composer-image:hover .composer-image-remove, .composer-image-remove:focus-visible { opacity: 1; background: rgba(0, 0, 0, 0.8); }
 @keyframes spin { to { transform: rotate(360deg); } }
 .composer-keys, .blocked-keys { display: flex; gap: 6px; flex-wrap: wrap; align-items: center; }
 .send {
