@@ -1,0 +1,67 @@
+import { useEffect, useState } from "react";
+import { create } from "zustand";
+import type { PaneView } from "../lib/types";
+
+/** Shared with the other settings writers: one JSON object, each writer merges its own keys. */
+const SETTINGS_KEY = "herdr-app:settings";
+
+/** The Agents column's twin of the sidebar's session filter (docs/design/ui-ux-guidelines.md §7.1). */
+export type PaneFilter = "all" | "active";
+
+function readRaw(): Record<string, unknown> {
+  try {
+    const raw = localStorage.getItem(SETTINGS_KEY);
+    const p = raw ? (JSON.parse(raw) as unknown) : null;
+    return p && typeof p === "object" ? (p as Record<string, unknown>) : {};
+  } catch {
+    return {};
+  }
+}
+
+export const usePaneFilter = create<{ filter: PaneFilter; setFilter: (f: PaneFilter) => void }>((set) => ({
+  filter: readRaw().paneFilter === "all" ? "all" : "active",
+  setFilter: (filter) => {
+    try {
+      localStorage.setItem(SETTINGS_KEY, JSON.stringify({ ...readRaw(), paneFilter: filter }));
+    } catch {
+      /* ignore */
+    }
+    set({ filter });
+  },
+}));
+
+/** An agent idle this long leaves Active: a pane just looked at stays while the user is likely to return. */
+export const IDLE_KEPT_MS = 30 * 60_000;
+
+/** A pane's title when it is only the shell's name ("terminal": herdr names an untitled one). */
+const SHELL_NAMES = new Set(["sh", "bash", "zsh", "fish", "nu", "pwsh", "dash", "ksh", "tcsh", "terminal"]);
+
+/** A shell with nothing to watch: idle at its prompt, by its process when herdr reported it, else by its title. */
+export const isPlainShell = (pane: PaneView) =>
+  !pane.agent && (pane.busy != null ? !pane.busy : SHELL_NAMES.has(pane.title.trim().replace(/^-/, "").toLowerCase()));
+
+/** How Active treats a pane. `since` is when its status last changed (unknown before the app saw a change). */
+export function paneState(pane: PaneView, seen: boolean, since: number | undefined, now: number): { quiet: boolean; idleFor: number | null } {
+  if (!pane.agent) return { quiet: isPlainShell(pane), idleFor: null };
+  // An agent herdr cannot read may be waiting on the user: never hide it.
+  if (pane.status === "blocked" || pane.status === "working" || pane.status === "unknown") return { quiet: false, idleFor: null };
+  if (pane.status === "done" && !seen) return { quiet: false, idleFor: null };
+  const idleFor = since === undefined ? null : now - since;
+  return { quiet: idleFor === null || idleFor > IDLE_KEPT_MS, idleFor };
+}
+
+/** `12m`, `1h` for an idle time. */
+export function idleLabel(ms: number): string {
+  const min = Math.max(1, Math.floor(ms / 60_000));
+  return min < 60 ? `${min}m` : `${Math.floor(min / 60)}h`;
+}
+
+/** The current time, refreshed every minute: an idle agent leaves Active without any event. */
+export function useMinuteClock(): number {
+  const [now, setNow] = useState(() => Date.now());
+  useEffect(() => {
+    const t = setInterval(() => setNow(Date.now()), 60_000);
+    return () => clearInterval(t);
+  }, []);
+  return now;
+}

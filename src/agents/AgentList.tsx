@@ -6,9 +6,10 @@ import { useApp } from "../store/app";
 import { stepTriage, triageQueue } from "../dashboard/triage";
 import type { MenuItem } from "../sidebar/ContextMenu";
 import { ActionsProvider, useActions } from "../sidebar/actions";
-import { BotIcon, CheckIcon, ChevronIcon, CloseIcon, FolderOpenIcon, PencilIcon, PlusIcon, SplitDownIcon, SplitRightIcon, TabPlusIcon, TerminalIcon } from "../ui/icons";
+import { BotIcon, CheckIcon, CloseIcon, FolderOpenIcon, PencilIcon, PlusIcon, SplitDownIcon, SplitRightIcon, TabPlusIcon, TerminalIcon } from "../ui/icons";
 import { folderName, suggestFolder, useFolder } from "../workspaces/folder";
 import { AgentIcon } from "./AgentIcon";
+import { idleLabel, paneState, useMinuteClock, usePaneFilter } from "./paneFilter";
 import { AGENTS, openAgentTab } from "./openAgentTab";
 import { useTabReorder } from "./tabDnd";
 
@@ -30,13 +31,13 @@ export function workspaceGroups(session: SessionView): { workspace: WorkspaceVie
   }));
 }
 
-/** Splits a workspace's entries into consecutive runs sharing a tab. */
-function tabRuns(entries: PaneEntry[]): PaneEntry[][] {
-  const runs: PaneEntry[][] = [];
-  for (const e of entries) {
+/** Splits a workspace's rows into consecutive runs sharing a tab. */
+function tabRuns(rows: Row[]): Row[][] {
+  const runs: Row[][] = [];
+  for (const r of rows) {
     const last = runs[runs.length - 1];
-    if (last && last[0].tab.tab_id === e.tab.tab_id) last.push(e);
-    else runs.push([e]);
+    if (last && last[0].entry.tab.tab_id === r.entry.tab.tab_id) last.push(r);
+    else runs.push([r]);
   }
   return runs;
 }
@@ -50,19 +51,14 @@ function statusWord(status: AgentStatus, seen: boolean, agent: boolean): string 
   return agent ? "state unknown" : "";
 }
 
-/** A pane's title when it is only the shell's name ("terminal": herdr names an untitled one). */
-const SHELL_NAMES = new Set(["sh", "bash", "zsh", "fish", "nu", "pwsh", "dash", "ksh", "tcsh", "terminal"]);
-/** A shell with nothing to watch: idle at its prompt, by its process when herdr reported it, else by its title. */
-const isPlainShell = (pane: PaneView) =>
-  !pane.agent && (pane.busy != null ? !pane.busy : SHELL_NAMES.has(pane.title.trim().replace(/^-/, "").toLowerCase()));
-
-/** Where a pane goes in the column (docs/design/ui-ux-guidelines.md §7.1): shown, or folded as idle or shell. */
-function placement(pane: PaneView, seen: boolean): "shown" | "idle" | "shell" {
-  if (!pane.agent) return isPlainShell(pane) ? "shell" : "shown";
-  // An agent herdr cannot read may be waiting on the user: never hide it.
-  if (pane.status === "blocked" || pane.status === "working" || pane.status === "unknown") return "shown";
-  if (pane.status === "done" && !seen) return "shown";
-  return "idle";
+/** A pane with how Active treats it (paneFilter.ts). */
+interface Row {
+  entry: PaneEntry;
+  /** The pane's store key (paneKey). */
+  key: string;
+  quiet: boolean;
+  /** Set on an agent kept in Active for having gone idle recently. */
+  idleFor: number | null;
 }
 
 /** The mark at a row's end: only the states that ask for a look carry one. */
@@ -88,7 +84,8 @@ function StatusMark({ status, seen, agent }: { status: AgentStatus; seen: boolea
 type Reorder = ReturnType<typeof useTabReorder>;
 
 /** `tabRow` when this card is its Tab's whole row (a single-pane Tab), so it is also the drop target. */
-function AgentCard({ machineId, session, entry, reorder, tabRow }: { machineId: string; session: string; entry: PaneEntry; reorder: Reorder; tabRow?: boolean }) {
+function AgentCard({ machineId, session, row, reorder, tabRow }: { machineId: string; session: string; row: Row; reorder: Reorder; tabRow?: boolean }) {
+  const { entry, quiet, idleFor } = row;
   const { pane, workspace: ws, tab } = entry;
   const ref = { machine_id: machineId, session, pane_id: pane.pane_id };
   const active = useApp((s) => s.selected !== null && paneKey(s.selected) === paneKey(ref));
@@ -118,7 +115,7 @@ function AgentCard({ machineId, session, entry, reorder, tabRow }: { machineId: 
     >
       <button
         {...reorder.source(tab.tab_id)}
-        className={"agent-card" + (active ? " active" : "") + (pane.status === "blocked" ? " blocked" : "") + (pane.agent ? "" : " shell")}
+        className={"agent-card" + (active ? " active" : "") + (pane.status === "blocked" ? " blocked" : "") + (pane.agent ? "" : " shell") + (quiet ? " quiet" : "")}
         aria-label={`${pane.title}, ${pane.agent ?? "shell"}${word ? `, ${word}` : ""}`}
         aria-current={active ? "true" : undefined}
         onClick={() => select(ref)}
@@ -128,6 +125,11 @@ function AgentCard({ machineId, session, entry, reorder, tabRow }: { machineId: 
       >
         <AgentIcon agent={pane.agent} />
         <span className="agent-card-title">{pane.title}</span>
+        {!quiet && idleFor !== null && (
+          <span className="row-age" title={`Idle for ${idleLabel(idleFor)}`}>
+            {idleLabel(idleFor)}
+          </span>
+        )}
         <StatusMark status={pane.status} seen={seen} agent={!!pane.agent} />
       </button>
       <button className="agent-card-close" aria-label={`Close ${pane.title}`} title="Close pane" onClick={() => a?.guard(close)}>
@@ -137,31 +139,21 @@ function AgentCard({ machineId, session, entry, reorder, tabRow }: { machineId: 
   );
 }
 
-function WorkspaceGroup({ machineId, session, workspace: ws, entries }: { machineId: string; session: string; workspace: WorkspaceView; entries: PaneEntry[] }) {
+function WorkspaceGroup({ machineId, session, workspace: ws, rows: all, active }: { machineId: string; session: string; workspace: WorkspaceView; rows: Row[]; active: boolean }) {
   const a = useActions();
   const ref = { machine_id: machineId, session, workspace_id: ws.workspace_id };
   const folder = useFolder(ref);
   const call = (method: string, params: unknown) => () => herdrCall(machineId, session, method, params);
-  // Folding (§7.1): the header folds the whole workspace; idle agents and plain shells always sit behind a line.
+  // The header folds the whole workspace (§7.1); Active leaves out the quiet panes.
   const foldKey = `ws:${machineId}/${session}/${ws.workspace_id}`;
-  const quietKey = `quiet:${machineId}/${session}/${ws.workspace_id}`;
   const open = useApp((s) => s.expanded[foldKey] ?? true);
-  const quietOpen = useApp((s) => s.expanded[quietKey] ?? false);
   const toggle = useApp((s) => s.toggle);
   const selected = useApp((s) => (s.selected ? paneKey(s.selected) : null));
   const doneSeen = useApp((s) => s.doneSeen);
+  const entries = all.map((r) => r.entry);
   const keyOf = (e: PaneEntry) => paneKey({ machine_id: machineId, session, pane_id: e.pane.pane_id });
-  const place = (e: PaneEntry) => placement(e.pane, !!doneSeen[keyOf(e)]);
   // The selected pane always shows, so ⌘J and the palette never land on a hidden row.
-  const quiet = (e: PaneEntry) => place(e) !== "shown";
-  const quietShown = open && quietOpen;
-  // Above the fold line: what matters, and the selected pane when its line is closed.
-  const main = entries.filter((e) => (open && !quiet(e)) || (keyOf(e) === selected && !(quietShown && quiet(e))));
-  // Below it, once opened: the idle agents and plain shells, so the line heads what it folded.
-  const below = quietShown ? entries.filter(quiet) : [];
-  const idle = entries.filter((e) => place(e) === "idle").length;
-  const shells = entries.filter((e) => place(e) === "shell").length;
-  const quietLabel = [idle && `${idle} idle`, shells && `${shells} ${shells === 1 ? "shell" : "shells"}`].filter(Boolean).join(" · ");
+  const shown = all.filter((r) => r.key === selected || (open && (!active || !r.quiet)));
   const need = entries.filter((e) => {
     if (!e.pane.agent) return false;
     return e.pane.status === "blocked" || (e.pane.status === "done" && !doneSeen[keyOf(e)]);
@@ -200,37 +192,30 @@ function WorkspaceGroup({ machineId, session, workspace: ws, entries }: { machin
           <PlusIcon />
         </button>
       </div>
-      {main.length > 0 && rows(main)}
-      {open && quietLabel && (
-        <button className="ws-quiet" aria-expanded={quietOpen} onClick={() => toggle(quietKey, quietOpen)}>
-          <ChevronIcon className={"icon chev" + (quietOpen ? " open" : "")} />
-          {quietLabel}
-        </button>
-      )}
-      {below.length > 0 && rows(below)}
+      {shown.length > 0 && rows(shown)}
     </section>
   );
 
-  function rows(list: PaneEntry[]) {
+  function rows(list: Row[]) {
     return (
         <ul className="agent-cards">
           {tabRuns(list).map((run) =>
             run.length > 1 ? (
               <li
-                key={run[0].tab.tab_id}
+                key={run[0].entry.tab.tab_id}
                 role="group"
-                aria-label={`Tab ${run[0].tab.label}`}
-                className={"tab-group" + reorder.indicatorClass(run[0].tab.tab_id)}
-                {...reorder.target(run[0].tab.tab_id)}
+                aria-label={`Tab ${run[0].entry.tab.label}`}
+                className={"tab-group" + reorder.indicatorClass(run[0].entry.tab.tab_id)}
+                {...reorder.target(run[0].entry.tab.tab_id)}
               >
                 <ul className="agent-cards">
-                  {run.map((e) => (
-                    <AgentCard key={e.pane.pane_id} machineId={machineId} session={session} entry={e} reorder={reorder} />
+                  {run.map((r) => (
+                    <AgentCard key={r.entry.pane.pane_id} machineId={machineId} session={session} row={r} reorder={reorder} />
                   ))}
                 </ul>
               </li>
             ) : (
-              <AgentCard key={run[0].pane.pane_id} machineId={machineId} session={session} entry={run[0]} reorder={reorder} tabRow />
+              <AgentCard key={run[0].entry.pane.pane_id} machineId={machineId} session={session} row={run[0]} reorder={reorder} tabRow />
             ),
           )}
         </ul>
@@ -311,27 +296,64 @@ export const AgentList = memo(function AgentList() {
         <p className="agents-empty">Select a session</p>
       </>
     );
-  const groups = workspaceGroups(session);
+  return <SessionPanes machineId={viewed.machine_id} session={session} />;
+});
+
+/** The PANES header (All | Active N, as in the sidebar's Sessions section). */
+function PanesHeader({ active, count }: { active: boolean; count: number }) {
+  const setFilter = usePaneFilter((s) => s.setFilter);
+  return (
+    <div className="section-head panes-head">
+      <span className="section-label">Panes</span>
+      <div className={"seg seg-sm" + (active ? " seg-right" : "")} role="group" aria-label="Show panes">
+        <span className="seg-thumb" aria-hidden="true" />
+        <button type="button" aria-pressed={!active} onClick={() => setFilter("all")}>All</button>
+        <button type="button" aria-pressed={active} onClick={() => setFilter("active")}>Active {count}</button>
+      </div>
+    </div>
+  );
+}
+
+function SessionPanes({ machineId, session }: { machineId: string; session: SessionView }) {
+  const active = usePaneFilter((s) => s.filter === "active");
+  const doneSeen = useApp((s) => s.doneSeen);
+  const since = useApp((s) => s.statusSince);
+  const selected = useApp((s) => (s.selected ? paneKey(s.selected) : null));
+  const now = useMinuteClock();
+  const groups = workspaceGroups(session).map((g) => ({
+    workspace: g.workspace,
+    rows: g.entries.map((entry): Row => {
+      const key = paneKey({ machine_id: machineId, session: session.name, pane_id: entry.pane.pane_id });
+      return { entry, key, ...paneState(entry.pane, !!doneSeen[key], since[key], now) };
+    }),
+  }));
+  const kept = (r: Row) => !r.quiet || r.key === selected;
+  const count = groups.reduce((n, g) => n + g.rows.filter(kept).length, 0);
+  // Active drops a workspace whose panes it all leaves out; an empty one stays, to add to it.
+  const visible = active ? groups.filter((g) => g.rows.length === 0 || g.rows.some(kept)) : groups;
   return (
     <ActionsProvider>
       <div className="agents-head" data-tauri-drag-region>
         <span className="agents-title">{session.name}</span>
-        <SessionQueueChip machineId={viewed.machine_id} session={session.name} />
-        {session.running && <NewWorkspaceButton machineId={viewed.machine_id} session={session.name} />}
+        <SessionQueueChip machineId={machineId} session={session.name} />
+        {session.running && <NewWorkspaceButton machineId={machineId} session={session.name} />}
       </div>
+      {session.running && groups.length > 0 && <PanesHeader active={active} count={count} />}
       {/* Only the list scrolls, so the head needs no background of its own: a second layer of the
           translucent chrome would darken it against the column. */}
       <div className="agents-list">
         {!session.running ? (
-          <StoppedSession machineId={viewed.machine_id} session={session.name} />
+          <StoppedSession machineId={machineId} session={session.name} />
         ) : groups.length === 0 ? (
           <p className="agents-empty">No panes</p>
+        ) : visible.length === 0 ? (
+          <p className="agents-empty">Nothing active</p>
         ) : (
-          groups.map((g) => (
-            <WorkspaceGroup key={g.workspace.workspace_id} machineId={viewed.machine_id} session={session.name} workspace={g.workspace} entries={g.entries} />
+          visible.map((g) => (
+            <WorkspaceGroup key={g.workspace.workspace_id} machineId={machineId} session={session.name} workspace={g.workspace} rows={g.rows} active={active} />
           ))
         )}
       </div>
     </ActionsProvider>
   );
-});
+}
