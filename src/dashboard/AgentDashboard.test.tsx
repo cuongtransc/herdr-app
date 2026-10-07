@@ -55,6 +55,23 @@ describe("AgentDashboard", () => {
     expect(within(column(/in progress/i)).getByText("1")).toBeTruthy();
   });
 
+  it("leaves a lane's Done out of the Review count", () => {
+    const laneAndUser: MachineView = {
+      id: "local", label: "local", kind: "local", state: "connected", error: null, version: "0.9.3", status: "idle",
+      sessions: [{ name: "default", running: true, status: "idle", error: null, workspaces: [
+        { workspace_id: "w1", label: "herdr-app", number: 1, status: "idle", tabs: [
+          { tab_id: "w1:t1", label: "lane-caps", number: 1, status: "idle", panes: [pane("l", "Lane docs", "done")] },
+          { tab_id: "w1:t2", label: "1", number: 2, status: "idle", panes: [pane("u", "User docs", "done")] },
+        ] } ] }],
+    };
+    useApp.setState({ machines: { local: laneAndUser }, order: ["local"], doneSeen: {} });
+    render(<AgentDashboard />);
+    const review = column(/review/i);
+    expect(review.querySelector(".dash-col-head .count")?.textContent).toBe("1");
+    expect(within(review).getByText("Lane docs")).toBeTruthy();
+    expect(within(review).getByText("User docs")).toBeTruthy();
+  });
+
   it("shows a seen Done agent as Idle", () => {
     useApp.setState({ doneSeen: { "local/default/c": true } });
     render(<AgentDashboard />);

@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import type { MachineView, PaneView } from "../lib/types";
-import { bucketCounts, bucketOf, dashboardCards, matchesQuery, waitingCount } from "./buckets";
+import { bucketCounts, bucketOf, countsForUser, dashboardCards, matchesQuery, waitingCount } from "./buckets";
+import type { DashCard } from "./buckets";
 
 const pane = (id: string, status: PaneView["status"], extra: Partial<PaneView> = {}): PaneView => ({
   pane_id: id, terminal_id: "t" + id, title: "pane " + id, cwd: "/x", agent: "claude", status, ...extra,
@@ -31,6 +32,15 @@ describe("bucketOf", () => {
   it("treats idle and unknown as Idle", () => {
     expect(bucketOf("idle", false)).toBe("idle");
     expect(bucketOf("unknown", false)).toBe("idle");
+  });
+});
+
+describe("countsForUser", () => {
+  it("leaves a lane's Done out of what counts for the user", () => {
+    const base = { key: "k", lane: false, bucket: "done" } as DashCard;
+    expect(countsForUser(base)).toBe(true);
+    expect(countsForUser({ ...base, lane: true })).toBe(false);
+    expect(countsForUser({ ...base, lane: true, bucket: "attention" })).toBe(true);
   });
 });
 

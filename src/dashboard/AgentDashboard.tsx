@@ -4,7 +4,7 @@ import { StatusDot } from "../sidebar/StatusDot";
 import { useApp } from "../store/app";
 import { CloseIcon, FilterIcon, FolderIcon, LaptopIcon, SearchIcon, ServerIcon } from "../ui/icons";
 import { QuotaColumn } from "./QuotaColumn";
-import { BUCKETS, dashboardCards, matchesQuery } from "./buckets";
+import { BUCKETS, countsForUser, dashboardCards, matchesQuery } from "./buckets";
 import type { DashCard } from "./buckets";
 
 function useCards(): DashCard[] {
@@ -179,7 +179,7 @@ export function AgentDashboard() {
             <section key={b.id} className={"dash-col dash-col-" + b.id} role="region" aria-label={b.label}>
               <div className="dash-col-head">
                 <span className="dash-col-title">{b.label}</span>
-                <span className="count">{col.length}</span>
+                <span className="count">{col.filter(countsForUser).length}</span>
               </div>
               {col.length === 0 ? (
                 <p className="dash-col-empty">None</p>

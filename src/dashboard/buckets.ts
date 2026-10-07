@@ -32,6 +32,12 @@ export function bucketOf(status: AgentStatus, seen: boolean): Bucket {
   return "idle";
 }
 
+/** Whether a card counts for the user: a lane's Done belongs to its orchestrator, not the user.
+ *  The card stays in its column; only counts and queues leave it out. */
+export function countsForUser(card: DashCard): boolean {
+  return !(card.bucket === "done" && card.lane);
+}
+
 /** Every agent pane (shells are left out) of a running session on a connected machine, in sidebar order, except Done and Idle:
  *  newest status change first (`since`), then panes with no known time in sidebar order. */
 export function dashboardCards(
