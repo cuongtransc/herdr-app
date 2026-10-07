@@ -58,3 +58,18 @@ it("opens the panel beside the strip, inside the window, every cell readable", a
   expect(Math.round(panel.bottom)).toBe(Math.round(strip.bottom));
   for (const n of document.querySelectorAll(".qp-num, .qp-name")) expect(fits(n), n.textContent!).toBe(true);
 });
+
+it("folds to a header that lines up with the Sidebar's sections, its line fitting the width", async () => {
+  const head = document.querySelector<HTMLElement>(".quota-toggle")!;
+  const nav = document.querySelector(".sidebar")!.getBoundingClientRect();
+  expect(Math.round(head.getBoundingClientRect().left)).toBe(Math.round(nav.left));
+  await act(async () => head.click());
+  expect(document.querySelectorAll(".quota-row")).toHaveLength(0);
+  const line = document.querySelector<HTMLElement>(".quota-fold")!;
+  // The board's only warning is a full account, so the fullest with room takes the line.
+  expect(line.textContent).toBe("Codex · 24%");
+  expect(document.querySelector(".quota-fold-full")!.textContent).toBe("· 1 full");
+  expect(fits(line)).toBe(true);
+  expect(head.getBoundingClientRect().right).toBeLessThanOrEqual(nav.right);
+  await act(async () => head.click());
+});

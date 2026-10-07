@@ -5,6 +5,8 @@ import { useQuotaPolling } from "../dashboard/QuotaColumn";
 import { agoShort, elapsedFraction, shortReset } from "../quota/format";
 import { HIDE_AFTER_MS, headline, trouble } from "../quota/summary";
 import { useQuota } from "../quota/store";
+import { useApp } from "../store/app";
+import { ChevronIcon } from "../ui/icons";
 import { quotaView, type QuotaItem } from "../quota/view";
 import { itemLabel, QuotaPanel } from "./QuotaPanel";
 
@@ -28,6 +30,33 @@ function stripRows(items: QuotaItem[], now: number): Row[] {
   });
 }
 
+/** What the folded strip's header says, or null when no row has numbers to trust. */
+type Fold = { text: string; warn: boolean; full: string | null };
+
+/**
+ * The folded strip's one line. A full account says nothing new for the days until it resets, so
+ * it only counts beside the line; the line goes to the account that warns (the fullest of them),
+ * else the fullest with room. Only when every account is full does fullness warn, with the
+ * soonest reset. Rows whose numbers cannot be trusted stay out, as in the strip.
+ */
+function foldLine(rows: Row[], now: number): Fold | null {
+  const numbers = rows.flatMap((r) => (r.kind === "numbers" ? [r] : []));
+  if (numbers.length === 0) return null;
+  const isFull = (r: (typeof numbers)[number]) => r.h.window.usedPercent >= 100;
+  const full = numbers.filter(isFull);
+  const room = numbers.filter((r) => !isFull(r)).sort((a, b) => b.h.window.usedPercent - a.h.window.usedPercent);
+  if (room.length === 0) {
+    const soonest = Math.min(...full.map((r) => r.h.window.resetsAt ?? Infinity));
+    const reset = shortReset(Number.isFinite(soonest) ? soonest : null, now);
+    return { text: `${full.length} full` + (reset ? ` · ${reset}` : ""), warn: true, full: null };
+  }
+  const pick = room.find((r) => r.h.tone === "warn") ?? room[0];
+  const warn = pick.h.tone === "warn";
+  const reset = warn ? shortReset(pick.h.window.resetsAt, now) : null;
+  const text = `${pick.label} · ${Math.round(pick.h.window.usedPercent)}%` + (reset ? ` · ${reset}` : "");
+  return { text, warn, full: full.length > 0 ? `· ${full.length} full` : null };
+}
+
 /** The Sidebar's foot: per signed-in Provider or `cta` account, its most pressing window (ui-ux-guidelines §7.3). */
 export function QuotaStrip() {
   useQuotaPolling();
@@ -36,14 +65,28 @@ export function QuotaStrip() {
   const cta = useQuota((s) => s.cta);
   const now = useMinuteClock();
   const [open, setOpen] = useState(false);
+  // Folds like the Sidebar's sections, remembered with them.
+  const unfolded = useApp((s) => s.expanded["quota"] ?? true);
+  const toggle = useApp((s) => s.toggle);
   const strip = useRef<HTMLDivElement>(null);
   const view = quotaView({ source, cta, slots });
   const rows = stripRows(view.kind === "items" ? view.items : [], now);
   if (rows.length === 0) return null;
+  const fold = unfolded ? null : foldLine(rows, now);
   return (
     <div ref={strip} className={"quota-strip" + (open ? " open" : "")}>
       {open && <QuotaPanel anchor={strip} onClose={() => setOpen(false)} />}
-      {rows.map((row) => {
+      <button type="button" className="section-toggle quota-toggle" aria-expanded={unfolded} onClick={() => toggle("quota", unfolded)}>
+        <ChevronIcon className={"icon chev" + (unfolded ? " open" : "")} />
+        Quota
+        {fold && (
+          <span className="quota-fold-line">
+            <span className={"quota-fold" + (fold.warn ? " tone-warn" : "")}>{fold.text}</span>
+            {fold.full && <span className="quota-fold-full">{fold.full}</span>}
+          </span>
+        )}
+      </button>
+      {unfolded && rows.map((row) => {
         const { item, label } = row;
         const id = item.accountId !== null ? ` · ${item.accountId}` : "";
         if (row.kind === "trouble") {

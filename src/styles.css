@@ -1440,6 +1440,13 @@ button.composer-model:disabled { cursor: default; }
 .quota-row.problem .quota-name { color: var(--fg-3); }
 .quota-row.problem .quota-val { grid-column: 3 / 5; font-style: italic; }
 .quota-row.problem .agent-tile { filter: grayscale(1); }
+/* The strip folds like the Sidebar's sections; its header lines up with theirs (the strip pads 8px). */
+/* Its right edge meets the rows' values, inside the rows' own 8px padding. */
+.quota-toggle { margin: 0 -8px; width: calc(100% + 16px); padding-right: 16px; }
+.quota-fold-line { margin-left: auto; min-width: 0; display: flex; gap: 4px; overflow: hidden; white-space: nowrap; text-transform: none; letter-spacing: 0; font-weight: 400; font-size: var(--fs-xs); font-variant-numeric: tabular-nums; }
+.quota-fold { min-width: 0; overflow: hidden; text-overflow: ellipsis; color: var(--fg-2); }
+.quota-fold.tone-warn { color: var(--amber-text); font-weight: 600; }
+.quota-fold-full { flex: none; color: var(--fg-3); }
 .quota-scrim { position: fixed; inset: 0; z-index: 19; }
 
 /* The Quota panel: accounts by window, beside the strip. */

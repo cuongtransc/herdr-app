@@ -5,6 +5,7 @@ import { quotaCta, quotaFetch } from "../lib/ipc";
 import type { CtaQuota, QuotaOutcome, QuotaProvider } from "../lib/types";
 import { initialQuota, useQuota } from "../quota/store";
 import { QuotaStrip } from "./QuotaStrip";
+import { useApp } from "../store/app";
 
 const fetchMock = vi.mocked(quotaFetch);
 const ctaMock = vi.mocked(quotaCta);
@@ -122,5 +123,94 @@ describe("QuotaStrip", () => {
     expect(within(detail).getByRole("row", { name: /^Grok/ }).textContent).toContain("Not polled for 1d.");
     fireEvent.click(within(detail).getByRole("button", { name: "Close" }));
     expect(screen.queryByRole("dialog", { name: "Quota" })).toBeNull();
+  });
+});
+
+describe("QuotaStrip fold", () => {
+  beforeEach(() => {
+    fetchMock.mockReset().mockResolvedValue({ kind: "notSignedIn" });
+    ctaMock.mockReset();
+    useQuota.setState(initialQuota());
+    useApp.setState({ expanded: {} });
+    localStorage.clear();
+    vi.useFakeTimers({ toFake: ["Date"] });
+  });
+  afterEach(() => vi.useRealTimers());
+
+  type W = { label: string; usedPercent: number; resetsAt: number | null; durationSecs: number | null };
+  const account = (provider: string, account: string, windows: W[], status = "ok") => ({
+    provider, account, polledAt: Date.now(), status, detail: status === "ok" ? "" : "HTTP 403", windows,
+  });
+  const board = (...accounts: ReturnType<typeof account>[]): CtaQuota => ({ kind: "ok", readAt: Date.now(), accounts });
+  const week = (usedPercent: number, inH: number): W => ({ label: "week", usedPercent, resetsAt: Date.now() + inH * H, durationSecs: 604_800 });
+  const fiveH = (usedPercent: number, inH: number): W => ({ label: "5h", usedPercent, resetsAt: Date.now() + inH * H, durationSecs: 18_000 });
+  const month = (usedPercent: number, inH: number): W => ({ label: "month", usedPercent, resetsAt: Date.now() + inH * H, durationSecs: null });
+  const fold = async () => {
+    const head = await screen.findByRole("button", { name: /^Quota/ });
+    fireEvent.click(head);
+    return screen.getByRole("button", { name: /^Quota/ });
+  };
+
+  it("folds to its header and opens again, remembering the choice", async () => {
+    ctaMock.mockResolvedValue(board(account("codex", "c1", [week(24, 100)])));
+    const { unmount } = render(<QuotaStrip />);
+    await screen.findByRole("button", { name: /^Codex/ });
+    const head = await fold();
+    expect(head.getAttribute("aria-expanded")).toBe("false");
+    expect(screen.queryByRole("button", { name: /^Codex/ })).toBeNull();
+    unmount();
+    render(<QuotaStrip />);
+    const again = await screen.findByRole("button", { name: /^Quota/ });
+    expect(again.getAttribute("aria-expanded")).toBe("false");
+    fireEvent.click(again);
+    expect(await screen.findByRole("button", { name: /^Codex/ })).toBeTruthy();
+    // Open, the header says nothing more: the rows do.
+    expect(screen.getByRole("button", { name: /^Quota/ }).textContent).toBe("Quota");
+  });
+
+  it("folded, names the account that warns, counting full ones beside it", async () => {
+    ctaMock.mockResolvedValue(board(
+      account("claude", "a1", [fiveH(92, 2)]),
+      account("opencode-go", "o1", [month(100, 13 * 24)]),
+      account("codex", "c1", [week(24, 100)]),
+    ));
+    render(<QuotaStrip />);
+    await screen.findByRole("button", { name: /^Codex/ });
+    const head = await fold();
+    expect(head.textContent).toBe("QuotaClaude · 92% · 2h· 1 full");
+    expect(head.querySelector(".quota-fold")!.className).toContain("tone-warn");
+  });
+
+  it("folded, a full account alone never takes the line: the fullest one with room does, plainly", async () => {
+    ctaMock.mockResolvedValue(board(
+      account("opencode-go", "o1", [month(100, 13 * 24)]),
+      account("codex", "c1", [week(24, 100)]),
+      account("grok", "g1", [week(3, 100)]),
+    ));
+    render(<QuotaStrip />);
+    await screen.findByRole("button", { name: /^Codex/ });
+    const head = await fold();
+    expect(head.textContent).toBe("QuotaCodex · 24%· 1 full");
+    expect(head.querySelector(".quota-fold")!.className).not.toContain("tone-warn");
+  });
+
+  it("folded, warns with the soonest reset once every account is full", async () => {
+    ctaMock.mockResolvedValue(board(
+      account("opencode-go", "o1", [month(100, 13 * 24)]),
+      account("claude", "a1", [fiveH(100, 2)]),
+    ));
+    render(<QuotaStrip />);
+    await screen.findByRole("button", { name: /^Claude/ });
+    const head = await fold();
+    expect(head.textContent).toBe("Quota2 full · 2h");
+    expect(head.querySelector(".quota-fold")!.className).toContain("tone-warn");
+  });
+
+  it("folded, leaves out accounts whose numbers cannot be trusted", async () => {
+    ctaMock.mockResolvedValue(board(account("opencode-go", "o1", [], "http")));
+    render(<QuotaStrip />);
+    await screen.findByRole("button", { name: /^OpenCode/ });
+    const head = await fold();
+    expect(head.textContent).toBe("Quota");
   });
 });
