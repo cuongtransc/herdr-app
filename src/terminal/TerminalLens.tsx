@@ -1,5 +1,4 @@
 import { Channel } from "@tauri-apps/api/core";
-import { writeText } from "@tauri-apps/plugin-clipboard-manager";
 import { FitAddon } from "@xterm/addon-fit";
 import { Terminal } from "@xterm/xterm";
 import "@xterm/xterm/css/xterm.css";
@@ -8,19 +7,17 @@ import "../fonts/fonts.css";
 import { attachKeyString, imageSaveTemp, termAck, termOpen, termRelease, termResize, termWrite } from "../lib/ipc";
 import type { AttachEvent, PaneRef } from "../lib/types";
 import { useApp } from "../store/app";
-import { dismissToast, showToast } from "../ui/Toast";
+import { showToast } from "../ui/Toast";
 import { Banner } from "./Banner";
 import { StartingOverlay } from "./StartingOverlay";
 import { ensureTermFont, useSettings, watchTermFont } from "../settings/store";
 import { watchTermTheme } from "../settings/theme";
-import { COPY_NOTICE_MS, createCopyNotice } from "./copyNotice";
-import { applyCopyOnSelect } from "./copyOnSelect";
 import { createAckBatcher, createInputQueue } from "./ipcBatch";
 import { createImagePaste } from "./imagePaste";
 import { createKeyHandler } from "./keyHandler";
 import { disposesOnEvent, endsOpen, initialLensState, lensReducer } from "./lensState";
 import { applyOsc52 } from "./osc52";
-import { applyDragHint, applyOptionCursor } from "./selectHint";
+import { applySelectUx, copyText } from "./selectUx";
 import { createOutputBuffer } from "./outputBuffer";
 import { claim, disposeIf, getOrCreate } from "./termCache";
 import { applyUnicode11 } from "./unicode";
@@ -28,17 +25,6 @@ import { forgetWebgl, showWebgl } from "./webgl";
 import { applyWheelScroll } from "./wheel";
 
 const RESIZE_SETTLE_MS = 150;
-
-const DRAG_HINT = "Hold ⌥ while dragging to select text";
-
-const notifyCopied = createCopyNotice((text) => showToast(text, { alert: false, ms: COPY_NOTICE_MS }), dismissToast);
-
-function copy(text: string, what: string) {
-  writeText(text).then(
-    () => notifyCopied(text),
-    (e) => console.error(`${what} copy failed`, e),
-  );
-}
 
 interface Props {
   pane: PaneRef;
@@ -58,8 +44,7 @@ function createEntry(key: string) {
   const fit = new FitAddon();
   term.loadAddon(fit);
   applyUnicode11(term);
-  applyOsc52(term, (text) => copy(text, "OSC 52"));
-  const stopCopyOnSelect = applyCopyOnSelect(term, (text) => copy(text, "selection"));
+  applyOsc52(term, (text) => copyText(text, "OSC 52"));
   term.attachCustomKeyEventHandler(createKeyHandler((text) => term.input(text)));
   applyWheelScroll(term);
   const unwatchFont = watchTermFont(term, fit);
@@ -71,7 +56,6 @@ function createEntry(key: string) {
     output,
     cleanup: () => {
       output.dispose();
-      stopCopyOnSelect();
       forgetWebgl(key);
       unwatchFont();
       unwatchTheme();
@@ -210,17 +194,11 @@ export function TerminalLens({ pane, terminalId }: Props) {
       },
     );
     container.addEventListener("paste", onPaste, true);
-    const stopDragHint = applyDragHint(
-      container,
-      () => term.modes.mouseTrackingMode !== "none",
-      () => void showToast(DRAG_HINT, { alert: false }),
-    );
-    const stopOptionCursor = applyOptionCursor(container);
+    const stopSelectUx = applySelectUx(container, term);
 
     return () => {
       container.removeEventListener("paste", onPaste, true);
-      stopDragHint();
-      stopOptionCursor();
+      stopSelectUx();
       live = false;
       output.setVisible(false);
       cancelAnimationFrame(frame);
