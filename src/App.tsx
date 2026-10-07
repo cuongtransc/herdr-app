@@ -115,6 +115,11 @@ export default function App() {
   );
   useEffect(() => applyTheme(theme, themePref), [theme, themePref]);
   useEffect(() => syncSeenToHerdr(), []);
+  useEffect(() => {
+    const onFocus = () => useApp.getState().acknowledgeSelectedDone();
+    window.addEventListener("focus", onFocus);
+    return () => window.removeEventListener("focus", onFocus);
+  }, []);
   useEffect(() => guardFileDrops(), []);
 
   useEffect(() => {

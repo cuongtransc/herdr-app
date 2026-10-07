@@ -125,6 +125,64 @@ describe("App shell", () => {
     expect(fireEvent.drop(document, { dataTransfer: { types: ["application/x-herdr-node"] } })).toBe(true);
   });
 
+  describe("focus-return Done acknowledgement", () => {
+    const ref = { machine_id: "local", session: "default", pane_id: "w1:p1" };
+    const machine = (status: "working" | "done") => ({
+      id: "local", label: "local", kind: "local" as const, state: "connected" as const, error: null, version: "0.9.3", status,
+      sessions: [{ name: "default", running: true, status, error: null, workspaces: [
+        { workspace_id: "w1", label: "app", number: 1, status, tabs: [
+          { tab_id: "w1:t1", label: "agent", number: 1, status, panes: [
+            { pane_id: "w1:p1", terminal_id: "t1", title: "agent", cwd: "/r", agent: "claude", status },
+          ] },
+        ] },
+      ] }],
+    });
+
+    it("acknowledges a selected Done pane on focus return without another snapshot, once", async () => {
+      const { invoke } = await import("@tauri-apps/api/core");
+      const focused = vi.spyOn(document, "hasFocus").mockReturnValue(false);
+      try {
+        useApp.setState({ machines: {}, order: [], selected: null, dashboardOpen: false, filesOverlay: null, doneSeen: {}, lens: { "local/default/w1:p1": "terminal" } });
+        render(<App />);
+        useApp.getState().upsertMachine(machine("working"));
+        useApp.getState().select(ref);
+        useApp.getState().upsertMachine(machine("done"));
+        expect(useApp.getState().doneSeen).toEqual({});
+        expect((invoke as any).mock.calls.filter(([cmd]: [string]) => cmd === "herdr_call")).toHaveLength(0);
+
+        focused.mockReturnValue(true);
+        fireEvent.focus(window);
+        expect(useApp.getState().doneSeen).toEqual({ "local/default/w1:p1": true });
+        expect((invoke as any).mock.calls.filter(([cmd]: [string]) => cmd === "herdr_call")).toEqual([
+          ["herdr_call", { machineId: "local", session: "default", method: "pane.focus", params: { pane_id: "w1:p1" } }],
+        ]);
+        fireEvent.focus(window);
+        expect((invoke as any).mock.calls.filter(([cmd]: [string]) => cmd === "herdr_call")).toHaveLength(1);
+      } finally {
+        focused.mockRestore();
+      }
+    });
+
+    it("leaves the selected Done pane unseen on focus return while the dashboard covers it", async () => {
+      const { invoke } = await import("@tauri-apps/api/core");
+      const focused = vi.spyOn(document, "hasFocus").mockReturnValue(false);
+      try {
+        useApp.setState({ machines: {}, order: [], selected: null, dashboardOpen: false, filesOverlay: null, doneSeen: {}, lens: { "local/default/w1:p1": "terminal" } });
+        render(<App />);
+        useApp.getState().upsertMachine(machine("working"));
+        useApp.getState().select(ref);
+        useApp.getState().setDashboardOpen(true);
+        useApp.getState().upsertMachine(machine("done"));
+        focused.mockReturnValue(true);
+        fireEvent.focus(window);
+        expect(useApp.getState().doneSeen).toEqual({});
+        expect((invoke as any).mock.calls.filter(([cmd]: [string]) => cmd === "herdr_call")).toHaveLength(0);
+      } finally {
+        focused.mockRestore();
+      }
+    });
+  });
+
   describe("layout", () => {
     const blockedMachine = {
       id: "local", label: "local", kind: "local" as const, state: "connected" as const, error: null, version: "0.9.3", status: "blocked" as const,

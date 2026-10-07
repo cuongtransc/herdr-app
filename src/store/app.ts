@@ -79,6 +79,7 @@ export interface AppState {
   upsertMachine: (v: MachineView) => void;
   removeMachine: (id: string) => void;
   select: (ref: PaneRef | null) => void;
+  acknowledgeSelectedDone: () => void;
   view: (ref: SessionRef | null) => void;
   setLens: (key: string, lens: Lens) => void;
   toggle: (nodeKey: string, current?: boolean) => void;
@@ -156,6 +157,13 @@ export const useApp = create<AppState>((set, get) => ({
       lastPane: ref ? { ...s.lastPane, [sessionKey(ref.machine_id, ref.session)]: ref } : s.lastPane,
       doneSeen: ref && findPane(s.machines, ref)?.status === "done" ? { ...s.doneSeen, [paneKey(ref)]: true } : s.doneSeen,
     })),
+  // Focus returning to the window views the selected pane without selecting it again.
+  acknowledgeSelectedDone: () =>
+    set((s) => {
+      const ref = s.selected;
+      if (!document.hasFocus() || s.dashboardOpen || !ref || s.doneSeen[paneKey(ref)] || findPane(s.machines, ref)?.status !== "done") return s;
+      return { doneSeen: { ...s.doneSeen, [paneKey(ref)]: true } };
+    }),
   // Viewing another session also opens its pane: the one last selected there, else its first.
   view: (ref) => {
     const s = get();
