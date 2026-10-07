@@ -57,7 +57,8 @@ impl CtaQuota {
         match self {
             Self::Missing => "missing".into(),
             Self::Ok { accounts, .. } => format!("ok {} accounts", accounts.len()),
-            Self::Failed { reason } => format!("failed {reason}"),
+            // Failure reasons may contain raw cta stderr; keep them in UI/IPC, not logs.
+            Self::Failed { .. } => "failed".into(),
         }
     }
 }
@@ -429,6 +430,23 @@ mod tests {
         );
     }
 
+    #[tokio::test]
+    async fn failure_log_does_not_expose_stderr_or_account_ids() {
+        let tmp = tempfile::tempdir().unwrap();
+        let cta = fake(
+            tmp.path(),
+            "printf 'token=secret account=sha256:private\\n' >&2; exit 2",
+        );
+        let result = run(&cta, false, FAST).await;
+        assert_eq!(
+            result,
+            CtaQuota::Failed {
+                reason: "cta exited 2: token=secret account=sha256:private".into(),
+            }
+        );
+        assert_eq!(result.log_line(), "failed");
+    }
+
     #[test]
     fn log_line_never_carries_account_ids() {
         let ok = CtaQuota::Ok {
@@ -442,7 +460,7 @@ mod tests {
                 reason: "cta timed out".into()
             }
             .log_line(),
-            "failed cta timed out"
+            "failed"
         );
     }
 }
