@@ -19,6 +19,8 @@ import { Composer } from "./Composer";
 import { clearCompletionCache } from "./useCompletions";
 import { useDraftImages } from "./draftImages";
 import { SUGGESTION_POLL_MS } from "./useClaudeSuggestion";
+import { useApp } from "../store/app";
+import { recordPrompt } from "./promptHistory";
 const pane = { machine_id: "devtuf", session: "default", pane_id: "w1:p1" };
 const png = () => new File([new Uint8Array([137, 80, 78, 71])], "image.png", { type: "image/png" });
 const sendButton = () => screen.getByRole<HTMLButtonElement>("button", { name: "Send" });
@@ -664,5 +666,128 @@ describe("Composer model menu", () => {
     expect(button().disabled).toBe(true);
     rerender(<Composer pane={pane} agent="claude" status="blocked" meta={meta} />);
     expect(button().disabled).toBe(true);
+  });
+});
+
+describe("Composer prompt history", () => {
+  const up = (box: HTMLElement) => fireEvent.keyDown(box, { key: "ArrowUp" });
+  const down = (box: HTMLElement) => fireEvent.keyDown(box, { key: "ArrowDown" });
+  const sendText = async (box: HTMLElement, value: string) => {
+    type(box, value);
+    await act(async () => fireEvent.keyDown(box, { key: "Enter" }));
+  };
+
+  it("recalls sent prompts with Up and returns the unsent draft with Down", async () => {
+    render(<Composer pane={pane} agent="claude" />);
+    const box = screen.getByRole<HTMLTextAreaElement>("textbox");
+    await sendText(box, "fix the bug");
+    await sendText(box, "run the tests");
+    type(box, "half typed");
+    up(box);
+    expect(box.value).toBe("run the tests");
+    up(box);
+    expect(box.value).toBe("fix the bug");
+    up(box);
+    expect(box.value).toBe("fix the bug");
+    down(box);
+    expect(box.value).toBe("run the tests");
+    down(box);
+    expect(box.value).toBe("half typed");
+  });
+
+  it("gives the draft back on Escape", async () => {
+    render(<Composer pane={pane} agent="claude" />);
+    const box = screen.getByRole<HTMLTextAreaElement>("textbox");
+    await sendText(box, "fix the bug");
+    type(box, "draft");
+    up(box);
+    expect(box.value).toBe("fix the bug");
+    fireEvent.keyDown(box, { key: "Escape" });
+    expect(box.value).toBe("draft");
+  });
+
+  it("leaves Up and Down to the caret inside multi-line text", async () => {
+    render(<Composer pane={pane} agent="claude" />);
+    const box = screen.getByRole<HTMLTextAreaElement>("textbox");
+    await sendText(box, "fix the bug");
+    type(box, "line one\nline two\nline three");
+    box.setSelectionRange(12, 12);
+    expect(up(box)).toBe(true);
+    expect(box.value).toBe("line one\nline two\nline three");
+    box.setSelectionRange(3, 3);
+    expect(down(box)).toBe(true);
+    expect(box.value).toBe("line one\nline two\nline three");
+    // On the first line Up recalls; on the last, Down has nothing past the draft.
+    expect(up(box)).toBe(false);
+    expect(box.value).toBe("fix the bug");
+  });
+
+  it("keeps stepping back from a recalled multi-line prompt with the caret at its end", async () => {
+    render(<Composer pane={pane} agent="claude" />);
+    const box = screen.getByRole<HTMLTextAreaElement>("textbox");
+    await sendText(box, "older");
+    await sendText(box, "first\nsecond");
+    up(box);
+    expect(box.value).toBe("first\nsecond");
+    box.setSelectionRange(box.value.length, box.value.length);
+    up(box);
+    expect(box.value).toBe("older");
+  });
+
+  it("starts again from the newest once a recalled prompt is edited", async () => {
+    render(<Composer pane={pane} agent="claude" />);
+    const box = screen.getByRole<HTMLTextAreaElement>("textbox");
+    await sendText(box, "one");
+    await sendText(box, "two");
+    up(box);
+    up(box);
+    type(box, "one more");
+    box.setSelectionRange(0, 0);
+    up(box);
+    expect(box.value).toBe("two");
+    down(box);
+    expect(box.value).toBe("one more");
+  });
+
+  it("leaves Up to the completion list while it is open", async () => {
+    recordPrompt("devtuf/default/w1:p1", "fix the bug");
+    render(<Composer pane={pane} agent="claude" />);
+    const box = screen.getByRole<HTMLTextAreaElement>("textbox");
+    type(box, "/c");
+    await screen.findByRole("listbox");
+    up(box);
+    expect(box.value).toBe("/c");
+  });
+
+  it("does not record a failed send", async () => {
+    vi.mocked(herdrCall).mockRejectedValueOnce({ code: "timeout", message: "timed out" });
+    render(<Composer pane={pane} agent="claude" />);
+    const box = screen.getByRole<HTMLTextAreaElement>("textbox");
+    await sendText(box, "lost");
+    type(box, "");
+    up(box);
+    expect(box.value).toBe("");
+  });
+
+  it("shares the history between panes in the same folder", async () => {
+    const panes = [
+      { pane_id: "w1:p1", cwd: "/Users/me/app" },
+      { pane_id: "w1:p2", cwd: "/Users/me/app" },
+      { pane_id: "w1:p3", cwd: "/Users/me/other" },
+    ];
+    useApp.setState({
+      machines: { devtuf: { id: "devtuf", sessions: [{ name: "default", workspaces: [{ workspace_id: "w1", tabs: [{ panes }] }] }] } as never },
+    });
+    const { unmount } = render(<Composer pane={pane} agent="claude" />);
+    await sendText(screen.getByRole("textbox"), "fix the bug");
+    unmount();
+    const { unmount: unmount2 } = render(<Composer pane={{ ...pane, pane_id: "w1:p2" }} agent="claude" />);
+    up(screen.getByRole("textbox"));
+    expect(screen.getByRole<HTMLTextAreaElement>("textbox").value).toBe("fix the bug");
+    unmount2();
+    render(<Composer pane={{ ...pane, pane_id: "w1:p3" }} agent="claude" />);
+    up(screen.getByRole("textbox"));
+    expect(screen.getByRole<HTMLTextAreaElement>("textbox").value).toBe("");
+    useApp.setState({ machines: {} });
   });
 });
