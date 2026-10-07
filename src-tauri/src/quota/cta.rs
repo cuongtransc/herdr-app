@@ -41,57 +41,60 @@ pub enum CtaQuota {
 pub fn parse_board(stdout: &[u8]) -> Option<Vec<CtaAccount>> {
     let root: Value = serde_json::from_slice(stdout).ok()?;
     let entries = root.as_object()?.get("accounts")?.as_array()?;
-    Some(
-        entries
-            .iter()
-            .filter_map(|entry| {
-                let provider = entry.get("provider")?.as_str()?.to_owned();
-                let account = entry.get("account")?.as_str()?.to_owned();
-                let windows = entry
-                    .get("windows")
-                    .and_then(Value::as_array)
-                    .into_iter()
-                    .flatten()
-                    .filter_map(|window| {
-                        let label = window.get("window")?.as_str()?.to_owned();
-                        let used_percent = window.get("used_pct")?.as_f64()?.clamp(0.0, 100.0);
-                        let resets_at = window.get("resets_at").and_then(parse_date);
-                        let duration_secs = window
-                            .get("duration_s")
-                            .and_then(Value::as_f64)
-                            .filter(|secs| secs.is_finite() && *secs > 0.0)
-                            .map(|secs| secs.round() as u64);
-                        Some(QuotaWindow {
-                            label,
-                            used_percent,
-                            resets_at,
-                            duration_secs,
-                        })
+    let accounts: Vec<_> = entries
+        .iter()
+        .filter_map(|entry| {
+            let provider = entry.get("provider")?.as_str()?.to_owned();
+            let account = entry.get("account")?.as_str()?.to_owned();
+            let windows = entry
+                .get("windows")
+                .and_then(Value::as_array)
+                .into_iter()
+                .flatten()
+                .filter_map(|window| {
+                    let label = window.get("window")?.as_str()?.to_owned();
+                    let used_percent = window.get("used_pct")?.as_f64()?.clamp(0.0, 100.0);
+                    let resets_at = window.get("resets_at").and_then(parse_date);
+                    let duration_secs = window
+                        .get("duration_s")
+                        .and_then(Value::as_f64)
+                        .filter(|secs| secs.is_finite() && *secs > 0.0)
+                        .map(|secs| secs.round() as u64);
+                    Some(QuotaWindow {
+                        label,
+                        used_percent,
+                        resets_at,
+                        duration_secs,
                     })
-                    .collect();
-                let poll = entry.get("last_poll");
-                let polled_at = poll.and_then(|p| p.get("at")).and_then(parse_date);
-                let status = poll
-                    .and_then(|p| p.get("status"))
-                    .and_then(Value::as_str)
-                    .unwrap_or("unknown")
-                    .to_owned();
-                let detail = poll
-                    .and_then(|p| p.get("detail"))
-                    .and_then(Value::as_str)
-                    .unwrap_or("")
-                    .to_owned();
-                Some(CtaAccount {
-                    provider,
-                    account,
-                    windows,
-                    polled_at,
-                    status,
-                    detail,
                 })
+                .collect();
+            let poll = entry.get("last_poll");
+            let polled_at = poll.and_then(|p| p.get("at")).and_then(parse_date);
+            let status = poll
+                .and_then(|p| p.get("status"))
+                .and_then(Value::as_str)
+                .unwrap_or("unknown")
+                .to_owned();
+            let detail = poll
+                .and_then(|p| p.get("detail"))
+                .and_then(Value::as_str)
+                .unwrap_or("")
+                .to_owned();
+            Some(CtaAccount {
+                provider,
+                account,
+                windows,
+                polled_at,
+                status,
+                detail,
             })
-            .collect(),
-    )
+        })
+        .collect();
+    if !entries.is_empty() && accounts.is_empty() {
+        None
+    } else {
+        Some(accounts)
+    }
 }
 
 pub const FALLBACK_DIRS: [&str; 2] = ["/opt/homebrew/bin", "/usr/local/bin"];
@@ -192,6 +195,14 @@ mod tests {
         assert_eq!(parse_board(br#"{"accounts":{}}"#), None);
         assert_eq!(parse_board(br#"[]"#), None);
         assert_eq!(parse_board(br#"{"accounts":[]}"#), Some(vec![]));
+    }
+
+    #[test]
+    fn rejects_nonempty_accounts_array_when_every_entry_is_invalid() {
+        assert_eq!(
+            parse_board(br#"{"accounts":[{"provider":7,"account":"bad"},{"provider":"claude"}]}"#),
+            None
+        );
     }
 
     fn exe(dir: &Path, mode: u32) -> PathBuf {
