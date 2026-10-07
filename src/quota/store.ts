@@ -69,7 +69,7 @@ export const useQuota = create<QuotaState>((set, get) => {
           return;
         }
         set((s) => ({ source: "builtin", cta: { ...s.cta, result, inFlight: false } }));
-      } else if (get().source !== "builtin") {
+      } else if (get().source !== "builtin" || get().cta.inFlight) {
         return;
       }
       await refreshBuiltin(trigger);

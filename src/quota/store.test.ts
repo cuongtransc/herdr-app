@@ -29,14 +29,17 @@ describe("useQuota", () => {
   });
 
   it("does not start a second fetch while one is in flight", async () => {
-    let release!: () => void;
-    fetchMock.mockImplementation(() => new Promise<QuotaOutcome>((r) => (release = () => r({ kind: "notSignedIn" }))));
-    void useQuota.getState().refresh("manual");
-    void useQuota.getState().refresh("manual");
+    let release!: (outcome: QuotaOutcome) => void;
+    const pending = new Promise<QuotaOutcome>((resolve) => (release = resolve));
+    fetchMock.mockImplementation(() => pending);
+    const first = useQuota.getState().refresh("manual");
     await vi.waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(4));
+    const second = useQuota.getState().refresh("manual");
+    await second;
+    expect(fetchMock).toHaveBeenCalledTimes(4);
     expect(useQuota.getState().slots.grok.inFlight).toBe(true);
-    release();
-    fetchMock.mockResolvedValue({ kind: "notSignedIn" });
+    release({ kind: "notSignedIn" });
+    await first;
   });
 
   it("respects the schedule: shown twice within a minute fetches once", async () => {
@@ -109,6 +112,28 @@ describe("useQuota with cta", () => {
     await useQuota.getState().refresh("manual");
     expect(ctaMock).toHaveBeenLastCalledWith(true);
     expect(useQuota.getState().source).toBe("cta");
+  });
+
+  it("waits for an in-flight cta refresh before using builtin after cta was missing", async () => {
+    ctaMock.mockResolvedValueOnce({ kind: "missing" });
+    fetchMock.mockResolvedValue({ kind: "notSignedIn" });
+    await useQuota.getState().refresh("shown");
+    expect(useQuota.getState().source).toBe("builtin");
+    expect(fetchMock).toHaveBeenCalledTimes(4);
+
+    let release!: (result: CtaQuota) => void;
+    const pending = new Promise<CtaQuota>((resolve) => (release = resolve));
+    ctaMock.mockReturnValueOnce(pending);
+    const first = useQuota.getState().refresh("manual");
+    expect(useQuota.getState().cta.inFlight).toBe(true);
+    const second = useQuota.getState().refresh("manual");
+    await second;
+    expect(ctaMock).toHaveBeenCalledTimes(2);
+    expect(fetchMock).toHaveBeenCalledTimes(4);
+    release(board);
+    await first;
+    expect(useQuota.getState().source).toBe("cta");
+    expect(fetchMock).toHaveBeenCalledTimes(4);
   });
 
   it("polls through cta on manual refresh without starting a second cta while one runs", async () => {
