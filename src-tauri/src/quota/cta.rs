@@ -3,6 +3,10 @@
 use std::ffi::OsStr;
 use std::os::unix::fs::PermissionsExt;
 use std::path::{Path, PathBuf};
+use std::process::Stdio;
+use std::time::Duration;
+
+use tokio::process::Command;
 
 use serde::Serialize;
 use serde_json::Value;
@@ -35,6 +39,106 @@ pub enum CtaQuota {
     Failed {
         reason: String,
     },
+}
+
+#[derive(Debug, Clone, Copy)]
+pub struct Timeouts {
+    pub read: Duration,
+    pub poll: Duration,
+}
+
+pub const TIMEOUTS: Timeouts = Timeouts {
+    read: Duration::from_secs(20),
+    poll: Duration::from_secs(60),
+};
+
+impl CtaQuota {
+    pub fn log_line(&self) -> String {
+        match self {
+            Self::Missing => "missing".into(),
+            Self::Ok { accounts, .. } => format!("ok {} accounts", accounts.len()),
+            Self::Failed { reason } => format!("failed {reason}"),
+        }
+    }
+}
+
+async fn execute(
+    cta: &Path,
+    args: &[&str],
+    timeout: Duration,
+) -> Result<std::process::Output, String> {
+    let mut command = Command::new(cta);
+    command.args(args).stdin(Stdio::null()).kill_on_drop(true);
+    let child = command.output();
+    match tokio::time::timeout(timeout, child).await {
+        Err(_) => Err("timeout".into()),
+        Ok(Err(_)) => Err("start".into()),
+        Ok(Ok(output)) => Ok(output),
+    }
+}
+
+pub async fn run(cta: &Path, poll: bool, timeouts: Timeouts) -> CtaQuota {
+    if poll
+        && execute(cta, &["ledger", "quota", "poll"], timeouts.poll).await == Err("start".into())
+    {
+        return CtaQuota::Failed {
+            reason: "cta could not start".into(),
+        };
+    }
+    let output = match execute(cta, &["ledger", "quota", "--json"], timeouts.read).await {
+        Ok(output) => output,
+        Err(error) if error == "timeout" => {
+            return CtaQuota::Failed {
+                reason: "cta timed out".into(),
+            }
+        }
+        Err(_) => {
+            return CtaQuota::Failed {
+                reason: "cta could not start".into(),
+            }
+        }
+    };
+    if !output.status.success() {
+        let code = output
+            .status
+            .code()
+            .map(|code| format!("cta exited {code}"));
+        let Some(mut reason) = code else {
+            return CtaQuota::Failed {
+                reason: "cta killed".into(),
+            };
+        };
+        let stderr = String::from_utf8_lossy(&output.stderr);
+        if let Some(line) = stderr.lines().map(str::trim).find(|line| !line.is_empty()) {
+            reason.push_str(": ");
+            reason.extend(line.chars().take(200));
+        }
+        return CtaQuota::Failed { reason };
+    }
+    match parse_board(&output.stdout) {
+        Some(accounts) => CtaQuota::Ok {
+            accounts,
+            read_at: chrono::Utc::now().timestamp_millis(),
+        },
+        None => CtaQuota::Failed {
+            reason: "cta: unreadable output".into(),
+        },
+    }
+}
+
+pub async fn read(poll: bool) -> CtaQuota {
+    let fallback_dirs = FALLBACK_DIRS.map(PathBuf::from);
+    let found = locate(
+        std::env::var_os("HOME").as_deref().map(Path::new),
+        std::env::var_os("PATH").as_deref(),
+        &fallback_dirs,
+    );
+    let result = match found {
+        Some(path) => run(&path, poll, TIMEOUTS).await,
+        None => CtaQuota::Missing,
+    };
+    tracing::info!("quota cta: {}", result.log_line());
+    result
 }
 
 /// Preserve the account and window order reported by `cta`.
@@ -126,6 +230,7 @@ mod tests {
     use super::*;
     use crate::quota::{QuotaWindow, FIVE_HOURS, WEEK};
     use std::os::unix::fs::PermissionsExt;
+    use std::time::Duration;
 
     fn ms(s: &str) -> i64 {
         crate::quota::parsers::parse_date(&serde_json::json!(s)).unwrap()
@@ -239,5 +344,105 @@ mod tests {
         );
         assert_eq!(locate(Some(&home), None, &fallback), Some(in_brew));
         assert_eq!(locate(None, None, &[]), None);
+    }
+
+    const FAST: Timeouts = Timeouts {
+        read: Duration::from_secs(5),
+        poll: Duration::from_secs(5),
+    };
+
+    /// A fake cta that records its arguments next to itself, then runs `body`.
+    fn fake(dir: &Path, body: &str) -> PathBuf {
+        let p = dir.join("cta");
+        std::fs::write(
+            &p,
+            format!("#!/bin/sh\necho \"$*\" >> \"$(dirname \"$0\")/calls\"\n{body}\n"),
+        )
+        .unwrap();
+        std::fs::set_permissions(&p, std::fs::Permissions::from_mode(0o755)).unwrap();
+        p
+    }
+    fn calls(dir: &Path) -> String {
+        std::fs::read_to_string(dir.join("calls")).unwrap_or_default()
+    }
+    const ONE: &str = r#"{"accounts":[{"provider":"grok","account":"g1","windows":[],"last_poll":{"at":"2026-10-07T13:51:05Z","status":"ok","detail":""}}]}"#;
+
+    #[tokio::test]
+    async fn reads_without_polling() {
+        let tmp = tempfile::tempdir().unwrap();
+        let cta = fake(tmp.path(), &format!("echo '{ONE}'"));
+        let CtaQuota::Ok { accounts, read_at } = run(&cta, false, FAST).await else {
+            panic!("not ok")
+        };
+        assert_eq!(accounts.len(), 1);
+        assert!(read_at > 0);
+        assert_eq!(calls(tmp.path()), "ledger quota --json\n");
+    }
+
+    #[tokio::test]
+    async fn polls_first_and_ignores_the_poll_exit_status() {
+        let tmp = tempfile::tempdir().unwrap();
+        let cta = fake(
+            tmp.path(),
+            &format!("[ \"$3\" = poll ] && exit 1\necho '{ONE}'"),
+        );
+        assert!(matches!(run(&cta, true, FAST).await, CtaQuota::Ok { .. }));
+        assert_eq!(
+            calls(tmp.path()),
+            "ledger quota poll\nledger quota --json\n"
+        );
+    }
+
+    #[tokio::test]
+    async fn reports_failures_in_fixed_copy() {
+        let tmp = tempfile::tempdir().unwrap();
+        let failed = |reason: &str| CtaQuota::Failed {
+            reason: reason.into(),
+        };
+        let long_body = format!("echo {} >&2; exit 4", "x".repeat(300));
+        let cases = [
+            (
+                "printf '\\nboom\\nmore\\n' >&2; exit 2",
+                failed("cta exited 2: boom"),
+            ),
+            ("exit 3", failed("cta exited 3")),
+            (
+                long_body.as_str(),
+                failed(&format!("cta exited 4: {}", "x".repeat(200))),
+            ),
+            ("echo garbage", failed("cta: unreadable output")),
+            ("kill -9 $$", failed("cta killed")),
+        ];
+        for (body, want) in cases {
+            let cta = fake(tmp.path(), body);
+            assert_eq!(run(&cta, false, FAST).await, want, "body: {body}");
+        }
+        let slow = fake(tmp.path(), "sleep 5");
+        let short = Timeouts {
+            read: Duration::from_millis(200),
+            poll: Duration::from_millis(200),
+        };
+        assert_eq!(run(&slow, false, short).await, failed("cta timed out"));
+        assert_eq!(
+            run(&tmp.path().join("absent"), false, FAST).await,
+            failed("cta could not start")
+        );
+    }
+
+    #[test]
+    fn log_line_never_carries_account_ids() {
+        let ok = CtaQuota::Ok {
+            accounts: parse_board(BOARD.as_bytes()).unwrap(),
+            read_at: 1,
+        };
+        assert_eq!(ok.log_line(), "ok 4 accounts");
+        assert_eq!(CtaQuota::Missing.log_line(), "missing");
+        assert_eq!(
+            CtaQuota::Failed {
+                reason: "cta timed out".into()
+            }
+            .log_line(),
+            "failed cta timed out"
+        );
     }
 }
