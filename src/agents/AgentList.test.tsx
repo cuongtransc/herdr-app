@@ -60,6 +60,17 @@ describe("AgentList", () => {
     expect(screen.queryByText(/^(DONE|IDLE|WORKING)$/)).toBeNull();
   });
 
+  it("opens the folded panes under their line, and names a pane's tab only in its tooltip", () => {
+    render(<AgentList />);
+    fireEvent.click(screen.getByRole("button", { name: "1 idle" }));
+    const web = screen.getByRole("group", { name: "web" });
+    const order = [...web.querySelectorAll(".agent-card, .ws-quiet")].map((b) => b.getAttribute("aria-label") ?? b.textContent);
+    expect(order).toEqual(["Guard export, codex, needs input", "Tag v1.4.0, shell", "1 idle", "Ship flag, pi, idle"]);
+    const guard = screen.getByRole("button", { name: "Guard export, codex, needs input" });
+    expect(guard.querySelector(".agent-card-sub")).toBeNull();
+    expect(guard.getAttribute("title")).toBe("ui · /x");
+  });
+
   it("never folds the selected pane", () => {
     useApp.setState({ selected: { machine_id: "local", session: "default", pane_id: "p4" } });
     render(<AgentList />);
@@ -131,8 +142,11 @@ describe("AgentList", () => {
   });
 
   it("keeps the panes of a multi-pane tab together, leaving single-pane tabs bare", () => {
+    // Both panes of the "release" tab shown: one working agent, one shell running something.
+    const busy = structuredClone(m);
+    busy.sessions[0].workspaces[1].tabs[1].panes[1].status = "working";
+    useApp.setState({ machines: { local: busy } });
     render(<AgentList />);
-    fireEvent.click(screen.getByRole("button", { name: "1 idle" }));
     const tab = screen.getByRole("group", { name: "Tab release" });
     expect(tab.className).toContain("tab-group");
     expect(within(tab).getAllByRole("listitem").map((li) => li.textContent)).toEqual([
@@ -236,6 +250,9 @@ describe("AgentList tab reordering", () => {
   });
 
   it("shows the indicator on the whole tab while dragging over one of its panes", () => {
+    const busy = structuredClone(m);
+    busy.sessions[0].workspaces[1].tabs[1].panes[1].status = "working";
+    useApp.setState({ machines: { local: busy } });
     render(<AgentList />);
     const dataTransfer = dt();
     fireEvent.dragStart(card("Guard export"), { dataTransfer });

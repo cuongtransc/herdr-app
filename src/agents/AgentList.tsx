@@ -114,11 +114,11 @@ function AgentCard({ machineId, session, entry, reorder, tabRow }: { machineId: 
         aria-current={active ? "true" : undefined}
         onClick={() => select(ref)}
         onContextMenu={(e) => a?.menu(e, items)}
-        title={pane.cwd ?? undefined}
+        // The tab's name and the folder live in the tooltip: on the row they crowded the title.
+        title={[sub, pane.cwd].filter(Boolean).join(" · ") || undefined}
       >
         <AgentIcon agent={pane.agent} />
         <span className="agent-card-title">{pane.title}</span>
-        {sub && <span className="agent-card-sub">{sub}</span>}
         <StatusMark status={pane.status} seen={seen} />
       </button>
       <button className="agent-card-close" aria-label={`Close ${pane.title}`} title="Close pane" onClick={() => a?.guard(close)}>
@@ -144,7 +144,12 @@ function WorkspaceGroup({ machineId, session, workspace: ws, entries }: { machin
   const keyOf = (e: PaneEntry) => paneKey({ machine_id: machineId, session, pane_id: e.pane.pane_id });
   const place = (e: PaneEntry) => placement(e.pane, !!doneSeen[keyOf(e)]);
   // The selected pane always shows, so ⌘J and the palette never land on a hidden row.
-  const visible = (e: PaneEntry) => keyOf(e) === selected || (open && (quietOpen || place(e) === "shown"));
+  const quiet = (e: PaneEntry) => place(e) !== "shown";
+  const quietShown = open && quietOpen;
+  // Above the fold line: what matters, and the selected pane when its line is closed.
+  const main = entries.filter((e) => (open && !quiet(e)) || (keyOf(e) === selected && !(quietShown && quiet(e))));
+  // Below it, once opened: the idle agents and plain shells, so the line heads what it folded.
+  const below = quietShown ? entries.filter(quiet) : [];
   const idle = entries.filter((e) => place(e) === "idle").length;
   const shells = entries.filter((e) => place(e) === "shell").length;
   const quietLabel = [idle && `${idle} idle`, shells && `${shells} ${shells === 1 ? "shell" : "shells"}`].filter(Boolean).join(" · ");
@@ -186,9 +191,21 @@ function WorkspaceGroup({ machineId, session, workspace: ws, entries }: { machin
           <PlusIcon />
         </button>
       </div>
-      {entries.some(visible) && (
+      {main.length > 0 && rows(main)}
+      {open && quietLabel && (
+        <button className="ws-quiet" aria-expanded={quietOpen} onClick={() => toggle(quietKey, quietOpen)}>
+          <ChevronIcon className={"icon chev" + (quietOpen ? " open" : "")} />
+          {quietLabel}
+        </button>
+      )}
+      {below.length > 0 && rows(below)}
+    </section>
+  );
+
+  function rows(list: PaneEntry[]) {
+    return (
         <ul className="agent-cards">
-          {tabRuns(entries.filter(visible)).map((run) =>
+          {tabRuns(list).map((run) =>
             run.length > 1 ? (
               <li
                 key={run[0].tab.tab_id}
@@ -208,15 +225,8 @@ function WorkspaceGroup({ machineId, session, workspace: ws, entries }: { machin
             ),
           )}
         </ul>
-      )}
-      {open && quietLabel && (
-        <button className="ws-quiet" aria-expanded={quietOpen} onClick={() => toggle(quietKey, quietOpen)}>
-          <ChevronIcon className={"icon chev" + (quietOpen ? " open" : "")} />
-          {quietLabel}
-        </button>
-      )}
-    </section>
-  );
+    );
+  }
 }
 
 function StoppedSession({ machineId, session }: { machineId: string; session: string }) {
