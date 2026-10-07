@@ -8,6 +8,8 @@ import { GitStatusLine } from "./GitStatus";
 import { rankCommands, rankFiles, readUsage, recordUse, splitParentQuery } from "./complete";
 import { dirSuggestions } from "../lib/pathInput";
 import { readDraft, useDraft } from "./drafts";
+import { HistoryCursor, readHistory, recordPrompt } from "./promptHistory";
+import { useApp } from "../store/app";
 import { usePaneImages, type Attachment } from "./draftImages";
 import { activeTrigger, applyCompletion } from "./mentions";
 import { contextMeter, formatTokens, modelLabel, type ContextMeter } from "./modelLabel";
@@ -132,6 +134,24 @@ export function Composer({
   useEffect(() => setUsage(agent ? readUsage(agent) : {}), [agent]);
   // Sending clears the text and a failed send restores it, so the draft follows both.
   useDraft(key, text);
+
+  // Sent prompts are kept per folder; a pane whose folder is not known yet keeps its own.
+  const cwd = useApp(
+    (s) =>
+      s.machines[pane.machine_id]?.sessions
+        .find((x) => x.name === pane.session)
+        ?.workspaces.flatMap((w) => w.tabs.flatMap((t) => t.panes))
+        .find((p) => p.pane_id === pane.pane_id)?.cwd ?? null,
+  );
+  const historyScope = cwd ? `${pane.machine_id}:${cwd}` : key;
+  const history = useMemo(() => new HistoryCursor(() => readHistory(historyScope)), [historyScope]);
+  // A recalled prompt replaces the text, with the caret at its end and no completion list on it.
+  const recall = (t: string) => {
+    setText(t);
+    setCaret(t.length);
+    setDismissed(true);
+    requestAnimationFrame(() => box.current?.setSelectionRange(t.length, t.length));
+  };
 
   const [sending, setSending] = useState(false);
   // Read only while the box is empty (that is when the suggestion shows, and Tab takes it), and
@@ -263,6 +283,8 @@ export function Composer({
     if (!canSend) return;
     const sent = text;
     const sentImages = images;
+    const scope = historyScope;
+    history.reset();
     setText("");
     setImages([]);
     // The suggestion was for the turn this send answers.
@@ -273,6 +295,7 @@ export function Composer({
       .then(
         () => {
           sentImages.forEach(revoke);
+          recordPrompt(scope, sent);
           if (agent === "pi" && PI_MODEL_RE.test(sent.trim())) onPiModel?.();
         },
         () => {
@@ -364,6 +387,8 @@ export function Composer({
             setText(e.target.value);
             setCaret(e.target.selectionStart);
             setDismissed(false);
+            // An edited recalled prompt is the draft now: the next Up starts again from the newest.
+            history.reset();
           }}
           onSelect={(e) => setCaret(e.currentTarget.selectionStart)}
           onPaste={(e) => {
@@ -390,6 +415,26 @@ export function Composer({
               if (e.key === "Tab" || (e.key === "Enter" && !e.shiftKey)) {
                 e.preventDefault();
                 return choose(current);
+              }
+            }
+            // After the completion list: Up on the first line and Down on the last step through the
+            // sent prompts (a recalled one keeps stepping with the caret at its end); elsewhere they
+            // move the caret. Escape gives back the draft.
+            if (!e.nativeEvent.isComposing && !e.altKey && !e.metaKey && !e.ctrlKey && !e.shiftKey) {
+              const { value, selectionStart: start, selectionEnd: end } = e.currentTarget;
+              if (e.key === "ArrowUp" && start === end && (!value.slice(0, start).includes("\n") || (history.browsing && start === value.length))) {
+                const prev = history.back(value);
+                if (prev !== null) recall(prev);
+                if (history.browsing) e.preventDefault();
+                return;
+              }
+              if (e.key === "ArrowDown" && start === end && history.browsing && !value.slice(end).includes("\n")) {
+                e.preventDefault();
+                return recall(history.forward() ?? "");
+              }
+              if (e.key === "Escape" && history.browsing) {
+                e.preventDefault();
+                return recall(history.cancel() ?? "");
               }
             }
             // After the completion list: Tab takes the suggestion into the empty box, as in Claude's own input.
