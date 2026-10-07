@@ -1,4 +1,5 @@
 import type { AgentStatus, MachineView, PaneRef } from "../lib/types";
+import { scoreFields } from "./fuzzy";
 
 export interface PaneHit {
   ref: PaneRef;
@@ -9,33 +10,34 @@ export interface PaneHit {
   status: AgentStatus;
 }
 
-/** Index of the first matched character if `q` is a subsequence of `text`, else -1. */
-function subsequence(text: string, q: string): number {
-  if (q === "") return 0;
-  let first = -1;
-  let from = 0;
-  for (const ch of q) {
-    const i = text.indexOf(ch, from);
-    if (i < 0) return -1;
-    if (first < 0) first = i;
-    from = i + 1;
-  }
-  return first;
-}
+/** Where a match counts most: names the user typed or sees, then the agent and Machine, then paths. */
+const WEIGHT = { title: 1, session: 1, workspace: 0.9, agent: 0.8, machine: 0.7, folder: 0.7, path: 0.5 };
+
+const basename = (p: string) => p.replace(/\/+$/, "").split("/").pop() ?? "";
 
 export function search(machines: MachineView[], query: string): PaneHit[] {
-  const q = query.trim().toLowerCase();
-  const scored: { hit: PaneHit; pos: number }[] = [];
+  const scored: { hit: PaneHit; score: number; i: number }[] = [];
   for (const m of machines) {
     for (const s of m.sessions) {
       for (const w of s.workspaces) {
         for (const t of w.tabs) {
           for (const p of t.panes) {
-            const hay = [p.title, p.agent ?? "", p.cwd ?? "", w.label].join(" ").toLowerCase();
-            const pos = subsequence(hay, q);
-            if (pos < 0) continue;
+            const score = scoreFields(
+              [
+                { text: p.title, weight: WEIGHT.title },
+                { text: s.name, weight: WEIGHT.session },
+                { text: w.label, weight: WEIGHT.workspace },
+                { text: p.agent ?? "", weight: WEIGHT.agent },
+                { text: m.label, weight: WEIGHT.machine },
+                { text: basename(p.cwd ?? ""), weight: WEIGHT.folder },
+                { text: p.cwd ?? "", weight: WEIGHT.path },
+              ],
+              query,
+            );
+            if (score === 0) continue;
             scored.push({
-              pos,
+              score,
+              i: scored.length,
               hit: {
                 ref: { machine_id: m.id, session: s.name, pane_id: p.pane_id },
                 title: p.title,
@@ -49,9 +51,7 @@ export function search(machines: MachineView[], query: string): PaneHit[] {
       }
     }
   }
-  const rank = (h: PaneHit) => (h.status === "blocked" ? 0 : 1);
-  return scored
-    .map((x, i) => ({ ...x, i }))
-    .sort((a, b) => rank(a.hit) - rank(b.hit) || a.pos - b.pos || a.i - b.i)
-    .map((x) => x.hit);
+  // Better match first; between equal ones (an empty query included) panes waiting for input lead.
+  const waiting = (h: PaneHit) => (h.status === "blocked" ? 0 : 1);
+  return scored.sort((a, b) => b.score - a.score || waiting(a.hit) - waiting(b.hit) || a.i - b.i).map((x) => x.hit);
 }
