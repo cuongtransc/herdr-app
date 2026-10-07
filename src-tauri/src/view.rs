@@ -23,6 +23,8 @@ pub struct MachineView {
     pub state: MachineState,
     pub error: Option<AppError>,
     pub version: Option<String>,
+    /// The login user's home folder, once herdr was found there; paths are shown under `~`.
+    pub home: Option<String>,
     pub status: AgentStatus,
     pub sessions: Vec<SessionView>,
 }

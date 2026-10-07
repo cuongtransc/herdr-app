@@ -270,11 +270,18 @@ describe("AgentList", () => {
   it("changes the folder from the header menu", () => {
     render(<AgentList />);
     fireEvent.contextMenu(screen.getByText("web", { selector: ".ws-label" }));
-    expect(screen.getAllByRole("menuitem").map((b) => b.textContent)).toEqual(["New claude", "New pi", "New shell", "Change folder…", "Rename workspace…", "Close workspace"]);
+    expect(screen.getAllByRole("menuitem").map((b) => b.textContent)).toEqual(["New claude", "New pi", "New shell", "Browse files", "Change folder…", "Rename workspace…", "Close workspace"]);
     fireEvent.click(screen.getByRole("menuitem", { name: "Change folder…" }));
     fireEvent.change(screen.getByRole("combobox"), { target: { value: "/srv/web" } });
     fireEvent.click(screen.getByRole("button", { name: "Save" }));
     expect(within(screen.getByRole("group", { name: "web" })).getByText("web", { selector: ".ws-folder" })).toBeTruthy();
+  });
+
+  it("opens the workspace's Files from the header menu", () => {
+    render(<AgentList />);
+    fireEvent.contextMenu(screen.getByText("web", { selector: ".ws-label" }));
+    fireEvent.click(screen.getByRole("menuitem", { name: "Browse files" }));
+    expect(useApp.getState().filesOverlay).toEqual({ machine_id: "local", session: "default", workspace_id: "w2" });
   });
 
   it("starts an agent from the header menu in the workspace folder", () => {
