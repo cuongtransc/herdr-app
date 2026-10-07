@@ -1,10 +1,12 @@
 import { useEffect, useState } from "react";
 import { AgentIcon } from "../agents/AgentIcon";
 import type { QuotaWindow } from "../lib/types";
-import { PROVIDER_INFO, QUOTA_PROVIDERS } from "../quota/entry";
+import { staleNote } from "../quota/cta";
+import { QUOTA_PROVIDERS } from "../quota/entry";
 import type { QuotaEntry } from "../quota/entry";
 import { WARN_PERCENT, elapsedFraction, percent, tone, untilReset, updatedAgo } from "../quota/format";
 import { useQuota } from "../quota/store";
+import { quotaView } from "../quota/view";
 import { RefreshIcon } from "../ui/icons";
 
 function WindowRow({ w, now }: { w: QuotaWindow; now: number }) {
@@ -26,7 +28,8 @@ function WindowRow({ w, now }: { w: QuotaWindow; now: number }) {
   );
 }
 
-function Body({ entry, now }: { entry: QuotaEntry; now: number }) {
+/** `showProblemAge` is off for a `cta` card, whose age is its poll time, shown below it. */
+function Body({ entry, now, showProblemAge = true }: { entry: QuotaEntry; now: number; showProblemAge?: boolean }) {
   switch (entry.kind) {
     case "loading":
       return null;
@@ -38,7 +41,7 @@ function Body({ entry, now }: { entry: QuotaEntry; now: number }) {
       return (
         <>
           <p className="dash-quota-note">
-            {entry.last ? `${entry.message} · ${updatedAgo(entry.last.fetchedAt, now)}` : entry.message}
+            {entry.last && showProblemAge ? `${entry.message} · ${updatedAgo(entry.last.fetchedAt, now)}` : entry.message}
           </p>
           {entry.last && (
             <div className="dash-quota-stale">
@@ -79,12 +82,16 @@ export function useSecondClock(): number {
   return now;
 }
 
-/** The Quota head (title and refresh) and one card per Provider; `signedInOnly` folds the others into one line. */
+/** The Quota head (title and refresh) and one card per Provider or `cta` account; `signedInOnly` folds the others into one line. */
 export function QuotaDetail({ now, signedInOnly = false }: { now: number; signedInOnly?: boolean }) {
   const slots = useQuota((s) => s.slots);
+  const source = useQuota((s) => s.source);
+  const cta = useQuota((s) => s.cta);
   const refresh = useQuota((s) => s.refresh);
-  const busy = QUOTA_PROVIDERS.some((p) => slots[p].inFlight);
-  const out = signedInOnly ? QUOTA_PROVIDERS.filter((p) => slots[p].entry.kind === "notSignedIn") : [];
+  const busy = cta.inFlight || QUOTA_PROVIDERS.some((p) => slots[p].inFlight);
+  const view = quotaView({ source, cta, slots });
+  const items = view.kind === "items" ? view.items : [];
+  const out = signedInOnly ? items.filter((i) => i.entry.kind === "notSignedIn") : [];
   return (
     <>
       <div className="dash-col-head">
@@ -98,17 +105,28 @@ export function QuotaDetail({ now, signedInOnly = false }: { now: number; signed
         </button>
       </div>
       <ul className="dash-cards">
-        {QUOTA_PROVIDERS.filter((p) => !out.includes(p)).map((p) => (
-          <li key={p} className="dash-quota-card">
-            <span className="dash-card-head">
-              <AgentIcon agent={PROVIDER_INFO[p].agent} />
-              <span className="dash-card-title">{PROVIDER_INFO[p].name}</span>
-            </span>
-            <Body entry={slots[p].entry} now={now} />
+        {view.kind === "ctaNote" && (
+          <li className="dash-quota-card">
+            <span className="dash-card-head"><span className="dash-card-title">cta</span></span>
+            <p className="dash-quota-note">{view.message}</p>
           </li>
-        ))}
+        )}
+        {items.filter((i) => !out.includes(i)).map((i) => {
+          const note = i.fromCta ? staleNote(i.polledAt, now) : null;
+          return (
+            <li key={i.key} className="dash-quota-card">
+              <span className="dash-card-head">
+                <AgentIcon agent={i.agent} />
+                <span className="dash-card-title">{i.name}</span>
+                {i.account !== null && <span className="dash-quota-account">{i.account}</span>}
+              </span>
+              <Body entry={i.entry} now={now} showProblemAge={!i.fromCta} />
+              {note !== null && <p className="dash-quota-note">{note}</p>}
+            </li>
+          );
+        })}
       </ul>
-      {out.length > 0 && <p className="dash-quota-note quota-out">Not signed in: {out.map((p) => PROVIDER_INFO[p].name).join(", ")}</p>}
+      {out.length > 0 && <p className="dash-quota-note quota-out">Not signed in: {out.map((i) => i.name).join(", ")}</p>}
     </>
   );
 }

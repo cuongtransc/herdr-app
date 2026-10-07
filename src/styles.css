@@ -1404,6 +1404,7 @@ button.composer-model:disabled { cursor: default; }
 .tone-warn .dash-quota-bar .fill { background: var(--amber); }
 .tone-muted .dash-quota-bar .fill { background: var(--fg-3); }
 .dash-quota-note { margin: 0; color: var(--fg-3); font-size: 12px; }
+.dash-quota-account { color: var(--fg-3); font-size: 11px; font-family: var(--font-mono, monospace); }
 .dash-quota-stale { display: flex; flex-direction: column; gap: 6px; opacity: 0.45; }
 
 /* The Sidebar's foot, outside the scroll: one line per signed-in Provider, its most pressing window.

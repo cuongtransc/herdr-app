@@ -82,6 +82,7 @@ pub fn run() {
             commands::system_fonts,
             commands::font_face,
             commands::quota_fetch,
+            commands::quota_cta,
             commands::layout_load,
             commands::layout_save,
         ])

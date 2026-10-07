@@ -1,7 +1,9 @@
-import { act, fireEvent, render, screen, within } from "@testing-library/react";
+import { act, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-vi.mock("../lib/ipc", () => ({ quotaFetch: vi.fn().mockResolvedValue({ kind: "notSignedIn" }) }));
+vi.mock("../lib/ipc", () => ({ quotaFetch: vi.fn(), quotaCta: vi.fn() }));
+import { quotaCta, quotaFetch } from "../lib/ipc";
 import type { MachineView, PaneView } from "../lib/types";
+import { initialQuota, useQuota } from "../quota/store";
 import { useApp } from "../store/app";
 import { AgentDashboard } from "./AgentDashboard";
 
@@ -22,14 +24,19 @@ const box = machine("box", "devtuf", [pane("d", "Deploy", "idle")]);
 const column = (name: RegExp) => screen.getByRole("region", { name });
 
 describe("AgentDashboard", () => {
-  beforeEach(() =>
-    useApp.setState({ machines: { local, box }, order: ["local", "box"], selected: null, viewed: null, doneSeen: {}, dashboardOpen: true }),
-  );
+  beforeEach(() => {
+    vi.mocked(quotaFetch).mockReset().mockResolvedValue({ kind: "notSignedIn" });
+    vi.mocked(quotaCta).mockReset().mockResolvedValue({ kind: "missing" });
+    useQuota.setState(initialQuota());
+    useApp.setState({ machines: { local, box }, order: ["local", "box"], selected: null, viewed: null, doneSeen: {}, dashboardOpen: true });
+  });
 
-  it("keeps the Quota column when search hides every agent", () => {
+  it("keeps the builtin Quota column when cta is missing and search hides every agent", async () => {
     render(<AgentDashboard />);
     fireEvent.change(screen.getByPlaceholderText(/search/i), { target: { value: "zzz-no-match" } });
-    expect(screen.getByRole("region", { name: "Quota" })).toBeTruthy();
+    const quota = screen.getByRole("region", { name: "Quota" });
+    await waitFor(() => expect(within(quota).getAllByText("not signed in")).toHaveLength(4));
+    expect(useQuota.getState().source).toBe("builtin");
     expect(within(column(/blocked/i)).getByText("None")).toBeTruthy();
   });
 

@@ -3,6 +3,10 @@
 Date: 2026-10-03
 Status: draft
 
+Amended by [ADR 0005](../../adr/0005-quota-from-cta-with-builtin-fallback.md): when `cta` is
+installed the column shows `cta ledger quota --json`; this design is the fallback for a Mac
+without `cta` and gets no new Provider.
+
 ## Purpose
 
 Show, on the Agent Dashboard, how much of each Provider's Quota has been used and when

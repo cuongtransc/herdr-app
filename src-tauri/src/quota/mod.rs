@@ -3,6 +3,7 @@
 use serde::{Deserialize, Serialize};
 
 pub mod credentials;
+pub mod cta;
 pub mod outcome;
 pub mod parsers;
 pub mod requests;

@@ -710,6 +710,11 @@ pub async fn quota_fetch(
     Ok(crate::quota::fetch(provider).await)
 }
 
+#[tauri::command]
+pub async fn quota_cta(poll: bool) -> Result<crate::quota::cta::CtaQuota, AppError> {
+    Ok(crate::quota::cta::read(poll).await)
+}
+
 /// The saved sidebar layout, or `null` when none was saved yet.
 #[tauri::command]
 pub async fn layout_load(store: State<'_, Arc<LayoutStore>>) -> Result<Option<Value>, AppError> {
