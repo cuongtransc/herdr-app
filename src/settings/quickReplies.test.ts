@@ -19,7 +19,7 @@ beforeEach(() => {
 describe("quick replies", () => {
   it("defaults to shown, with the canned list", () => {
     expect(loadQuickReplies()).toEqual({ show: true, replies: DEFAULT_QUICK_REPLIES });
-    expect(DEFAULT_QUICK_REPLIES).toEqual(["continue", "yes", "no", "commit and push", "retry"]);
+    expect(DEFAULT_QUICK_REPLIES).toEqual(["ok", "continue", "merged", "what's next?", "commit and push"]);
   });
 
   it("keeps strings only, capped in count and length; anything else falls back to the defaults", () => {

@@ -90,10 +90,10 @@ describe("Settings quick replies", () => {
     fireEvent.change(screen.getByRole("textbox", { name: "Quick reply 1" }), { target: { value: "go on" } });
     expect(useQuickReplies.getState().replies[0]).toBe("go on");
     fireEvent.click(screen.getByRole("button", { name: "Remove quick reply 2" }));
-    expect(useQuickReplies.getState().replies).toEqual(["go on", "no", "commit and push", "retry"]);
+    expect(useQuickReplies.getState().replies).toEqual(["go on", ...DEFAULT_QUICK_REPLIES.slice(2)]);
     fireEvent.click(screen.getByRole("button", { name: "Add quick reply" }));
-    expect(useQuickReplies.getState().replies).toHaveLength(5);
-    expect(document.activeElement).toBe(screen.getByRole("textbox", { name: "Quick reply 5" }));
+    expect(useQuickReplies.getState().replies).toHaveLength(DEFAULT_QUICK_REPLIES.length);
+    expect(document.activeElement).toBe(screen.getByRole("textbox", { name: `Quick reply ${DEFAULT_QUICK_REPLIES.length}` }));
     fireEvent.click(screen.getByRole("button", { name: "Reset quick replies" }));
     expect(useQuickReplies.getState().replies).toEqual(DEFAULT_QUICK_REPLIES);
   });
