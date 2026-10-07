@@ -20,6 +20,7 @@ import { applyOsc52 } from "./osc52";
 import { applySelectUx, copyText } from "./selectUx";
 import { createOutputBuffer } from "./outputBuffer";
 import { claim, disposeIf, getOrCreate } from "./termCache";
+import { TERM_MIN_CONTRAST } from "./theme";
 import { applyUnicode11 } from "./unicode";
 import { forgetWebgl, showWebgl } from "./webgl";
 import { applyWheelScroll } from "./wheel";
@@ -40,6 +41,7 @@ function createEntry(key: string) {
     allowProposedApi: true,
     // herdr turns on mouse reporting, so a plain drag never selects; Option+drag selects and copies.
     macOptionClickForcesSelection: true,
+    minimumContrastRatio: TERM_MIN_CONTRAST,
   });
   const fit = new FitAddon();
   term.loadAddon(fit);

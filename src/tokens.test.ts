@@ -45,12 +45,22 @@ function contrast(a: string, b: string): number {
   return (hi + 0.05) / (lo + 0.05);
 }
 
+/** Every token used as a text colour; a new one belongs here. */
+const TEXT = [
+  "--fg", "--fg-2", "--fg-3", "--accent", "--err", "--err-fg", "--diff-del", "--diff-add",
+  "--amber-text", "--green-text", "--blue-text",
+  "--hl-fg", "--hl-comment", "--hl-keyword", "--hl-string", "--hl-number", "--hl-title", "--hl-type", "--hl-attr", "--hl-meta",
+];
+
+/** The opaque surfaces text sits on; --surface-3 (toasts, hover) is the darkest in light, lightest in dark. */
+const SURFACES = ["--surface-0", "--surface-1", "--surface-2", "--surface-3", "--surface-code"];
+
 describe.each([
   ["dark", dark],
   ["light", light],
 ])("%s theme", (_, t) => {
-  it.each(["--fg", "--fg-2", "--fg-3", "--amber-text", "--green-text"])("%s reads at 4.5:1 on the base surfaces", (fg) => {
-    for (const bg of ["--surface-0", "--surface-1"]) {
+  it.each(TEXT)("%s reads at 4.5:1 on every surface", (fg) => {
+    for (const bg of SURFACES) {
       expect(contrast(hex(t, fg), hex(t, bg)), `${fg} on ${bg}`).toBeGreaterThanOrEqual(4.5);
     }
   });
@@ -68,4 +78,10 @@ it("stopped and offline sessions are quiet by colour, not by opacity", () => {
   const rules = css.match(/\.session\.(offline|stopped)[^{]*\{[^}]*\}/g) ?? [];
   expect(rules.length).toBeGreaterThan(0);
   for (const r of rules) expect(r, r).not.toMatch(/opacity/);
+});
+
+it("text takes the -text variant of a mark colour; only icons use the mark colour itself", () => {
+  const icons = new Set([".project-row .mark-done", ".agent-card .mark-done"]);
+  const rules = [...css.matchAll(/([^{}]+)\{([^}]*)\}/g)].filter(([, , body]) => /(^|[;\s])color:\s*var\(--(amber|green|blue)\)/.test(body));
+  for (const [, selector] of rules) expect(icons.has(selector.trim()), selector.trim()).toBe(true);
 });
