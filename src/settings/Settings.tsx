@@ -1,4 +1,5 @@
 import { type CSSProperties, memo, useEffect, useRef, useState } from "react";
+import { create } from "zustand";
 import { notificationsEnabled, setNotificationsEnabled } from "../notify";
 import { CloseIcon, GearIcon, SearchIcon } from "../ui/icons";
 import { FontPicker } from "./FontPicker";
@@ -263,13 +264,20 @@ function SettingsDialog({ onClose }: { onClose: () => void }) {
   );
 }
 
+/** Whether the Settings dialog is open: the gear button and the app menu's Settings… ⌘, both open it. */
+export const useSettingsOpen = create<{ open: boolean; show: () => void; hide: () => void }>((setState) => ({
+  open: false,
+  show: () => setState({ open: true }),
+  hide: () => setState({ open: false }),
+}));
+
 // Takes no props: memo keeps it out of App's re-renders; it reads the store itself.
 export const Settings = memo(function Settings() {
-  const [open, setOpen] = useState(false);
+  const { open, show, hide } = useSettingsOpen();
   return (
     <div className="settings">
-      {open && <SettingsDialog onClose={() => setOpen(false)} />}
-      <button className="icon-btn" aria-label="Settings" aria-expanded={open} onClick={() => setOpen(true)}>
+      {open && <SettingsDialog onClose={hide} />}
+      <button className="icon-btn" aria-label="Settings" aria-expanded={open} onClick={show}>
         <GearIcon />
       </button>
       <span className="settings-hint">

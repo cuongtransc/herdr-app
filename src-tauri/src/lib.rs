@@ -16,7 +16,7 @@ pub mod transport;
 pub mod view;
 
 use std::sync::Arc;
-use tauri::menu::{Menu, MenuItemKind};
+use tauri::menu::{Menu, MenuItem, MenuItemKind, PredefinedMenuItem};
 use tauri::{Emitter, Manager};
 
 use attach::AttachManager;
@@ -32,6 +32,13 @@ pub fn run() {
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_dialog::init())
         .menu(app_menu)
+        .on_menu_event(|app, event| {
+            if let Some(name) = menu_event(event.id().as_ref()) {
+                if let Err(err) = app.emit(name, ()) {
+                    tracing::warn!("emit {name} failed: {err}");
+                }
+            }
+        })
         .invoke_handler(tauri::generate_handler![
             commands::machines_list,
             commands::machine_connect,
@@ -133,13 +140,34 @@ pub fn run() {
         });
 }
 
-/// The default menu minus "Close Window": with a single window its Cmd+W quit the app.
+const SETTINGS_MENU_ID: &str = "settings";
+const SETTINGS_MENU_TEXT: &str = "Settings…";
+const SETTINGS_ACCELERATOR: &str = "CmdOrCtrl+,";
+
+/// The webview event a click on our own menu item sends, if it is one.
+fn menu_event(id: &str) -> Option<&'static str> {
+    (id == SETTINGS_MENU_ID).then_some("menu://settings")
+}
+
+/// The default menu with "Settings… ⌘," where macOS apps keep it (the app menu, after About and
+/// its separator), and minus "Close Window": with a single window its Cmd+W quit the app.
 fn app_menu<R: tauri::Runtime>(app: &tauri::AppHandle<R>) -> tauri::Result<Menu<R>> {
     let menu = Menu::default(app)?;
-    for item in menu.items()? {
+    for (i, item) in menu.items()?.into_iter().enumerate() {
         let Some(sub) = item.as_submenu() else {
             continue;
         };
+        // On macOS the first submenu is the app menu: About, separator, Services, ...
+        if cfg!(target_os = "macos") && i == 0 {
+            let settings = MenuItem::with_id(
+                app,
+                SETTINGS_MENU_ID,
+                SETTINGS_MENU_TEXT,
+                true,
+                Some(SETTINGS_ACCELERATOR),
+            )?;
+            sub.insert_items(&[&settings, &PredefinedMenuItem::separator(app)?], 2)?;
+        }
         for entry in sub.items()? {
             if let MenuItemKind::Predefined(p) = &entry {
                 if p.text()? == "Close Window" {
@@ -169,4 +197,21 @@ fn init_logging(dir: std::path::PathBuf) -> Result<(), Box<dyn std::error::Error
         .try_init()
         .map_err(|e| e.to_string())?;
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn settings_menu_item_opens_settings_in_the_webview() {
+        assert_eq!(menu_event(SETTINGS_MENU_ID), Some("menu://settings"));
+        assert_eq!(menu_event("quit"), None);
+    }
+
+    #[test]
+    fn settings_item_follows_macos_conventions() {
+        assert_eq!(SETTINGS_MENU_TEXT, "Settings…");
+        assert_eq!(SETTINGS_ACCELERATOR, "CmdOrCtrl+,");
+    }
 }

@@ -58,6 +58,8 @@ export const onPaneStatus = (cb: (e: PaneStatusEvent) => void): Promise<Unlisten
   listen<PaneStatusEvent>("pane://status", (e) => cb(e.payload));
 export const notifyPane = (pane: PaneRef, title: string, body: string) =>
   invoke<void>("notify_pane", { pane, title, body });
+/** Fires when the app menu's Settings… (⌘,) is chosen. */
+export const onMenuSettings = (cb: () => void): Promise<UnlistenFn> => listen("menu://settings", () => cb());
 /** Fires with the pane of a desktop notification the user clicked. */
 export const onNotifyActivate = (cb: (pane: PaneRef) => void): Promise<UnlistenFn> =>
   listen<PaneRef>("notify://activate", (e) => cb(e.payload));

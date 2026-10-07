@@ -1,4 +1,4 @@
-import { fireEvent, render, screen } from "@testing-library/react";
+import { act, fireEvent, render, screen } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 
 vi.mock("@tauri-apps/api/core", () => ({ invoke: vi.fn().mockResolvedValue([]), Channel: class {} }));
@@ -10,12 +10,23 @@ vi.mock("./terminal/TerminalLens", async () => {
 });
 
 import App from "./App";
+import { useSettingsOpen } from "./settings/Settings";
 import { useApp } from "./store/app";
 import { useLensSettings } from "./settings/lens";
 import { useLayout } from "./settings/layout";
 import { initialSlots, useQuota } from "./quota/store";
 
 describe("App shell", () => {
+  it("opens Settings from the app menu's Settings… ⌘,", async () => {
+    const { listen } = await import("@tauri-apps/api/event");
+    render(<App />);
+    const call = vi.mocked(listen).mock.calls.find(([name]) => name === "menu://settings");
+    expect(call).toBeTruthy();
+    act(() => void (call![1] as (e: unknown) => void)({ payload: null }));
+    expect(screen.getByRole("dialog", { name: "Settings" })).toBeTruthy();
+    act(() => useSettingsOpen.getState().hide());
+  });
+
   it("renders the sidebar and the empty main area", () => {
     render(<App />);
     expect(screen.getByRole("navigation", { name: "Machines" })).toBeTruthy();
