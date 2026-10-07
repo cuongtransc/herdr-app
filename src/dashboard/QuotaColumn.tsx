@@ -82,8 +82,8 @@ export function useSecondClock(): number {
   return now;
 }
 
-/** The Quota head (title and refresh) and one card per Provider or `cta` account; `signedInOnly` folds the others into one line. */
-export function QuotaDetail({ now, signedInOnly = false }: { now: number; signedInOnly?: boolean }) {
+/** The Quota head (title and refresh) and one card per Provider or `cta` account. */
+export function QuotaDetail({ now }: { now: number }) {
   const slots = useQuota((s) => s.slots);
   const source = useQuota((s) => s.source);
   const cta = useQuota((s) => s.cta);
@@ -91,7 +91,6 @@ export function QuotaDetail({ now, signedInOnly = false }: { now: number; signed
   const busy = cta.inFlight || QUOTA_PROVIDERS.some((p) => slots[p].inFlight);
   const view = quotaView({ source, cta, slots });
   const items = view.kind === "items" ? view.items : [];
-  const out = signedInOnly ? items.filter((i) => i.entry.kind === "notSignedIn") : [];
   return (
     <>
       <div className="dash-col-head">
@@ -111,14 +110,14 @@ export function QuotaDetail({ now, signedInOnly = false }: { now: number; signed
             <p className="dash-quota-note">{view.message}</p>
           </li>
         )}
-        {items.filter((i) => !out.includes(i)).map((i) => {
+        {items.map((i) => {
           const note = i.fromCta ? staleNote(i.polledAt, now) : null;
           return (
             <li key={i.key} className="dash-quota-card">
               <span className="dash-card-head">
                 <AgentIcon agent={i.agent} />
                 <span className="dash-card-title">{i.name}</span>
-                {i.account !== null && <span className="dash-quota-account">{i.account}</span>}
+                {i.account !== null && <span className="dash-quota-account">{i.accountId}</span>}
               </span>
               <Body entry={i.entry} now={now} showProblemAge={!i.fromCta} />
               {note !== null && <p className="dash-quota-note">{note}</p>}
@@ -126,7 +125,6 @@ export function QuotaDetail({ now, signedInOnly = false }: { now: number; signed
           );
         })}
       </ul>
-      {out.length > 0 && <p className="dash-quota-note quota-out">Not signed in: {out.map((i) => i.name).join(", ")}</p>}
     </>
   );
 }

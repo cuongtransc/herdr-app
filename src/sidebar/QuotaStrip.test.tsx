@@ -37,10 +37,10 @@ describe("QuotaStrip", () => {
     const o = outcomes();
     fetchMock.mockImplementation(async (p) => o[p]);
     render(<QuotaStrip />);
-    const claude = await screen.findByRole("button", { name: /^Claude/ });
-    expect(claude.textContent).toContain("week 61% · 3d4h");
+    const claude = await screen.findByRole("button", { name: /^Claude, week 61%/ });
+    expect(claude.textContent).toBe("Claude61% · 3d");
     expect(claude.className).toContain("tone-warn");
-    expect(screen.getByRole("button", { name: /^Codex/ }).textContent).toContain("5h 12% · 4h30m");
+    expect(screen.getByRole("button", { name: /^Codex, 5h 12%/ }).textContent).toBe("Codex12% · 5h");
     expect(screen.queryByRole("button", { name: /^Grok/ })).toBeNull();
     expect(fetchMock).toHaveBeenCalledTimes(4);
   });
@@ -51,7 +51,8 @@ describe("QuotaStrip", () => {
     render(<QuotaStrip />);
     fireEvent.click(await screen.findByRole("button", { name: /^Claude/ }));
     const detail = screen.getByRole("dialog", { name: "Quota" });
-    expect(within(detail).getByText("42%")).toBeTruthy();
+    expect(within(detail).getAllByRole("columnheader").map((h) => h.textContent)).toEqual(["Account", "5 hours", "Week"]);
+    expect(within(detail).getByRole("row", { name: /^Claude/ }).textContent).toContain("42%");
     expect(within(detail).getByText("Not signed in: OpenCode Go, Grok")).toBeTruthy();
     expect(within(detail).queryByText("not signed in")).toBeNull();
     fireEvent.keyDown(window, { key: "Escape" });
@@ -77,9 +78,49 @@ describe("QuotaStrip", () => {
     ] };
     ctaMock.mockResolvedValue(board);
     render(<QuotaStrip />);
-    expect((await screen.findByRole("button", { name: /^Claude 0bb1535b/ })).textContent).toContain("5h 52%");
-    expect(screen.getByRole("button", { name: /^Claude 955f5fbe/ }).textContent).toContain("week 17%");
-    expect(screen.getByRole("button", { name: /^kimi/ }).textContent).toContain("month 5%");
+    const first = await screen.findByRole("button", { name: /^Claude 1, 5h 52%/ });
+    expect(first.title).toBe("Claude 1 · 0bb1535b · 5h window");
+    expect(screen.getByRole("button", { name: /^Claude 2, week 17%/ }).textContent).toContain("17%");
+    expect(screen.getByRole("button", { name: /^kimi, month 5%/ }).textContent).toBe("kimi5%");
     expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it("greys out a cta account it cannot trust, naming why, and drops one gone for a day", async () => {
+    const now = Date.now();
+    const M = 60_000;
+    const board: CtaQuota = { kind: "ok", readAt: now, accounts: [
+      // cta still says ok but stopped polling it: the sign-in is gone.
+      { provider: "claude", account: "0bb1535b-bb5a", polledAt: now - 70 * M, status: "ok", detail: "",
+        windows: [{ label: "5h", usedPercent: 94, resetsAt: now + 17 * M, durationSecs: 18_000 }] },
+      { provider: "claude", account: "955f5fbe-a050", polledAt: now, status: "ok", detail: "",
+        windows: [{ label: "5h", usedPercent: 5, resetsAt: now + 4 * H, durationSecs: 18_000 },
+          { label: "week · Fable", usedPercent: 0, resetsAt: now + 100 * H, durationSecs: 604_800 }] },
+      { provider: "opencode-go", account: "sha256:008e82c8aa", polledAt: now - 9 * H, status: "http",
+        detail: "HTTP 403 from opencode.ai/zen/go/v1/usage", windows: [] },
+      { provider: "grok", account: "g1", polledAt: now - 25 * H, status: "ok", detail: "",
+        windows: [{ label: "week", usedPercent: 3, resetsAt: now + 50 * H, durationSecs: 604_800 }] },
+    ] };
+    ctaMock.mockResolvedValue(board);
+    render(<QuotaStrip />);
+    const gone = await screen.findByRole("button", { name: /^Claude 1, not polled · 1h/ });
+    expect(gone.textContent).toBe("Claude 1not polled · 1h");
+    expect(gone.className).toContain("problem");
+    expect(gone.className).not.toContain("tone-warn");
+    expect(screen.getByRole("button", { name: /^OpenCode, HTTP 403 · 9h/ })).toBeTruthy();
+    expect(screen.queryByRole("button", { name: /^Grok/ })).toBeNull();
+
+    fireEvent.click(gone);
+    const detail = screen.getByRole("dialog", { name: "Quota" });
+    expect(within(detail).getAllByRole("columnheader").map((h) => h.textContent)).toEqual(["Account", "5 hours", "Other"]);
+    const claude1 = within(detail).getByRole("row", { name: /^Claude 1/ });
+    expect(claude1.textContent).toContain("Not polled for 1h.");
+    expect(claude1.textContent).toContain("Sign in again with claude");
+    expect(claude1.textContent).not.toContain("94%");
+    expect(within(detail).getByRole("row", { name: /^Claude 2/ }).textContent).toContain("Fable 0%");
+    expect(within(detail).getByRole("row", { name: /^OpenCode/ }).textContent).toContain("HTTP 403 from opencode.ai/zen/go/v1/usage.");
+    // The strip leaves out an account gone for a day; the detail keeps it, with what to do.
+    expect(within(detail).getByRole("row", { name: /^Grok/ }).textContent).toContain("Not polled for 1d.");
+    fireEvent.click(within(detail).getByRole("button", { name: "Close" }));
+    expect(screen.queryByRole("dialog", { name: "Quota" })).toBeNull();
   });
 });

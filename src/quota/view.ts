@@ -6,7 +6,12 @@ import type { QuotaState } from "./store";
 export interface QuotaItem {
   key: string;
   name: string;
+  short: string;
+  /** The account's number among its Provider's, when it has several. */
   account: string | null;
+  /** A `cta` account's short id. */
+  accountId: string | null;
+  cli: string | null;
   agent: string;
   entry: QuotaEntry;
   /** Set for a `cta` account; built-in entries carry their own age. */
@@ -31,7 +36,10 @@ export function quotaView(s: Pick<QuotaState, "source" | "cta" | "slots">): Quot
     items: QUOTA_PROVIDERS.map((p) => ({
       key: p,
       name: PROVIDER_INFO[p].name,
+      short: PROVIDER_INFO[p].short,
       account: null,
+      accountId: null,
+      cli: PROVIDER_INFO[p].cli,
       agent: PROVIDER_INFO[p].agent,
       entry: s.slots[p].entry,
       polledAt: null,

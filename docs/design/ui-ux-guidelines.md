@@ -318,10 +318,16 @@ trail after the last (possibly nested) Group with no header, reading as its chil
   stopped, muted with its age (`12m`): the user just looked at it and is likely to return. Rows
   keep the user's order: never re-sort by status (spatial memory).
 - The Machines section stays at the bottom and folds by default once more than one Machine exists.
-- **Quota at the foot**, outside the scroll, under Machines: one line per signed-in Provider with
-  its most pressing window (a warning one, else the fullest) and the time to reset, amber when it
-  warns (§ quota tone: 90% used, or used faster than the window elapses). A click opens the full
-  Quota above it; Providers not signed in fold into one line there.
+- **Quota at the foot**, outside the scroll, under Machines: one line per signed-in Provider or
+  `cta` account (numbered when a Provider has several: "Claude 1", "Claude 2") with its most
+  pressing window (a warning one, else the fullest): percent and time to reset in fixed columns,
+  amber when it warns (§ quota tone: 90% used, or past 25% and used faster than the window
+  elapses). Numbers that cannot be trusted never show: a failed poll, or a `cta` account not polled
+  for 30 minutes, reads as a muted reason (`not polled · 1h`, `HTTP 403 · 9h`), and leaves the strip
+  after a day.
+- A click opens the **Quota panel** beside the strip: accounts by window (5 hours, Week, Month,
+  Other), each trouble row saying what failed, when, and how to fix it; Providers not signed in
+  fold into one line at its foot.
 
 ## 8. Decisions where the review disagreed
 
