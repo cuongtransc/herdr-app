@@ -62,6 +62,8 @@ pub struct PaneView {
     pub cwd: Option<String>,
     pub agent: Option<String>,
     pub status: AgentStatus,
+    /// A shell's: whether a command holds its terminal; None for an agent or when unread.
+    pub busy: Option<bool>,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]

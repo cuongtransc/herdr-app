@@ -86,6 +86,40 @@ describe("AgentList", () => {
     expect(screen.queryByText("zsh")).toBeNull();
   });
 
+  it("keeps an agent herdr cannot read in view, marked unknown", () => {
+    // Started through a wrapper: herdr names the agent from its session but reports no state.
+    const mm = structuredClone(m);
+    Object.assign(mm.sessions[0].workspaces[1].tabs[1].panes[0], { agent: "claude", status: "unknown", busy: null });
+    useApp.setState({ machines: { local: mm } });
+    render(<AgentList />);
+    const row = screen.getByRole("button", { name: "Tag v1.4.0, claude, state unknown" });
+    expect(row.querySelector(".mark-unknown")?.getAttribute("title")).toMatch(/can't read/);
+  });
+
+  it("folds an untitled shell (herdr's \"Terminal\") like a named one", () => {
+    const shell = structuredClone(m);
+    shell.sessions[0].workspaces[1].tabs[1].panes[0].title = "Terminal";
+    useApp.setState({ machines: { local: shell } });
+    render(<AgentList />);
+    expect(screen.getByRole("button", { name: "1 idle · 1 shell" })).toBeTruthy();
+  });
+
+  it("reads a shell's state from its process, not its title, once herdr reported it", () => {
+    const shell = structuredClone(m);
+    const pane = shell.sessions[0].workspaces[1].tabs[1].panes[0];
+    // Idle at its prompt though a program left its title behind.
+    Object.assign(pane, { title: "Tag v1.4.0", busy: false });
+    useApp.setState({ machines: { local: shell } });
+    const { unmount } = render(<AgentList />);
+    expect(screen.getByRole("button", { name: "1 idle · 1 shell" })).toBeTruthy();
+    unmount();
+    // Running a command though untitled.
+    Object.assign(pane, { title: "Terminal", busy: true });
+    useApp.setState({ machines: { local: structuredClone(shell) } });
+    render(<AgentList />);
+    expect(screen.getByRole("button", { name: "Terminal, shell" })).toBeTruthy();
+  });
+
   it("folds a workspace from its header, keeping what needs the user counted on it", () => {
     render(<AgentList />);
     const head = screen.getByRole("button", { name: "web" });

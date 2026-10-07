@@ -1,6 +1,6 @@
 //! Per-session watcher: keeps a `SessionView` fresh from herdr's event stream.
 use super::{
-    model::{apply_status, pane_ids, session_view, DoneMarks},
+    model::{apply_status, pane_ids, session_view, shell_proc, DoneMarks, Shells},
     rpc::{self, Subscription},
     types::{AgentStatus, AgentStatusChanged, EventFrame, Snapshot},
 };
@@ -17,10 +17,12 @@ use std::{
 use tokio::{
     sync::{mpsc::UnboundedSender, Notify},
     task::JoinHandle,
-    time::{timeout_at, Instant},
+    time::{sleep_until, timeout_at, Instant},
 };
 
 const DEBOUNCE: Duration = Duration::from_millis(150);
+/// How often shell panes are asked what holds their terminal: herdr sends no event for it.
+const SHELL_POLL: Duration = Duration::from_secs(4);
 
 #[derive(Debug)]
 pub enum WatchEvent {
@@ -101,11 +103,12 @@ struct Watch<'a> {
     last: SessionView,
     marks: &'a SharedMarks,
     tx: &'a UnboundedSender<WatchEvent>,
+    shells: Shells,
 }
 
 impl Watch<'_> {
     fn view(&self) -> SessionView {
-        session_view(self.name, &self.snap, &self.marks.lock())
+        session_view(self.name, &self.snap, &self.marks.lock(), &self.shells)
     }
 
     /// Send the view when it differs from the last one sent; `false` once the receiver is gone.
@@ -204,6 +207,29 @@ impl Watch<'_> {
     }
 }
 
+/// What each shell pane's terminal holds; a pane whose read fails is left out (unknown).
+async fn read_shells(socket: &Path, snap: &Snapshot) -> Shells {
+    let agents: Vec<&str> = snap
+        .agents
+        .iter()
+        .filter(|a| a.agent.is_some())
+        .map(|a| a.pane_id.as_str())
+        .collect();
+    let mut shells = Shells::default();
+    for p in &snap.panes {
+        let is_agent = agents.contains(&p.pane_id.as_str())
+            || p.agent_session.as_ref().is_some_and(|s| s.agent.is_some());
+        if is_agent {
+            continue;
+        }
+        let read = rpc::call(socket, "pane.process_info", json!({ "pane_id": p.pane_id })).await;
+        if let Some(proc) = read.ok().as_ref().and_then(shell_proc) {
+            shells.insert(p.pane_id.clone(), proc);
+        }
+    }
+    shells
+}
+
 /// Runs until the stream ends, a call fails, or the receiver is dropped (`None`).
 /// `refetch` asks for a fresh snapshot (e.g. right after a rename, ahead of its `pane.updated`).
 async fn run(
@@ -220,7 +246,7 @@ async fn run(
     let last = {
         let mut m = marks.lock();
         m.retain(&pane_ids(&snap));
-        session_view(name, &snap, &m)
+        session_view(name, &snap, &m, &Shells::default())
     };
     if tx.send(WatchEvent::View(last.clone())).is_err() {
         return None;
@@ -231,15 +257,25 @@ async fn run(
         last,
         marks,
         tx,
+        shells: Shells::default(),
     };
     let mut sub = match subscribe_all(socket, &w.snap).await {
         Ok(s) => s,
         Err(e) => return Some(e),
     };
     let mut need_refetch = false;
+    let mut next_poll = Instant::now();
     loop {
         if !need_refetch {
             tokio::select! {
+                _ = sleep_until(next_poll) => {
+                    next_poll = Instant::now() + SHELL_POLL;
+                    w.shells = read_shells(socket, &w.snap).await;
+                    if !w.send_view() {
+                        return None;
+                    }
+                    continue;
+                }
                 ev = sub.rx.recv() => {
                     let Some(ev) = ev else { return Some(closed()) };
                     match w.handle_event(&ev) {
@@ -398,6 +434,55 @@ mod tests {
             .find(|p| p.pane_id == pane_id)
             .unwrap()
             .status
+    }
+    #[tokio::test]
+    async fn a_shell_running_a_command_shows_busy_with_that_command() {
+        let snap = fixture_value();
+        let snap2 = snap.clone();
+        let f = FakeHerdr::start(Arc::new(move |m, params| match m {
+            "session.snapshot" => {
+                Ok(json!({"type":"session_snapshot","snapshot": snap2.lock().unwrap().clone()}))
+            }
+            "pane.process_info" if params["pane_id"] == "w2:p1" => Ok(json!({"process_info": {
+                "shell_pid": 10, "foreground_process_group_id": 11,
+                "foreground_processes": [{"argv": ["cargo", "watch"], "pid": 11}]}})),
+            "pane.process_info" => Ok(json!({"process_info": {
+                "shell_pid": 20, "foreground_process_group_id": 20, "foreground_processes": []}})),
+            _ => Err(("unknown".into(), m.to_string())),
+        }));
+        let (tx, mut rx) = mpsc::unbounded_channel();
+        let _h = spawn_watcher(
+            "default".into(),
+            f.path.clone(),
+            tx,
+            Arc::default(),
+            Arc::default(),
+        );
+        let pane = |v: &SessionView, id: &str| {
+            v.workspaces
+                .iter()
+                .flat_map(|w| &w.tabs)
+                .flat_map(|t| &t.panes)
+                .find(|p| p.pane_id == id)
+                .cloned()
+                .unwrap()
+        };
+        let WatchEvent::View(first) = next(&mut rx).await else {
+            panic!("expected a view")
+        };
+        assert_eq!(
+            pane(&first, "w2:p1").busy,
+            None,
+            "unread before the first poll"
+        );
+        let WatchEvent::View(v) = next(&mut rx).await else {
+            panic!("expected a view")
+        };
+        assert_eq!(pane(&v, "w2:p1").busy, Some(true));
+        assert_eq!(pane(&v, "w2:p1").title, "cargo watch");
+        assert_eq!(pane(&v, "w2:p2").busy, Some(false));
+        assert_eq!(pane(&v, "w1:p1").busy, None);
+        assert_eq!(f.calls_of("pane.process_info"), 2, "agents are not polled");
     }
     #[tokio::test]
     async fn a_run_ending_in_idle_shows_done_until_the_app_focuses() {

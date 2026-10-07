@@ -330,6 +330,7 @@ mod tests {
             cwd: Some("/w/app".into()),
             agent: Some("claude".into()),
             status: Default::default(),
+            busy: None,
         };
         let got = locate(
             &crate::transport::local::LocalTransport,
@@ -379,6 +380,7 @@ mod tests {
             cwd: Some("/w/app".into()),
             agent: Some("claude".into()),
             status: Default::default(),
+            busy: None,
         };
         (home, info, pane)
     }
