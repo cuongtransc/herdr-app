@@ -33,7 +33,8 @@ export default defineConfig(() => ({
   test: {
     environment: "jsdom",
     setupFiles: ["./src/test-setup.ts"],
-    // git worktrees under .worktrees/ carry their own copy of the tests and node_modules
-    exclude: [...configDefaults.exclude, ".worktrees/**"],
+    // git worktrees under .worktrees/ carry their own copy of the tests and node_modules;
+    // *.browser.test.* need a real browser (vitest.browser.config.ts)
+    exclude: [...configDefaults.exclude, ".worktrees/**", "**/*.browser.test.*"],
   },
 }));

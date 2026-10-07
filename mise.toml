@@ -82,6 +82,11 @@ run = "cargo clippy -- -D warnings"
 description = "Frontend unit tests"
 run = "pnpm test"
 
+# Real mouse and key events in the installed Chrome (headless); not part of `ci`.
+[tasks."test:browser"]
+description = "Frontend tests that need a real browser (*.browser.test.tsx)"
+run = "pnpm vitest run --config vitest.browser.config.ts"
+
 [tasks."test:backend"]
 description = "Backend unit tests"
 dir = "src-tauri"

@@ -1,5 +1,4 @@
 import { Channel } from "@tauri-apps/api/core";
-import { writeText } from "@tauri-apps/plugin-clipboard-manager";
 import { FitAddon } from "@xterm/addon-fit";
 import { Terminal } from "@xterm/xterm";
 import "@xterm/xterm/css/xterm.css";
@@ -13,12 +12,12 @@ import { Banner } from "./Banner";
 import { StartingOverlay } from "./StartingOverlay";
 import { ensureTermFont, useSettings, watchTermFont } from "../settings/store";
 import { watchTermTheme } from "../settings/theme";
-import { applyCopyOnSelect } from "./copyOnSelect";
 import { createAckBatcher, createInputQueue } from "./ipcBatch";
 import { createImagePaste } from "./imagePaste";
 import { createKeyHandler } from "./keyHandler";
 import { disposesOnEvent, endsOpen, initialLensState, lensReducer } from "./lensState";
 import { applyOsc52 } from "./osc52";
+import { applySelectUx, copyText } from "./selectUx";
 import { createOutputBuffer } from "./outputBuffer";
 import { claim, disposeIf, getOrCreate } from "./termCache";
 import { applyUnicode11 } from "./unicode";
@@ -45,8 +44,7 @@ function createEntry(key: string) {
   const fit = new FitAddon();
   term.loadAddon(fit);
   applyUnicode11(term);
-  applyOsc52(term, (text) => void writeText(text).catch((e) => console.error("OSC 52 copy failed", e)));
-  const stopCopyOnSelect = applyCopyOnSelect(term, (text) => void writeText(text).catch((e) => console.error("selection copy failed", e)));
+  applyOsc52(term, (text) => copyText(text, "OSC 52"));
   term.attachCustomKeyEventHandler(createKeyHandler((text) => term.input(text)));
   applyWheelScroll(term);
   const unwatchFont = watchTermFont(term, fit);
@@ -58,7 +56,6 @@ function createEntry(key: string) {
     output,
     cleanup: () => {
       output.dispose();
-      stopCopyOnSelect();
       forgetWebgl(key);
       unwatchFont();
       unwatchTheme();
@@ -197,9 +194,11 @@ export function TerminalLens({ pane, terminalId }: Props) {
       },
     );
     container.addEventListener("paste", onPaste, true);
+    const stopSelectUx = applySelectUx(container, term);
 
     return () => {
       container.removeEventListener("paste", onPaste, true);
+      stopSelectUx();
       live = false;
       output.setVisible(false);
       cancelAnimationFrame(frame);

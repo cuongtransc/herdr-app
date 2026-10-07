@@ -666,6 +666,8 @@ kbd {
 .term-host { flex: 1; min-height: 0; overflow: hidden; }
 /* Padding on .xterm (not the host) so FitAddon subtracts it when sizing rows. */
 .term-host .xterm { padding: 10px 0 0 14px; }
+/* Option held over a terminal in mouse mode: a drag now selects, so show the text cursor. */
+.term-host.term-select .xterm.enable-mouse-events, .term-host.term-select .xterm.enable-mouse-events .xterm-screen { cursor: text; }
 /* xterm.css paints the viewport (which spans the padding) pure black. */
 .xterm .xterm-viewport { background-color: var(--surface-term) !important; }
 .term-banner, .chat-notice {
