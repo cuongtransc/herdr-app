@@ -400,11 +400,28 @@ async fn locate_pane(
     };
     let mut agent_get = match fetch_agent().await {
         Ok(v) => v,
+        // herdr's agent API does not know an agent started through a wrapper; its pane still
+        // carries the session.
+        Err(e) if pane.untracked => {
+            let pane_get = mgr
+                .call(
+                    machine_id,
+                    session,
+                    "pane.get",
+                    serde_json::json!({ "pane_id": pane_id }),
+                )
+                .await?;
+            match transcript::locate::agent_from_pane(&pane_get) {
+                Some(v) => v,
+                None if path.is_some() => Value::Null,
+                None => return Err(e),
+            }
+        }
         Err(_) if path.is_some() => Value::Null,
         Err(e) => return Err(e),
     };
     // Without its session, a just-started Claude would get another pane's transcript.
-    if path.is_none() {
+    if path.is_none() && !pane.untracked {
         let deadline = tokio::time::Instant::now() + SESSION_WAIT;
         while transcript::locate::awaiting_session(&agent_get)
             && tokio::time::Instant::now() < deadline

@@ -140,10 +140,12 @@ pub fn session_view(
                         .map(|p| {
                             // herdr keeps the session of an agent it no longer detects (one
                             // started through a wrapper), so that still names the agent.
-                            let agent = agents
-                                .get(p.pane_id.as_str())
-                                .and_then(|a| a.agent.clone())
+                            let tracked =
+                                agents.get(p.pane_id.as_str()).and_then(|a| a.agent.clone());
+                            let untracked = tracked.is_none();
+                            let agent = tracked
                                 .or_else(|| p.agent_session.as_ref().and_then(|s| s.agent.clone()));
+                            let untracked = untracked && agent.is_some();
                             let shell = agent.is_none().then(|| shells.get(&p.pane_id)).flatten();
                             let title = [&p.label, &p.terminal_title_stripped]
                                 .into_iter()
@@ -159,6 +161,7 @@ pub fn session_view(
                                 agent,
                                 status: marks.status(&p.pane_id, p.agent_status),
                                 busy: shell.map(|s| s.busy),
+                                untracked,
                             }
                         })
                         .collect();
@@ -297,6 +300,8 @@ mod tests {
         assert_eq!(p.agent.as_deref(), Some("claude"));
         assert_eq!(p.status, AgentStatus::Unknown);
         assert_eq!(p.busy, None, "an agent is not a shell");
+        assert!(p.untracked, "herdr's agent API does not know it");
+        assert!(!v.workspaces[0].tabs[0].panes[0].untracked);
     }
     #[test]
     fn a_shell_is_busy_while_another_process_holds_its_terminal() {

@@ -40,6 +40,15 @@ const SLASH_AGENTS = new Set(["claude", "pi", "codex"]);
 const PI_MODEL_RE = /^\/model(\s|$)/;
 
 const bracketedPaste = (text: string) => `\x1b[200~${text}\x1b[201~`;
+
+/** An `agent.*` call as the `pane.*` call that does the same, for an agent herdr does not track. */
+function asPaneCall(method: string, params: unknown): [string, unknown] {
+  const p = params as { target?: string; text?: string; keys?: string[] };
+  // agent.prompt pastes the text, then submits it.
+  if (method === "agent.prompt") return ["pane.send_input", { pane_id: p.target, text: bracketedPaste(p.text ?? ""), keys: ["enter"] }];
+  if (method === "agent.send_keys") return ["pane.send_keys", { pane_id: p.target, keys: p.keys }];
+  return [method, params];
+}
 const mention = (path: string) => (/[\s"]/.test(path) ? `@"${path}"` : `@${path}`);
 
 // Unique across Composers: one pane's images outlive the Composer that pasted them.
@@ -55,6 +64,7 @@ export function Composer({
   status,
   onPiModel,
   meta,
+  untracked,
 }: {
   pane: PaneRef;
   agent: string | null;
@@ -62,6 +72,8 @@ export function Composer({
   /** Called once `/model` has gone to pi, whose picker the Chat lens then shows as a card. */
   onPiModel?: () => void;
   meta?: ChatMeta;
+  /** herdr's agent API does not know this agent (started through a wrapper): drive its pane. */
+  untracked?: boolean;
 }) {
   const key = paneKey(pane);
   const [text, setText] = useState(() => readDraft(key));
@@ -153,8 +165,9 @@ export function Composer({
     requestAnimationFrame(() => box.current?.setSelectionRange(next.caret, next.caret));
   };
 
-  const call = (method: string, params: unknown) =>
-    herdrCall(pane.machine_id, pane.session, method, params).then(
+  const call = (method: string, params: unknown) => {
+    const [m, p] = untracked ? asPaneCall(method, params) : [method, params];
+    return herdrCall(pane.machine_id, pane.session, m, p).then(
       () => setError(null),
       (e) => {
         console.error(method, "failed", e);
@@ -162,6 +175,7 @@ export function Composer({
         return Promise.reject(e);
       },
     );
+  };
 
   const attach = async (file: File) => {
     const ext = IMAGE_EXTS[file.type];

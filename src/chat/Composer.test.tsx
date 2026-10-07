@@ -52,6 +52,16 @@ describe("Composer", () => {
     expect(herdrCall).toHaveBeenCalledWith("devtuf", "default", "agent.prompt", { target: "w1:p1", text: "fix the bug" });
     expect((box as HTMLTextAreaElement).value).toBe("");
   });
+  it("drives an agent herdr's agent API does not know (a wrapper) through its pane", async () => {
+    render(<Composer pane={pane} agent="claude" untracked />);
+    const box = screen.getByRole("textbox");
+    fireEvent.change(box, { target: { value: "fix the bug" } });
+    fireEvent.keyDown(box, { key: "Enter" });
+    expect(herdrCall).toHaveBeenCalledWith("devtuf", "default", "pane.send_input", { pane_id: "w1:p1", text: "\x1b[200~fix the bug\x1b[201~", keys: ["enter"] });
+    fireEvent.click(screen.getByRole("button", { name: "Esc" }));
+    expect(herdrCall).toHaveBeenCalledWith("devtuf", "default", "pane.send_keys", { pane_id: "w1:p1", keys: ["esc"] });
+    expect(vi.mocked(herdrCall).mock.calls.some((c) => String(c[2]).startsWith("agent."))).toBe(false);
+  });
   it("moves the caret to the line's start and end with Home and End", () => {
     render(<Composer pane={pane} agent="claude" />);
     const box = screen.getByRole<HTMLTextAreaElement>("textbox");
