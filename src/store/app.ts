@@ -70,6 +70,11 @@ export interface AppState {
   /** The Workspace whose Files overlay is open, if any. Not persisted. */
   filesOverlay: WorkspaceRef | null;
   setFilesOverlay: (ref: WorkspaceRef | null) => void;
+  /** A file the open Files overlay should show (an absolute path, at a line), e.g. from a path
+   *  clicked in Chat; the overlay takes it and clears it. `n` makes a repeated click a new request. */
+  filesRequest: { abs: string; line: number | null; n: number } | null;
+  openInFiles: (ref: WorkspaceRef, abs: string, line: number | null) => void;
+  clearFilesRequest: () => void;
   /** Done panes the user has looked at (by paneKey); a seen Done pane counts as Idle on the
    *  dashboard. Cleared when the pane leaves done. Not persisted. */
   doneSeen: Record<string, true>;
@@ -94,11 +99,15 @@ export const useApp = create<AppState>((set, get) => ({
   starting: {},
   dashboardOpen: false,
   filesOverlay: null,
+  filesRequest: null,
   doneSeen: {},
   statusSince: {},
   ...load(),
   setFilesOverlay: (ref) =>
     set(ref ? { filesOverlay: ref, dashboardOpen: false } : { filesOverlay: null }),
+  openInFiles: (ref, abs, line) =>
+    set((s) => ({ filesOverlay: ref, dashboardOpen: false, filesRequest: { abs, line, n: (s.filesRequest?.n ?? 0) + 1 } })),
+  clearFilesRequest: () => set({ filesRequest: null }),
   // Closing returns to the selected pane, so a done one counts as seen then.
   setDashboardOpen: (open) =>
     set((s) => ({

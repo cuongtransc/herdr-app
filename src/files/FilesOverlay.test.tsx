@@ -227,6 +227,22 @@ describe("FilesOverlay", () => {
     expect(screen.queryByRole("heading", { name: "Notes" })).toBeNull();
   });
 
+  it("opens a file asked for from Chat, at its line, and takes the request", async () => {
+    texts["docs/notes.md"] = "# Notes\n\nsecond";
+    useApp.getState().openInFiles(ref, "/r/docs/notes.md", 3);
+    render(<FilesOverlay />);
+    await waitFor(() => expect(screen.getByRole("tab", { selected: true }).textContent).toContain("notes.md"));
+    await waitFor(() => expect(screen.getByRole("button", { name: "Source" }).getAttribute("aria-pressed")).toBe("true"));
+    expect(useApp.getState().filesRequest).toBeNull();
+  });
+
+  it("says so when the file asked for is outside the overlay's folder", async () => {
+    useApp.getState().openInFiles(ref, "/elsewhere/a.md", null);
+    render(<FilesOverlay />);
+    await waitFor(() => expect(showToast).toHaveBeenCalledWith("/elsewhere/a.md is outside this workspace's folder (/r)"));
+    expect(useApp.getState().filesRequest).toBeNull();
+  });
+
   describe("keys", () => {
     const key = filesKey(ref, "/r");
     const press = (k: string, extra: Partial<KeyboardEventInit> = {}) =>
