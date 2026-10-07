@@ -27,7 +27,7 @@ describe("ChatOutline", () => {
     expect(screen.getByRole("button", { name: "fix the header" }).getAttribute("aria-current")).toBe("true");
     rerender(<ChatOutline entries={[]} current={-1} onJump={() => {}} />);
     expect(rail().style.width).toBe("260px");
-    expect(rail().querySelectorAll("button")).toHaveLength(0);
+    expect(rail().querySelectorAll("ol button")).toHaveLength(0);
     expect(screen.getByText("Your prompts will appear here.")).toBeTruthy();
   });
 
@@ -57,5 +57,22 @@ describe("ChatOutline", () => {
     render(<ChatOutline entries={entries} current={0} onJump={() => {}} />);
     fireEvent.pointerMove(handle(), { clientX: 100, pointerId: 1 });
     expect(rail().style.width).toBe("260px");
+  });
+
+  it("collapses to a thin strip and opens again, remembering which", () => {
+    const { unmount } = render(<ChatOutline entries={entries} current={0} onJump={() => {}} />);
+    const hide = screen.getByRole("button", { name: "Hide outline" });
+    expect(hide.getAttribute("aria-expanded")).toBe("true");
+    fireEvent.click(hide);
+    expect(screen.queryByRole("button", { name: "fix the header" })).toBeNull();
+    expect(screen.queryByRole("separator", { name: "Resize outline" })).toBeNull();
+    expect(rail().className).toContain("collapsed");
+    expect(JSON.parse(localStorage.getItem("herdr-app:settings")!).outlineCollapsed).toBe(true);
+    unmount();
+    render(<ChatOutline entries={entries} current={0} onJump={() => {}} />);
+    const show = screen.getByRole("button", { name: "Show outline" });
+    expect(show.getAttribute("aria-expanded")).toBe("false");
+    fireEvent.click(show);
+    expect(screen.getByRole("button", { name: "fix the header" })).toBeTruthy();
   });
 });

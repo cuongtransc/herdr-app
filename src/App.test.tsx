@@ -213,6 +213,14 @@ describe("App shell", () => {
       expect(screen.queryByRole("dialog", { name: "Agent Dashboard" })).toBeNull();
       (invoke as any).mockImplementation(() => Promise.resolve([]));
     });
+    it("drops its word when the sidebar is hidden, keeping the count and its name", () => {
+      useLayout.setState({ layout: "sidebar-hidden" });
+      useApp.setState({ machines: { local: blockedMachine }, order: ["local"], selected: null, dashboardOpen: false, doneSeen: {} });
+      render(<App />);
+      const board = screen.getByRole("button", { name: "Board, 1 needs you (⇧⌘D)" });
+      expect(board.textContent).toBe("1");
+      useLayout.setState({ layout: "normal" });
+    });
     it("leaves the count to the waiting pill in focus", () => {
       useLayout.setState({ layout: "focus" });
       useApp.setState({ machines: { local: blockedMachine }, order: ["local"], selected: null, dashboardOpen: false, doneSeen: {} });

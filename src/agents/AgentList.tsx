@@ -3,7 +3,7 @@ import { herdrCall, sessionStart } from "../lib/ipc";
 import { paneKey } from "../lib/types";
 import type { AgentStatus, PaneView, SessionView, TabView, WorkspaceView } from "../lib/types";
 import { useApp } from "../store/app";
-import { needYouCount } from "../sidebar/activeFilter";
+import { stepTriage, triageQueue } from "../dashboard/triage";
 import type { MenuItem } from "../sidebar/ContextMenu";
 import { ActionsProvider, useActions } from "../sidebar/actions";
 import { BotIcon, CheckIcon, ChevronIcon, CloseIcon, FolderOpenIcon, PencilIcon, PlusIcon, SplitDownIcon, SplitRightIcon, TabPlusIcon, TerminalIcon } from "../ui/icons";
@@ -231,6 +231,45 @@ function StoppedSession({ machineId, session }: { machineId: string; session: st
   );
 }
 
+/** The ⌘J queue (triage.ts) narrowed to one session. */
+function sessionQueue(s: ReturnType<typeof useApp.getState>, machineId: string, session: string) {
+  const machine = s.machines[machineId];
+  if (!machine) return [];
+  return triageQueue({ [machineId]: machine }, [machineId], s.doneSeen, s.statusSince).filter((c) => c.ref.session === session);
+}
+
+/** "1 waiting · 2 done" for the viewed session: a click selects the next of them, waiting first. */
+function SessionQueueChip({ machineId, session }: { machineId: string; session: string }) {
+  // "waiting:done" as one string, so the selector's value compares equal between renders.
+  const counts = useApp((s) => {
+    const q = sessionQueue(s, machineId, session);
+    const waiting = q.filter((c) => c.bucket === "attention").length;
+    return `${waiting}:${q.length - waiting}`;
+  });
+  const [waiting, done] = counts.split(":").map(Number);
+  if (!waiting && !done) return null;
+  const parts = [waiting && `${waiting} waiting`, done && `${done} done`].filter(Boolean) as string[];
+  const next = () => {
+    const s = useApp.getState();
+    const q = sessionQueue(s, machineId, session);
+    const at = stepTriage(q.map((c) => c.key), s.selected ? paneKey(s.selected) : null, -1, 1);
+    if (at >= 0) s.select(q[at].ref);
+  };
+  return (
+    <button
+      type="button"
+      className="need-chip"
+      aria-label={`${parts.join(", ")}: go to the next one in this session`}
+      title="Go to the next agent that needs you in this session"
+      onClick={next}
+    >
+      {waiting > 0 && <span className="need-waiting">{waiting} waiting</span>}
+      {waiting > 0 && done > 0 && " · "}
+      {done > 0 && <span className="need-done">{done} done</span>}
+    </button>
+  );
+}
+
 function NewWorkspaceButton({ machineId, session }: { machineId: string; session: string }) {
   const a = useActions();
   return (
@@ -246,11 +285,6 @@ export const AgentList = memo(function AgentList() {
   const session = useApp((s) =>
     s.viewed ? s.machines[s.viewed.machine_id]?.sessions.find((x) => x.name === s.viewed!.session) : undefined,
   );
-  const need = useApp((s) => {
-    const machine = s.viewed ? s.machines[s.viewed.machine_id] : undefined;
-    const sess = machine?.sessions.find((x) => x.name === s.viewed!.session);
-    return machine && sess ? needYouCount(machine, sess, s.doneSeen) : 0;
-  });
   if (!viewed || !session)
     return (
       <>
@@ -263,7 +297,7 @@ export const AgentList = memo(function AgentList() {
     <ActionsProvider>
       <div className="agents-head" data-tauri-drag-region>
         <span className="agents-title">{session.name}</span>
-        {need > 0 && <span className="need-chip">{need} {need === 1 ? "needs" : "need"} you</span>}
+        <SessionQueueChip machineId={viewed.machine_id} session={session.name} />
         {session.running && <NewWorkspaceButton machineId={viewed.machine_id} session={session.name} />}
       </div>
       {/* Only the list scrolls, so the head needs no background of its own: a second layer of the

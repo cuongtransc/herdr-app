@@ -49,7 +49,7 @@ describe.each([
   ["dark", dark],
   ["light", light],
 ])("%s theme", (_, t) => {
-  it.each(["--fg", "--fg-2", "--fg-3", "--amber-text"])("%s reads at 4.5:1 on the base surfaces", (fg) => {
+  it.each(["--fg", "--fg-2", "--fg-3", "--amber-text", "--green-text"])("%s reads at 4.5:1 on the base surfaces", (fg) => {
     for (const bg of ["--surface-0", "--surface-1"]) {
       expect(contrast(hex(t, fg), hex(t, bg)), `${fg} on ${bg}`).toBeGreaterThanOrEqual(4.5);
     }

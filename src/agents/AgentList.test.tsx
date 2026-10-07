@@ -84,10 +84,16 @@ describe("AgentList", () => {
     expect(screen.queryByText("Guard export")).toBeNull();
   });
 
-  it("heads the column with what needs the user, not a pane count", () => {
+  it("heads the column with what waits and what is done, and steps through them in this session", () => {
     render(<AgentList />);
-    expect(screen.getByText("2 need you")).toBeTruthy();
     expect(document.querySelector(".agents-head .count")).toBeNull();
+    const chip = screen.getByRole("button", { name: "1 waiting, 1 done: go to the next one in this session" });
+    expect(chip.textContent).toBe("1 waiting · 1 done");
+    // Waiting for input first, then Done and unseen.
+    fireEvent.click(chip);
+    expect(useApp.getState().selected).toEqual({ machine_id: "local", session: "default", pane_id: "p2" });
+    fireEvent.click(screen.getByRole("button", { name: /waiting/ }));
+    expect(useApp.getState().selected).toEqual({ machine_id: "local", session: "default", pane_id: "p1" });
   });
 
   it("starts a stopped session from the column", () => {

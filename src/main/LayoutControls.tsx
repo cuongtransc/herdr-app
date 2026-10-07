@@ -56,7 +56,8 @@ export const LayoutControls = memo(function LayoutControls() {
         onClick={() => setBoardOpen(!boardOpen)}
       >
         <BoardIcon />
-        Board
+        {/* With the sidebar hidden the controls sit over the Agents column: the word gives way. */}
+        {shown && "Board"}
         {need > 0 && <span className="need" aria-hidden="true">{need}</span>}
       </button>
       {focus && waiting + done > 0 && (

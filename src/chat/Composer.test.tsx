@@ -135,6 +135,22 @@ describe("Composer", () => {
     expect(screen.getByRole("img", { name: "Pasted image 1" })).toBeTruthy();
   });
 
+  it("removes a pasted image with its button, or with Backspace in an empty box", async () => {
+    render(<Composer pane={pane} agent="claude" />);
+    const box = screen.getByRole("textbox");
+    paste(box, [png(), png()]);
+    await waitFor(() => expect(screen.getAllByRole("img", { name: /Pasted image/ })).toHaveLength(2));
+    fireEvent.click(screen.getByRole("button", { name: "Remove image 1" }));
+    expect(screen.getAllByRole("img", { name: /Pasted image/ })).toHaveLength(1);
+    // Backspace with text in the box edits the text, not the images.
+    fireEvent.change(box, { target: { value: "a" } });
+    fireEvent.keyDown(box, { key: "Backspace" });
+    expect(screen.getAllByRole("img", { name: /Pasted image/ })).toHaveLength(1);
+    fireEvent.change(box, { target: { value: "" } });
+    fireEvent.keyDown(box, { key: "Backspace" });
+    expect(screen.queryByRole("img", { name: /Pasted image/ })).toBeNull();
+  });
+
   it("pastes each image path for claude, then submits the text", async () => {
     render(<Composer pane={pane} agent="claude" />);
     const box = screen.getByRole("textbox");

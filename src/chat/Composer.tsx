@@ -339,6 +339,11 @@ export function Composer({
               requestAnimationFrame(() => box.current?.setSelectionRange(offered.length, offered.length));
               return;
             }
+            // Backspace in an empty box takes back the last pasted image, as in the agents' own TUIs.
+            if (e.key === "Backspace" && e.currentTarget.value === "" && images.length > 0 && !e.nativeEvent.isComposing) {
+              e.preventDefault();
+              return remove(images[images.length - 1].id);
+            }
             if ((e.key === "Home" || e.key === "End") && !e.altKey && !e.nativeEvent.isComposing) {
               e.preventDefault();
               return setCaret(jumpToEdge(e.currentTarget, e.key === "Home", e.metaKey || e.ctrlKey, e.shiftKey));
