@@ -3,7 +3,11 @@ import { create } from "zustand";
 /** Shared with store.ts, theme.ts and notify.ts: one JSON object, each writer merges its own keys. */
 const SETTINGS_KEY = "herdr-app:settings";
 
-export const DEFAULT_QUICK_REPLIES = ["continue", "yes", "no", "commit and push", "retry"];
+/**
+ * The short replies people send an agent most, by count; each person edits theirs in Settings.
+ * No /compact: the Composer shows its own once the context passes 75%.
+ */
+export const DEFAULT_QUICK_REPLIES = ["ok", "continue", "merged", "what's next?", "commit and push"];
 export const QUICK_REPLIES_MAX = 12;
 export const QUICK_REPLY_MAX_CHARS = 200;
 

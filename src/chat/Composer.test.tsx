@@ -551,10 +551,10 @@ describe("Composer quick replies", () => {
     let finish: (v: unknown) => void = () => {};
     vi.mocked(herdrCall).mockReturnValueOnce(new Promise((r) => (finish = r)));
     render(<Composer pane={pane} agent="claude" />);
-    fireEvent.click(screen.getByRole("button", { name: "yes" }));
-    expect(screen.getByRole<HTMLButtonElement>("button", { name: "no" }).disabled).toBe(true);
+    fireEvent.click(screen.getByRole("button", { name: "ok" }));
+    expect(screen.getByRole<HTMLButtonElement>("button", { name: "continue" }).disabled).toBe(true);
     await act(async () => finish({}));
-    expect(screen.getByRole<HTMLButtonElement>("button", { name: "no" }).disabled).toBe(false);
+    expect(screen.getByRole<HTMLButtonElement>("button", { name: "continue" }).disabled).toBe(false);
   });
 
   it("shows the replies with text only, and none when switched off", () => {
