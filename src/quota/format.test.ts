@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { QuotaWindow } from "../lib/types";
-import { elapsedFraction, percent, tone, untilReset, updatedAgo } from "./format";
+import { agoShort, elapsedFraction, percent, shortReset, tone, untilReset, updatedAgo } from "./format";
 
 const now = 1_789_650_000_000;
 const until = (s: number) => untilReset(now + s * 1000, now);
@@ -40,6 +40,23 @@ describe("format", () => {
     expect(elapsedFraction(now + 3_600_000, null, now)).toBeNull();
     expect(elapsedFraction(now + 3_600_000, 0, now)).toBeNull();
   });
+  it("short reset: the largest unit, hours rounded, for the Sidebar strip", () => {
+    const r = (s: number) => shortReset(now + s * 1000, now);
+    expect(r(6 * 86_400 + 20 * 3_600)).toBe("6d");
+    expect(r(13 * 86_400 + 7 * 3_600)).toBe("13d");
+    expect(r(3_600 + 57 * 60)).toBe("2h");
+    expect(r(4 * 3_600 + 29 * 60)).toBe("4h");
+    expect(r(17 * 60)).toBe("17m");
+    expect(r(30)).toBe("<1m");
+    expect(r(0)).toBeNull();
+    expect(shortReset(null, now)).toBeNull();
+  });
+  it("ago, compact", () => {
+    expect(agoShort(now - 30_000, now)).toBe("<1m");
+    expect(agoShort(now - 70 * 60_000, now)).toBe("1h");
+    expect(agoShort(now - 9 * 3_600_000, now)).toBe("9h");
+    expect(agoShort(now - 3 * 86_400_000, now)).toBe("3d");
+  });
   it("tone", () => {
     const w = (used: number, resetIn: number | null, dur: number | null): QuotaWindow => ({
       label: "5h", usedPercent: used, resetsAt: resetIn === null ? null : now + resetIn * 1000, durationSecs: dur,
@@ -47,7 +64,10 @@ describe("format", () => {
     expect(tone(w(30, 3_600, 18_000), now)).toBe("ok");
     expect(tone(w(80, 3_600, 18_000), now)).toBe("ok");
     expect(tone(w(81, 3_600, 18_000), now)).toBe("warn");
-    expect(tone(w(1, 18_000, 18_000), now)).toBe("warn");
+    // Burning faster than the window elapses warns only past 25% used: 4% at the start of a week is no risk.
+    expect(tone(w(1, 18_000, 18_000), now)).toBe("ok");
+    expect(tone(w(24, 9_000, 18_000), now)).toBe("ok");
+    expect(tone(w(25, 18_000 - 60, 18_000), now)).toBe("warn");
     expect(tone(w(90, 60, 18_000), now)).toBe("warn");
     expect(tone(w(95, null, null), now)).toBe("warn");
     expect(tone(w(50, null, 18_000), now)).toBe("muted");

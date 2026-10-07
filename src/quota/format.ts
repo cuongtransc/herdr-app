@@ -3,6 +3,8 @@ import type { QuotaWindow } from "../lib/types";
 export const WARN_PERCENT = 90;
 
 export type Tone = "muted" | "ok" | "warn";
+/** Below this, using faster than the window elapses is too early to call a risk. */
+export const PACE_FLOOR_PERCENT = 25;
 
 export function percent(n: number): string {
   return `${Math.round(n)}%`;
@@ -22,6 +24,25 @@ export function untilReset(resetsAt: number | null, now: number): string | null 
   return `${m}m`;
 }
 
+/** Time until a reset in its largest unit, hours rounded, for the Sidebar strip; null when none or already passed. */
+export function shortReset(resetsAt: number | null, now: number): string | null {
+  if (resetsAt === null || resetsAt <= now) return null;
+  const secs = (resetsAt - now) / 1000;
+  if (secs < 60) return "<1m";
+  if (secs < 3_600) return `${Math.floor(secs / 60)}m`;
+  if (secs < 86_400) return `${Math.round(secs / 3_600)}h`;
+  return `${Math.floor(secs / 86_400)}d`;
+}
+
+/** How long ago, compact: "<1m", "5m", "1h", "3d". */
+export function agoShort(at: number, now: number): string {
+  const mins = Math.floor((now - at) / 60_000);
+  if (mins < 1) return "<1m";
+  if (mins < 60) return `${mins}m`;
+  if (mins < 1_440) return `${Math.floor(mins / 60)}h`;
+  return `${Math.floor(mins / 1_440)}d`;
+}
+
 export function updatedAgo(fetchedAt: number, now: number): string {
   const secs = Math.floor((now - fetchedAt) / 1000);
   if (secs < 60) return "updated just now";
@@ -38,10 +59,10 @@ export function elapsedFraction(resetsAt: number | null, durationSecs: number | 
   return Math.min(1, Math.max(0, 1 - (resetsAt - now) / (durationSecs * 1000)));
 }
 
-/** Warn when nearly exhausted or burning faster than the window elapses. */
+/** Warn when nearly exhausted, or past PACE_FLOOR_PERCENT and burning faster than the window elapses. */
 export function tone(w: QuotaWindow, now: number): Tone {
   if (w.usedPercent >= WARN_PERCENT) return "warn";
   const fraction = elapsedFraction(w.resetsAt, w.durationSecs, now);
   if (fraction === null) return "muted";
-  return w.usedPercent > fraction * 100 ? "warn" : "ok";
+  return w.usedPercent >= PACE_FLOOR_PERCENT && w.usedPercent > fraction * 100 ? "warn" : "ok";
 }

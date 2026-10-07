@@ -3,11 +3,12 @@ import type { QuotaOutcome, QuotaProvider, QuotaWindow } from "../lib/types";
 /** Providers in display order. */
 export const QUOTA_PROVIDERS: QuotaProvider[] = ["claude", "codex", "opencodeGo", "grok"];
 
-export const PROVIDER_INFO: Record<QuotaProvider, { name: string; cli: string; agent: string }> = {
-  claude: { name: "Claude", cli: "claude", agent: "claude" },
-  codex: { name: "Codex", cli: "codex", agent: "codex" },
-  opencodeGo: { name: "OpenCode Go", cli: "opencode", agent: "opencode" },
-  grok: { name: "Grok", cli: "grok", agent: "grok" },
+/** `short` names the Provider where space is tight: the Sidebar strip and its detail. */
+export const PROVIDER_INFO: Record<QuotaProvider, { name: string; short: string; cli: string; agent: string }> = {
+  claude: { name: "Claude", short: "Claude", cli: "claude", agent: "claude" },
+  codex: { name: "Codex", short: "Codex", cli: "codex", agent: "codex" },
+  opencodeGo: { name: "OpenCode Go", short: "OpenCode", cli: "opencode", agent: "opencode" },
+  grok: { name: "Grok", short: "Grok", cli: "grok", agent: "grok" },
 };
 
 export interface QuotaReport {

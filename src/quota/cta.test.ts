@@ -20,9 +20,15 @@ describe("ctaCards", () => {
     expect(cards.map((c) => c.agent)).toEqual(["claude", "claude", "opencode", "grok", "kimi", "zeta"]);
   });
 
-  it("labels accounts only when a Provider has several", () => {
+  it("numbers accounts only when a Provider has several, and keeps each account's short id", () => {
     const cards = ctaCards([acct("claude", "0bb1535b-bb5a"), acct("claude", "955f5fbe-a050"), acct("codex", "edbec1d9")]);
-    expect(cards.map((c) => c.account)).toEqual(["0bb1535b", "955f5fbe", null]);
+    expect(cards.map((c) => c.account)).toEqual(["1", "2", null]);
+    expect(cards.map((c) => c.accountId)).toEqual(["0bb1535b", "955f5fbe", "edbec1d9"]);
+  });
+
+  it("names the short Provider name and its sign-in command", () => {
+    const cards = ctaCards([acct("opencode-go", "a"), acct("claude", "b"), acct("kimi", "k")]);
+    expect(cards.map((c) => [c.short, c.cli])).toEqual([["Claude", "claude"], ["OpenCode", "opencode"], ["kimi", null]]);
   });
 
   it("maps poll status to entries, keeping windows of a failed poll as the last report", () => {

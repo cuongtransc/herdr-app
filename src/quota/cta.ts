@@ -1,12 +1,17 @@
 import type { CtaAccount } from "../lib/types";
-import type { QuotaEntry } from "./entry";
+import { PROVIDER_INFO, type QuotaEntry } from "./entry";
 import { updatedAgo } from "./format";
 
 export interface CtaCard {
   key: string;
   name: string;
+  short: string;
   agent: string;
+  /** The account's number among its Provider's, when it has several. */
   account: string | null;
+  accountId: string;
+  /** The command that signs in again; null for a Provider Herdr does not know. */
+  cli: string | null;
   entry: QuotaEntry;
   polledAt: number | null;
 }
@@ -14,14 +19,15 @@ export interface CtaCard {
 export const STALE_POLL_MS = 1_800_000;
 
 const CTA_PROVIDERS = [
-  { id: "claude", name: "Claude", agent: "claude" },
-  { id: "codex", name: "Codex", agent: "codex" },
-  { id: "opencode-go", name: "OpenCode Go", agent: "opencode" },
-  { id: "grok", name: "Grok", agent: "grok" },
+  { id: "claude", ...PROVIDER_INFO.claude },
+  { id: "codex", ...PROVIDER_INFO.codex },
+  { id: "opencode-go", ...PROVIDER_INFO.opencodeGo },
+  { id: "grok", ...PROVIDER_INFO.grok },
 ];
 
 export function ctaCards(accounts: CtaAccount[]): CtaCard[] {
   const counts = new Map<string, number>();
+  const seen = new Map<string, number>();
   for (const account of accounts) counts.set(account.provider, (counts.get(account.provider) ?? 0) + 1);
 
   return accounts
@@ -40,6 +46,7 @@ export function ctaCards(accounts: CtaAccount[]): CtaCard[] {
       return a.index - b.index;
     })
     .map(({ account }) => {
+      seen.set(account.provider, (seen.get(account.provider) ?? 0) + 1);
       const provider = CTA_PROVIDERS.find((item) => item.id === account.provider);
       const fetchedAt = account.polledAt ?? 0;
       const report = { windows: account.windows, fetchedAt };
@@ -53,8 +60,11 @@ export function ctaCards(accounts: CtaAccount[]): CtaCard[] {
       return {
         key: `${account.provider}/${account.account}`,
         name: provider?.name ?? account.provider,
+        short: provider?.short ?? account.provider,
         agent: provider?.agent ?? account.provider,
-        account: counts.get(account.provider)! > 1 ? shortAccount(account.account) : null,
+        account: counts.get(account.provider)! > 1 ? String(seen.get(account.provider)) : null,
+        accountId: shortAccount(account.account),
+        cli: provider?.cli ?? null,
         entry,
         polledAt: account.polledAt,
       };
