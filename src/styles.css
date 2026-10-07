@@ -516,7 +516,6 @@ kbd {
 .agent-card.blocked.active { background: color-mix(in srgb, var(--amber) 7%, var(--active)); }
 .agent-card-title { flex: 1; min-width: 0; font-size: var(--fs-m); font-weight: 500; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .agent-card.shell .agent-card-title { color: var(--fg-2); font-weight: 400; }
-.agent-card-sub { flex: none; max-width: 30%; color: var(--fg-3); font-size: var(--fs-xs); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 /* The mark slot at a row's end; idle and shells keep it empty so titles align. */
 .agent-card .mark { flex: none; width: 8px; height: 8px; border-radius: 50%; }
 .agent-card .mark-working { background: var(--blue); }
