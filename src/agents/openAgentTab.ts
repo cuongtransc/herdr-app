@@ -11,12 +11,15 @@ interface TabCreated {
   root_pane: { pane_id: string };
 }
 
-/** Opens a new Tab in `workspaceId` at `cwd` (herdr's default when empty), selects its pane and starts `agent` there (a shell starts nothing), resolving once it runs. */
-export async function openAgentTab(machineId: string, session: string, workspaceId: string, agent: Agent, cwd: string): Promise<void> {
+/**
+ * Opens a new Tab in `workspaceId` at `cwd` (herdr's default when empty), selects its pane and starts `agent` there (a shell starts nothing), resolving once it runs.
+ * A shell's tab is named `tabName` when given: the name its row shows.
+ */
+export async function openAgentTab(machineId: string, session: string, workspaceId: string, agent: Agent, cwd: string, tabName = ""): Promise<void> {
   const res = await herdrCall<TabCreated>(machineId, session, "tab.create", {
     workspace_id: workspaceId,
     ...(cwd ? { cwd } : {}),
-    label: agent,
+    label: (agent === "shell" && tabName.trim()) || agent,
     focus: false,
   });
   const pane = { machine_id: machineId, session, pane_id: res.root_pane.pane_id };

@@ -15,6 +15,14 @@ describe("palette search", () => {
     expect(search([m], "srv/api").map(h => h.ref.pane_id)).toEqual(["w1:p2"]);
     expect(search([m], "herdr-app")).toHaveLength(2);
   });
+  it("matches what a shell is doing", () => {
+    const shell = { ...pane("w1:p3", "dev", null, "idle"), activity: "pnpm vite --port 1441" };
+    const box: MachineView = structuredClone(m);
+    box.sessions[0].workspaces[0].tabs[0].panes.push(shell);
+    const hits = search([box], "vite");
+    expect(hits.map((h) => h.ref.pane_id)).toEqual(["w1:p3"]);
+    expect(hits[0].activity).toBe("pnpm vite --port 1441");
+  });
   it("ranks blocked panes first and builds subtitles", () => {
     const hits = search([m], "");
     expect(hits[0].ref.pane_id).toBe("w1:p2");

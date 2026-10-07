@@ -29,6 +29,8 @@ export interface PaneView {
   pane_id: string;
   terminal_id: string;
   title: string;
+  /** A shell's: what it does now (its terminal title, else the command it runs), shown after the title. */
+  activity?: string | null;
   cwd: string | null;
   agent: string | null;
   status: AgentStatus;

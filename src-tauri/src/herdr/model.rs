@@ -107,6 +107,17 @@ pub fn shell_proc(result: &Value) -> Option<ShellProc> {
     })
 }
 
+/// A tab label the user chose: herdr's default is the tab's number, and `orch-`, `lane-` and
+/// `brief-` mark a role (see `src/agents/roles.ts`), none of which names a shell.
+fn user_tab_name(label: &str) -> Option<String> {
+    let numbered = !label.is_empty() && label.chars().all(|c| c.is_ascii_digit());
+    let role = ["orch-", "lane-", "brief-"]
+        .iter()
+        .any(|p| label.starts_with(p));
+    // The app labels a shell tab it opens unnamed "shell": that names nothing either.
+    (!label.is_empty() && !numbered && !role && label != "shell").then(|| label.to_string())
+}
+
 /// Build the sidebar tree for a live session. Workspaces and tabs are sorted by
 /// `number`, panes keep snapshot order, and every level's status is the rollup of
 /// its children, with `marks` applied to pane statuses and `shells` to shell panes. Panes whose
@@ -147,16 +158,31 @@ pub fn session_view(
                                 .or_else(|| p.agent_session.as_ref().and_then(|s| s.agent.clone()));
                             let untracked = untracked && agent.is_some();
                             let shell = agent.is_none().then(|| shells.get(&p.pane_id)).flatten();
-                            let title = [&p.label, &p.terminal_title_stripped]
-                                .into_iter()
-                                .find_map(|s| s.clone().filter(|s| !s.is_empty()))
-                                .or_else(|| agent.clone())
-                                .or_else(|| shell.and_then(|s| s.command.clone()))
-                                .unwrap_or_else(|| "Terminal".to_string());
+                            let non_empty =
+                                |s: &Option<String>| s.clone().filter(|s| !s.is_empty());
+                            // An agent keeps herdr's title. A shell reads `name · activity`: what the
+                            // user called it, and what it does now.
+                            let (title, activity) = match &agent {
+                                Some(agent) => (
+                                    non_empty(&p.label)
+                                        .or_else(|| non_empty(&p.terminal_title_stripped))
+                                        .unwrap_or_else(|| agent.clone()),
+                                    None,
+                                ),
+                                None => (
+                                    non_empty(&p.label)
+                                        .or_else(|| user_tab_name(&t.label))
+                                        .unwrap_or_else(|| "Terminal".to_string()),
+                                    non_empty(&p.terminal_title_stripped).or_else(|| {
+                                        shell.filter(|s| s.busy).and_then(|s| s.command.clone())
+                                    }),
+                                ),
+                            };
                             PaneView {
                                 pane_id: p.pane_id.clone(),
                                 terminal_id: p.terminal_id.clone(),
                                 title,
+                                activity,
                                 cwd: p.cwd.clone(),
                                 agent,
                                 status: marks.status(&p.pane_id, p.agent_status),
@@ -282,8 +308,12 @@ mod tests {
             ["1", "logs"]
         );
         assert_eq!(
-            w2.tabs[1].panes[0].title, "Terminal",
-            "a plain shell with no label or terminal title"
+            w2.tabs[1].panes[0].title, "logs",
+            "a plain shell takes the name its tab was given"
+        );
+        assert_eq!(
+            w2.tabs[0].panes[0].title, "Terminal",
+            "tab \"1\" is herdr's number"
         );
         assert_eq!(w2.status, AgentStatus::Idle);
     }
@@ -323,20 +353,23 @@ mod tests {
         let v = session_view("default", &fixture(), &DoneMarks::default(), &shells);
         let running = &v.workspaces[1].tabs[0].panes[0];
         assert_eq!(running.busy, Some(true));
+        assert_eq!(running.title, "Terminal", "the command is no name");
         assert_eq!(
-            running.title, "pnpm vite --port 1441",
-            "the command names an untitled shell"
+            running.activity.as_deref(),
+            Some("pnpm vite --port 1441"),
+            "a busy untitled shell shows its command"
         );
         let idle = &v.workspaces[1].tabs[1].panes[0];
         assert_eq!(idle.busy, Some(false));
-        assert_eq!(idle.title, "Terminal");
+        assert_eq!(idle.title, "logs");
+        assert_eq!(idle.activity, None, "an idle shell does nothing");
         assert_eq!(
             v.workspaces[0].tabs[0].panes[0].busy, None,
             "agents carry no busy flag"
         );
     }
     #[test]
-    fn a_terminal_title_wins_over_the_command() {
+    fn a_terminal_title_is_the_activity_and_wins_over_the_command() {
         let mut s = fixture();
         s.panes[2].terminal_title_stripped = Some("ubuntu@ct-hms".into());
         let mut shells = Shells::default();
@@ -348,7 +381,42 @@ mod tests {
             },
         );
         let v = session_view("default", &s, &DoneMarks::default(), &shells);
-        assert_eq!(v.workspaces[1].tabs[0].panes[0].title, "ubuntu@ct-hms");
+        let p = &v.workspaces[1].tabs[0].panes[0];
+        assert_eq!(p.title, "Terminal");
+        assert_eq!(p.activity.as_deref(), Some("ubuntu@ct-hms"));
+    }
+    fn tab_label(label: &str) -> PaneView {
+        let mut s = fixture();
+        s.tabs[1].label = label.into();
+        let v = session_view("default", &s, &DoneMarks::default(), &Shells::default());
+        v.workspaces[1].tabs[0].panes[0].clone()
+    }
+    #[test]
+    fn a_tab_the_user_named_names_its_shell() {
+        assert_eq!(tab_label("dev").title, "dev");
+    }
+    #[test]
+    fn a_tab_number_role_tab_or_the_apps_shell_label_is_no_name() {
+        for label in ["1", "12", "orch-app", "lane-fix", "brief-x", "shell"] {
+            assert_eq!(tab_label(label).title, "Terminal", "{label}");
+        }
+    }
+    #[test]
+    fn a_pane_label_beats_the_tab_label() {
+        let mut s = fixture();
+        s.tabs[1].label = "dev".into();
+        s.panes[2].label = Some("api".into());
+        let v = session_view("default", &s, &DoneMarks::default(), &Shells::default());
+        assert_eq!(v.workspaces[1].tabs[0].panes[0].title, "api");
+    }
+    #[test]
+    fn agent_panes_have_no_activity() {
+        let mut s = fixture();
+        s.tabs[0].label = "dev".into();
+        let v = session_view("default", &s, &DoneMarks::default(), &Shells::default());
+        let p = &v.workspaces[0].tabs[0].panes[0];
+        assert_eq!(p.title, "Rewrite", "an agent keeps its title");
+        assert_eq!(p.activity, None);
     }
     #[test]
     fn reads_shell_state_from_process_info() {

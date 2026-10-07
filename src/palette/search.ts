@@ -4,6 +4,8 @@ import { scoreFields } from "./fuzzy";
 export interface PaneHit {
   ref: PaneRef;
   title: string;
+  /** What a shell does now, shown after its title. */
+  activity: string | null;
   /** "machine › session › workspace" */
   subtitle: string;
   agent: string | null;
@@ -11,7 +13,7 @@ export interface PaneHit {
 }
 
 /** Where a match counts most: names the user typed or sees, then the agent and Machine, then paths. */
-const WEIGHT = { title: 1, session: 1, workspace: 0.9, agent: 0.8, machine: 0.7, folder: 0.7, path: 0.5 };
+const WEIGHT = { title: 1, activity: 0.9, session: 1, workspace: 0.9, agent: 0.8, machine: 0.7, folder: 0.7, path: 0.5 };
 
 const basename = (p: string) => p.replace(/\/+$/, "").split("/").pop() ?? "";
 
@@ -25,6 +27,7 @@ export function search(machines: MachineView[], query: string): PaneHit[] {
             const score = scoreFields(
               [
                 { text: p.title, weight: WEIGHT.title },
+                { text: p.activity ?? "", weight: WEIGHT.activity },
                 { text: s.name, weight: WEIGHT.session },
                 { text: w.label, weight: WEIGHT.workspace },
                 { text: p.agent ?? "", weight: WEIGHT.agent },
@@ -41,6 +44,7 @@ export function search(machines: MachineView[], query: string): PaneHit[] {
               hit: {
                 ref: { machine_id: m.id, session: s.name, pane_id: p.pane_id },
                 title: p.title,
+                activity: p.activity ?? null,
                 subtitle: `${m.label} › ${s.name} › ${w.label}`,
                 agent: p.agent,
                 status: p.status,

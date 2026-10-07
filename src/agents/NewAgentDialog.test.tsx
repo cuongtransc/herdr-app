@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 vi.mock("../lib/ipc", () => ({ herdrCall: vi.fn() }));
 import { herdrCall } from "../lib/ipc";
@@ -84,6 +84,32 @@ describe("NewAgentDialog", () => {
     expect(onError).not.toHaveBeenCalled();
   });
 
+  it("names a new shell tab with the tab name, typed or picked from a suggestion", async () => {
+    setFolder(ref, "/home/me/api");
+    respond();
+    open();
+    const input = screen.getByLabelText("Tab name") as HTMLInputElement;
+    expect(input.id).toBe("new-tab-name");
+    const chips = screen.getByRole("group", { name: "Tab name suggestions" });
+    expect(within(chips).getAllByRole("button").map((b) => b.textContent)).toEqual(["dev", "test", "server", "logs"]);
+    fireEvent.click(within(chips).getByRole("button", { name: "server" }));
+    expect(input.value).toBe("server");
+    fireEvent.change(input, { target: { value: " api logs " } });
+    fireEvent.click(screen.getByRole("button", { name: "shell" }));
+    await waitFor(() => expect(herdrCall).toHaveBeenCalledTimes(1));
+    expect(herdrCall).toHaveBeenCalledWith("local", "default", "tab.create", { workspace_id: "w1", cwd: "/home/me/api", label: "api logs", focus: false });
+  });
+
+  it("keeps the agent's name on its tab whatever the tab name says", async () => {
+    setFolder(ref, "/home/me/api");
+    respond();
+    open();
+    fireEvent.change(screen.getByLabelText("Tab name"), { target: { value: "dev" } });
+    fireEvent.click(screen.getByRole("button", { name: "claude" }));
+    await waitFor(() => expect(herdrCall).toHaveBeenCalledTimes(2));
+    expect(herdrCall).toHaveBeenNthCalledWith(1, "local", "default", "tab.create", { workspace_id: "w1", cwd: "/home/me/api", label: "claude", focus: false });
+  });
+
   it("asks for the folder the first time, prefilled from the first pane, and remembers it", async () => {
     respond();
     open();
@@ -132,7 +158,7 @@ describe("NewAgentDialog", () => {
     respond();
     open();
     const group = screen.getByRole("group", { name: "Agent" });
-    expect(screen.getAllByRole("button").map((b) => b.textContent)).toEqual(["claude", "pi", "shell"]);
+    expect(within(group).getAllByRole("button").map((b) => b.textContent)).toEqual(["claude", "pi", "shell"]);
     expect(screen.getByLabelText("Folder").compareDocumentPosition(group) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
   });
 

@@ -479,7 +479,7 @@ mod tests {
             panic!("expected a view")
         };
         assert_eq!(pane(&v, "w2:p1").busy, Some(true));
-        assert_eq!(pane(&v, "w2:p1").title, "cargo watch");
+        assert_eq!(pane(&v, "w2:p1").activity.as_deref(), Some("cargo watch"));
         assert_eq!(pane(&v, "w2:p2").busy, Some(false));
         assert_eq!(pane(&v, "w1:p1").busy, None);
         assert_eq!(f.calls_of("pane.process_info"), 2, "agents are not polled");
