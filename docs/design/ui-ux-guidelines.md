@@ -325,6 +325,11 @@ trail after the last (possibly nested) Group with no header, reading as its chil
   elapses). Numbers that cannot be trusted never show: a failed poll, or a `cta` account not polled
   for 30 minutes, reads as a muted reason (`not polled · 1h`, `HTTP 403 · 9h`), and leaves the strip
   after a day.
+- The strip **folds** under a QUOTA header like the sections above it (remembered, open by default).
+  Folded, the header keeps one line: a full account only counts beside it (`· 1 full`), since it says
+  nothing new until it resets; the line goes to the account that warns, else to the fullest one with
+  room in plain text. Only when every account is full does it warn (`2 full · 2h`, the soonest reset).
+  Untrusted numbers stay out, as in the strip.
 - A click opens the **Quota panel** beside the strip: accounts by window (5 hours, Week, Month,
   Other), each trouble row saying what failed, when, and how to fix it; Providers not signed in
   fold into one line at its foot.
