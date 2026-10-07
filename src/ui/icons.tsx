@@ -50,7 +50,7 @@ export const ServerIcon = (p: SVGProps<SVGSVGElement>) => (
     <path d="M7 7.5h.01M7 16.5h.01" />
   </Icon>
 );
-export const TerminalIcon = (p: SVGProps<SVGSVGElement>) => <Icon {...p}><path d="M5 7l5 5-5 5M12 18h7" /></Icon>;
+export const TerminalIcon = (p: SVGProps<SVGSVGElement>) => <Icon {...p}><rect x="3" y="3" width="18" height="18" rx="2" /><path d="M7 11l2-2-2-2M11 13h4" /></Icon>;
 export const ChatIcon = (p: SVGProps<SVGSVGElement>) => (
   <Icon {...p}><path d="M21 12a8 8 0 0 1-11.6 7.1L4 20l1-4.6A8 8 0 1 1 21 12z" /></Icon>
 );
