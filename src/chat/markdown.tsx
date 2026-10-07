@@ -5,6 +5,7 @@ import rehypeHighlight from "rehype-highlight";
 import remarkGfm from "remark-gfm";
 import { CopyButton } from "./CopyButton";
 import { MermaidBlock } from "./MermaidBlock";
+import { PathCode } from "./PathCode";
 
 /** The fenced block's language, from the `language-x` class rehype-highlight leaves on `<code>`. */
 function codeLanguage(node: unknown): string | null {
@@ -42,6 +43,9 @@ export function ExternalLink({ href, children, className, title }: { href?: stri
 /** True inside a markdown link, where an image must not become a second (nested) link. */
 export const InLinkContext = createContext(false);
 
+/** True inside a fenced block, whose code is never a path link. */
+const InPreContext = createContext(false);
+
 export const mdComponents: Components = {
   pre({ node, children }) {
     const lang = codeLanguage(node);
@@ -53,9 +57,18 @@ export const mdComponents: Components = {
           {lang ?? "code"}
           <CopyButton text={source} label="Copy code" />
         </div>
-        <pre>{children}</pre>
+        <InPreContext.Provider value={true}>
+          <pre>{children}</pre>
+        </InPreContext.Provider>
       </div>
     );
+  },
+  // Inline code that names a file (`src/a.ts:12`, `~/shot.png`) opens it; any other stays code.
+  code: function Code({ node, className, children }) {
+    const inPre = useContext(InPreContext);
+    const inLink = useContext(InLinkContext);
+    if (inPre || inLink || className) return <code className={className}>{children}</code>;
+    return <PathCode text={nodeText(node)}>{children}</PathCode>;
   },
   a({ href, children }) {
     return (

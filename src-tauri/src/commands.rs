@@ -29,6 +29,23 @@ use tauri::State;
 
 type Mgr<'a> = State<'a, Arc<MachineManager>>;
 
+/// Opens a file a chat message names, on this Mac: a viewable kind in its default app, anything
+/// else revealed in Finder (`open_file::decide`).
+#[tauri::command]
+pub async fn open_local_file(
+    app: tauri::AppHandle,
+    path: String,
+) -> Result<crate::open_file::Opened, AppError> {
+    use tauri_plugin_opener::OpenerExt;
+    let outcome = crate::open_file::decide(std::path::Path::new(&path))?;
+    let res = match outcome {
+        crate::open_file::Opened::Opened => app.opener().open_path(&path, None::<&str>),
+        crate::open_file::Opened::Revealed => app.opener().reveal_item_in_dir(&path),
+    };
+    res.map_err(|e| AppError::new("io", e.to_string()))?;
+    Ok(outcome)
+}
+
 #[tauri::command]
 pub async fn machines_list(mgr: Mgr<'_>) -> Result<Vec<MachineView>, AppError> {
     Ok(mgr.views())

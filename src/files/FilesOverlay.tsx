@@ -259,6 +259,19 @@ function FilesBrowser({ wsRef, root, online, reloadKey, reload, onMissing }: { o
     [key, open],
   );
 
+  // A file asked for from elsewhere (a path clicked in Chat), at its line.
+  const request = useApp((s) => s.filesRequest);
+  useEffect(() => {
+    if (!request) return;
+    useApp.getState().clearFilesRequest();
+    const base = root === "/" ? "" : root;
+    if (!request.abs.startsWith(base + "/")) {
+      showToast(`${request.abs} is outside this workspace's folder (${root})`);
+      return;
+    }
+    onLink(request.abs.slice(base.length + 1), request.line ? `L${request.line}` : null);
+  }, [request, root, onLink]);
+
   // Rendering parses on the main thread, so text past the highlight limit opens as source.
   const large = shown?.text != null && shown.text.length > HIGHLIGHT_LIMIT;
   // A `#L12` link has a line to show, which only the source view has.
