@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { MachineView, PaneView, SessionView } from "../lib/types";
-import { filterResolved, isActiveSession } from "./activeFilter";
+import { filterResolved, isActiveSession, needYouCount } from "./activeFilter";
 import type { RNode, RSession } from "./groups";
 
 const pane = (id: string, status: PaneView["status"], agent: string | null = "claude"): PaneView => ({
@@ -24,6 +24,19 @@ describe("isActiveSession", () => {
     expect(isActiveSession(machine, session("a", [pane("p", "blocked", null)]), {})).toBe(false);
     expect(isActiveSession(machine, session("a", [pane("p", "working")], false), {})).toBe(false);
     expect(isActiveSession({ ...machine, state: "error" }, session("a", [pane("p", "working")]), {})).toBe(false);
+  });
+});
+
+describe("lanes", () => {
+  const lanes = (status: PaneView["status"]): SessionView => ({
+    ...session("a", []),
+    workspaces: [{ workspace_id: "w1", label: "ws", number: 1, status: "idle", tabs: [{ tab_id: "t", label: "lane-x", number: 1, status: "idle", panes: [pane("p", status)] }] }],
+  });
+  it("counts a lane only while it works or waits, not its Done", () => {
+    expect(isActiveSession(machine, lanes("done"), {})).toBe(false);
+    expect(needYouCount(machine, lanes("done"), {})).toBe(0);
+    expect(needYouCount(machine, lanes("blocked"), {})).toBe(1);
+    expect(isActiveSession(machine, lanes("working"), {})).toBe(true);
   });
 });
 

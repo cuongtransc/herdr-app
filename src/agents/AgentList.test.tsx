@@ -286,6 +286,63 @@ describe("AgentList", () => {
   });
 });
 
+describe("AgentList lanes", () => {
+  const tab = (id: string, label: string, panes: PaneView[]) => ({ tab_id: id, label, number: 1, status: "idle" as const, panes });
+  const lanes: MachineView = {
+    ...m,
+    sessions: [
+      { name: "default", running: true, status: "working", error: null, workspaces: [
+        { workspace_id: "w1", label: "bmf-oms", number: 1, status: "working", tabs: [
+          tab("t1", "main-orches", [pane("o", "BMF-OMS review", "claude", "working")]),
+          tab("t2", "lane-caps", [pane("l1", "π - lane: caps — Wave 2", "pi", "working")]),
+          tab("t3", "lane-search", [pane("l2", "π - lane: search — Wave 2", "pi", "done")]),
+          tab("t4", "lane-ipscope", [pane("l3", "lane: ipscope — Wave 2", "claude", "blocked")]),
+          tab("t5", "2", [pane("s", "cargo watch", null, "unknown")]),
+        ] } ] },
+    ],
+  };
+  beforeEach(() => {
+    vi.clearAllMocks();
+    localStorage.clear();
+    useApp.setState({ machines: { local: lanes }, order: ["local"], selected: null, viewed: { machine_id: "local", session: "default" }, expanded: {}, doneSeen: {}, statusSince: {} });
+    usePaneFilter.setState({ filter: "active" });
+  });
+  const rows = () => [...document.querySelectorAll(".agent-card")].map((b) => b.getAttribute("aria-label"));
+
+  it("folds lanes under their orchestrator, surfacing only a lane that needs input", () => {
+    render(<AgentList />);
+    expect(rows()).toEqual(["BMF-OMS review, claude, working", "ipscope — Wave 2, claude, needs input", "cargo watch, shell"]);
+    const toggle = screen.getByRole("button", { name: "3 lanes" });
+    expect(toggle.getAttribute("aria-expanded")).toBe("false");
+    expect(toggle.getAttribute("title")).toBe("1 working, 1 done, 1 needs input");
+    expect(screen.getByRole("button", { name: "ipscope — Wave 2, claude, needs input" }).closest("li")?.className).toContain("lane-row");
+  });
+
+  it("opens every lane under the orchestrator, in tab order", () => {
+    render(<AgentList />);
+    fireEvent.click(screen.getByRole("button", { name: "3 lanes" }));
+    expect(rows()).toEqual([
+      "BMF-OMS review, claude, working",
+      "caps — Wave 2, pi, working",
+      "search — Wave 2, pi, done, not seen",
+      "ipscope — Wave 2, claude, needs input",
+      "cargo watch, shell",
+    ]);
+  });
+
+  it("keeps a selected lane in view while folded", () => {
+    useApp.setState({ selected: { machine_id: "local", session: "default", pane_id: "l1" } });
+    render(<AgentList />);
+    expect(rows()).toContain("caps — Wave 2, pi, working");
+  });
+
+  it("leaves a lane's done to the orchestrator: the head chip counts only what waits on the user", () => {
+    render(<AgentList />);
+    expect(screen.getByRole("button", { name: /go to the next one/ }).textContent).toBe("1 waiting");
+    expect(screen.getByRole("button", { name: "Active 3" })).toBeTruthy();
+  });
+});
+
 describe("AgentList tab reordering", () => {
   const dt = () => {
     const data: Record<string, string> = {};

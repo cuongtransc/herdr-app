@@ -6,10 +6,11 @@ import { useApp } from "../store/app";
 import { stepTriage, triageQueue } from "../dashboard/triage";
 import type { MenuItem } from "../sidebar/ContextMenu";
 import { ActionsProvider, useActions } from "../sidebar/actions";
-import { BotIcon, CheckIcon, CloseIcon, FolderOpenIcon, PencilIcon, PlusIcon, SplitDownIcon, SplitRightIcon, TabPlusIcon, TerminalIcon } from "../ui/icons";
+import { BotIcon, CheckIcon, ChevronIcon, CloseIcon, FolderOpenIcon, PencilIcon, PlusIcon, SplitDownIcon, SplitRightIcon, TabPlusIcon, TerminalIcon } from "../ui/icons";
 import { folderName, suggestFolder, useFolder } from "../workspaces/folder";
 import { AgentIcon } from "./AgentIcon";
 import { idleLabel, paneState, useMinuteClock, usePaneFilter } from "./paneFilter";
+import { laneTitle, paneRoles, tabRole } from "./roles";
 import { AGENTS, openAgentTab } from "./openAgentTab";
 import { useTabReorder } from "./tabDnd";
 
@@ -59,6 +60,15 @@ interface Row {
   quiet: boolean;
   /** Set on an agent kept in Active for having gone idle recently. */
   idleFor: number | null;
+  /** The workspace's orchestrator, or one of the lanes it dispatched (roles.ts). */
+  role: "orch" | "lane" | null;
+}
+
+/** "1 working, 1 done, 1 needs input" over some lanes. */
+function laneSummary(lanes: Row[]): string {
+  const n = (s: AgentStatus) => lanes.filter((r) => r.entry.pane.status === s).length;
+  const parts: [number, string][] = [[n("working"), "working"], [n("done"), "done"], [n("blocked"), "needs input"], [n("idle"), "idle"]];
+  return parts.filter(([c]) => c > 0).map(([c, w]) => `${c} ${w}`).join(", ");
 }
 
 /** The mark at a row's end: only the states that ask for a look carry one. */
@@ -84,9 +94,26 @@ function StatusMark({ status, seen, agent }: { status: AgentStatus; seen: boolea
 type Reorder = ReturnType<typeof useTabReorder>;
 
 /** `tabRow` when this card is its Tab's whole row (a single-pane Tab), so it is also the drop target. */
-function AgentCard({ machineId, session, row, reorder, tabRow }: { machineId: string; session: string; row: Row; reorder: Reorder; tabRow?: boolean }) {
+function AgentCard({
+  machineId,
+  session,
+  row,
+  reorder,
+  tabRow,
+  lanes,
+}: {
+  machineId: string;
+  session: string;
+  row: Row;
+  reorder: Reorder;
+  tabRow?: boolean;
+  /** On the orchestrator's row: its lanes' toggle. */
+  lanes?: { rows: Row[]; open: boolean; toggle: () => void };
+}) {
   const { entry, quiet, idleFor } = row;
   const { pane, workspace: ws, tab } = entry;
+  // A lane's place under its orchestrator already says "lane".
+  const title = row.role === "lane" || tabRole(tab.label) === "brief" ? laneTitle(pane.title) : pane.title;
   const ref = { machine_id: machineId, session, pane_id: pane.pane_id };
   const active = useApp((s) => s.selected !== null && paneKey(s.selected) === paneKey(ref));
   const seen = useApp((s) => !!s.doneSeen[paneKey(ref)]);
@@ -110,13 +137,13 @@ function AgentCard({ machineId, session, row, reorder, tabRow }: { machineId: st
     : [];
   return (
     <li
-      className={"agent-card-item" + (tabRow ? reorder.indicatorClass(tab.tab_id) : "")}
+      className={"agent-card-item" + (row.role === "lane" ? " lane-row" : "") + (lanes ? " has-lanes" : "") + (tabRow ? reorder.indicatorClass(tab.tab_id) : "")}
       {...(tabRow ? reorder.target(tab.tab_id) : {})}
     >
       <button
         {...reorder.source(tab.tab_id)}
         className={"agent-card" + (active ? " active" : "") + (pane.status === "blocked" ? " blocked" : "") + (pane.agent ? "" : " shell") + (quiet ? " quiet" : "")}
-        aria-label={`${pane.title}, ${pane.agent ?? "shell"}${word ? `, ${word}` : ""}`}
+        aria-label={`${title}, ${pane.agent ?? "shell"}${word ? `, ${word}` : ""}`}
         aria-current={active ? "true" : undefined}
         onClick={() => select(ref)}
         onContextMenu={(e) => a?.menu(e, items)}
@@ -124,7 +151,7 @@ function AgentCard({ machineId, session, row, reorder, tabRow }: { machineId: st
         title={[sub, pane.cwd].filter(Boolean).join(" · ") || undefined}
       >
         <AgentIcon agent={pane.agent} />
-        <span className="agent-card-title">{pane.title}</span>
+        <span className="agent-card-title">{title}</span>
         {!quiet && idleFor !== null && (
           <span className="row-age" title={`Idle for ${idleLabel(idleFor)}`}>
             {idleLabel(idleFor)}
@@ -132,7 +159,13 @@ function AgentCard({ machineId, session, row, reorder, tabRow }: { machineId: st
         )}
         <StatusMark status={pane.status} seen={seen} agent={!!pane.agent} />
       </button>
-      <button className="agent-card-close" aria-label={`Close ${pane.title}`} title="Close pane" onClick={() => a?.guard(close)}>
+      {lanes && (
+        <button className="lane-toggle" aria-expanded={lanes.open} title={laneSummary(lanes.rows)} onClick={lanes.toggle}>
+          {lanes.rows.length} lanes
+          <ChevronIcon className={"icon chev" + (lanes.open ? " open" : "")} />
+        </button>
+      )}
+      <button className="agent-card-close" aria-label={`Close ${title}`} title="Close pane" onClick={() => a?.guard(close)}>
         <CloseIcon />
       </button>
     </li>
@@ -153,7 +186,17 @@ function WorkspaceGroup({ machineId, session, workspace: ws, rows: all, active }
   const entries = all.map((r) => r.entry);
   const keyOf = (e: PaneEntry) => paneKey({ machine_id: machineId, session, pane_id: e.pane.pane_id });
   // The selected pane always shows, so ⌘J and the palette never land on a hidden row.
-  const shown = all.filter((r) => r.key === selected || (open && (!active || !r.quiet)));
+  // Lanes sit right under their orchestrator and fold behind it; one that needs input, or the
+  // selected one, still shows.
+  const lanesKey = `lanes:${machineId}/${session}/${ws.workspace_id}`;
+  const lanesOpen = useApp((s) => s.expanded[lanesKey] ?? false);
+  const laneRows = all.filter((r) => r.role === "lane");
+  const orch = all.find((r) => r.role === "orch");
+  const ordered = orch ? all.filter((r) => r.role !== "lane").flatMap((r) => (r === orch ? [r, ...laneRows] : [r])) : all;
+  const inView = (r: Row) =>
+    r.role === "lane" ? lanesOpen || r.entry.pane.status === "blocked" : !active || !r.quiet;
+  const shown = ordered.filter((r) => r.key === selected || (open && inView(r)));
+  const lanes = orch && { rows: laneRows, open: lanesOpen, toggle: () => toggle(lanesKey, lanesOpen) };
   const need = entries.filter((e) => {
     if (!e.pane.agent) return false;
     return e.pane.status === "blocked" || (e.pane.status === "done" && !doneSeen[keyOf(e)]);
@@ -210,12 +253,12 @@ function WorkspaceGroup({ machineId, session, workspace: ws, rows: all, active }
               >
                 <ul className="agent-cards">
                   {run.map((r) => (
-                    <AgentCard key={r.entry.pane.pane_id} machineId={machineId} session={session} row={r} reorder={reorder} />
+                    <AgentCard key={r.entry.pane.pane_id} machineId={machineId} session={session} row={r} reorder={reorder} lanes={r === orch ? lanes || undefined : undefined} />
                   ))}
                 </ul>
               </li>
             ) : (
-              <AgentCard key={run[0].entry.pane.pane_id} machineId={machineId} session={session} row={run[0]} reorder={reorder} tabRow />
+              <AgentCard key={run[0].entry.pane.pane_id} machineId={machineId} session={session} row={run[0]} reorder={reorder} lanes={run[0] === orch ? lanes || undefined : undefined} tabRow />
             ),
           )}
         </ul>
@@ -322,12 +365,14 @@ function SessionPanes({ machineId, session }: { machineId: string; session: Sess
   const now = useMinuteClock();
   const groups = workspaceGroups(session).map((g) => ({
     workspace: g.workspace,
-    rows: g.entries.map((entry): Row => {
-      const key = paneKey({ machine_id: machineId, session: session.name, pane_id: entry.pane.pane_id });
-      return { entry, key, ...paneState(entry.pane, !!doneSeen[key], since[key], now) };
-    }),
+    rows: ((roles) =>
+      g.entries.map((entry, i): Row => {
+        const key = paneKey({ machine_id: machineId, session: session.name, pane_id: entry.pane.pane_id });
+        return { entry, key, role: roles[i], ...paneState(entry.pane, !!doneSeen[key], since[key], now) };
+      }))(paneRoles(g.entries.map((e) => ({ tabLabel: e.tab.label, pane: e.pane })))),
   }));
-  const kept = (r: Row) => !r.quiet || r.key === selected;
+  // A lane counts only while it needs the user: the rest is its orchestrator's.
+  const kept = (r: Row) => r.key === selected || (r.role === "lane" ? r.entry.pane.status === "blocked" : !r.quiet);
   const count = groups.reduce((n, g) => n + g.rows.filter(kept).length, 0);
   // Active drops a workspace whose panes it all leaves out; an empty one stays, to add to it.
   const visible = active ? groups.filter((g) => g.rows.length === 0 || g.rows.some(kept)) : groups;

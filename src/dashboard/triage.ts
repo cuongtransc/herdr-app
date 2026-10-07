@@ -3,7 +3,8 @@ import { dashboardCards } from "./buckets";
 import type { DashCard } from "./buckets";
 
 /** The panes ⌘J walks: waiting for input first, longest waiting first, then Done and unseen,
- *  oldest first. A pane with no known status time comes after the timed ones of its kind. */
+ *  oldest first; a lane's Done is its orchestrator's to read, not the user's. A pane with no
+ *  known status time comes after the timed ones of its kind. */
 export function triageQueue(
   machines: Record<string, MachineView>,
   order: string[],
@@ -15,7 +16,7 @@ export function triageQueue(
   // Array.prototype.sort is stable, so untimed panes keep their sidebar order.
   return [
     ...cards.filter((c) => c.bucket === "attention").sort(oldest),
-    ...cards.filter((c) => c.bucket === "done").sort(oldest),
+    ...cards.filter((c) => c.bucket === "done" && !c.lane).sort(oldest),
   ];
 }
 

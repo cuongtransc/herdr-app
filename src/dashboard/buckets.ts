@@ -1,3 +1,4 @@
+import { tabRole } from "../agents/roles";
 import { paneKey } from "../lib/types";
 import type { AgentStatus, MachineView, PaneRef, PaneView, SessionView, WorkspaceView } from "../lib/types";
 
@@ -19,6 +20,8 @@ export interface DashCard {
   workspace: WorkspaceView;
   pane: PaneView;
   bucket: Bucket;
+  /** In a `lane-*` tab: a worker whose done goes to its orchestrator, not to the user. */
+  lane: boolean;
 }
 
 /** A pane's column: Done only until the user has seen it, then Idle. */
@@ -49,7 +52,8 @@ export function dashboardCards(
             if (!pane.agent) continue;
             const ref = { machine_id: machine.id, session: session.name, pane_id: pane.pane_id };
             const key = paneKey(ref);
-            cards.push({ key, ref, machine, session, workspace, pane, bucket: bucketOf(pane.status, !!doneSeen[key]) });
+            const lane = tabRole(tab.label) === "lane";
+            cards.push({ key, ref, machine, session, workspace, pane, bucket: bucketOf(pane.status, !!doneSeen[key]), lane });
           }
     }
   }
