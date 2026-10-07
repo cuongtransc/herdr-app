@@ -340,6 +340,26 @@ describe("AgentList lanes", () => {
     expect(screen.getByRole("button", { name: "ipscope — Wave 2, claude, blocked" }).closest("li")?.className).toContain("lane-row");
   });
 
+  it("keeps the lane toggle clear of the row's age and status word: they sit left of its slot", () => {
+    const idle = structuredClone(lanes);
+    idle.sessions[0].workspaces[0].tabs[0].panes[0].status = "idle";
+    useApp.setState({ machines: { local: idle }, statusSince: { "local/default/o": Date.now() - 5 * 60_000 } });
+    const { unmount } = render(<AgentList />);
+    const card = screen.getByRole("button", { name: /^BMF-OMS review/ });
+    const order = [...card.children].map((c) => c.className);
+    const slot = order.findIndex((c) => c.includes("lane-slot"));
+    expect(slot).toBeGreaterThan(order.findIndex((c) => c.includes("row-age")));
+    expect(card.querySelector(".lane-slot")?.textContent).toBe(screen.getByRole("button", { name: "3 lanes" }).textContent);
+    unmount();
+    const blocked = structuredClone(lanes);
+    blocked.sessions[0].workspaces[0].tabs[0].panes[0].status = "blocked";
+    useApp.setState({ machines: { local: blocked } });
+    render(<AgentList />);
+    const b = [...screen.getByRole("button", { name: /^BMF-OMS review/ }).children].map((c) => c.className);
+    expect(b.findIndex((c) => c.includes("lane-slot"))).toBeGreaterThan(b.findIndex((c) => c.includes("agent-input")));
+    expect(b.findIndex((c) => c.includes("lane-slot"))).toBeLessThan(b.findIndex((c) => c.includes("mark-blocked")));
+  });
+
   it("opens every lane under the orchestrator, in tab order", () => {
     render(<AgentList />);
     fireEvent.click(screen.getByRole("button", { name: "3 lanes" }));

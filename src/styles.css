@@ -578,13 +578,15 @@ kbd {
    ends in a muted "N lanes" toggle, left of its status mark. */
 .lane-row .agent-card { padding-left: 32px; }
 .lane-row .agent-card-title { font-weight: 400; }
-.has-lanes .agent-card-title { margin-right: 64px; }
 .lane-toggle {
-  position: absolute; top: 50%; right: 34px; transform: translateY(-50%);
+  /* Right over its twin (.lane-slot): the row's 10px padding, the 8px mark, one --s-4 gap. */
+  position: absolute; top: 50%; right: 26px; transform: translateY(-50%);
   display: inline-flex; align-items: center; gap: 2px; height: 20px; padding: 0 4px;
   border: 0; border-radius: var(--r-sm); background: none; color: var(--fg-3); font-size: var(--fs-xs); cursor: pointer;
 }
 .lane-toggle:hover { background: var(--hover); color: var(--fg-2); }
+/* The toggle's invisible twin inside the row: same box, in the flow, so the age and the status word stop left of it. */
+.lane-toggle.lane-slot { position: static; transform: none; flex: none; visibility: hidden; }
 .lane-toggle .chev { width: 10px; height: 10px; transition: transform var(--t-fast); }
 .lane-toggle .chev.open { transform: rotate(90deg); }
 /* Where a dragged tab will land: a line in the gap before or after the tab's row. */
