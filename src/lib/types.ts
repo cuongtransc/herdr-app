@@ -161,3 +161,16 @@ export type QuotaOutcome =
   | { kind: "noSubscription" }
   | { kind: "rateLimited"; until: number }
   | { kind: "failed"; reason: string };
+
+export interface CtaAccount {
+  provider: string;
+  account: string;
+  windows: QuotaWindow[];
+  polledAt: number | null;
+  status: string;
+  detail: string;
+}
+export type CtaQuota =
+  | { kind: "missing" }
+  | { kind: "ok"; accounts: CtaAccount[]; readAt: number }
+  | { kind: "failed"; reason: string };
