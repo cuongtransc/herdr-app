@@ -167,8 +167,13 @@ confirmation while tabs and workspaces confirm.
 
 ### 4.4 Counts and pills
 
-- Outside the Board, the only count is **"N need you"** (blocked + done unseen, as `triageQueue`
-  defines it), in amber, hidden at 0, the same in the sidebar, the titlebar and the focus pill.
+- Outside the Board, counts come from the ⌘J queue (`triageQueue`: blocked, then done and unseen),
+  hidden at 0. Where there is room for words they are split, **"N waiting · N done"** (waiting in
+  `--amber-text`, done in `--green-text`), because a single "need you" sent the user looking for
+  amber rows when the count was Done panes: the focus pill and the Agents column head do this. The
+  Board button and Session rows, with only room for a number, show the total.
+- A count that names things is also the way to them: the focus pill and the Agents column head
+  step to the next one (in the session, for the column head), as ⌘J does.
 - Working/done/idle counts live in the Board's column heads, labelled.
 
 ## 5. Accessibility checklist
