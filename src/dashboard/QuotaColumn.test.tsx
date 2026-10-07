@@ -100,6 +100,24 @@ describe("QuotaColumn", () => {
     expect(within(items[3]).getByText("5%")).toBeTruthy();
   });
 
+  it("preserves raw cta percentages while bounding only the bar widths", async () => {
+    ctaMock.mockResolvedValue({ kind: "ok", readAt: Date.now(), accounts: [
+      { provider: "opencode-go", account: "a1", polledAt: null, status: "ok", detail: "",
+        windows: [
+          { label: "5h", usedPercent: 130, resetsAt: null, durationSecs: 18_000 },
+          { label: "week", usedPercent: -4, resetsAt: null, durationSecs: 604_800 },
+        ] },
+    ] });
+    render(<QuotaColumn />);
+    const col = screen.getByRole("region", { name: "Quota" });
+    await waitFor(() => expect(within(col).getByText("130%")).toBeTruthy());
+    expect(within(col).getByText("-4%")).toBeTruthy();
+    const over = within(col).getByText("130%").closest(".dash-quota-window");
+    const under = within(col).getByText("-4%").closest(".dash-quota-window");
+    expect((over?.querySelector(".fill") as HTMLElement).style.width).toBe("100%");
+    expect((under?.querySelector(".fill") as HTMLElement).style.width).toBe("0%");
+  });
+
   it("shows one stale age for a failed cta account with retained windows", async () => {
     vi.useFakeTimers({ toFake: ["Date"] });
     const now = Date.now();

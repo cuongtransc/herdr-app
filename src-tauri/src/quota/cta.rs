@@ -158,7 +158,8 @@ pub fn parse_board(stdout: &[u8]) -> Option<Vec<CtaAccount>> {
                 .flatten()
                 .filter_map(|window| {
                     let label = window.get("window")?.as_str()?.to_owned();
-                    let used_percent = window.get("used_pct")?.as_f64()?.clamp(0.0, 100.0);
+                    // ADR 0005: cta owns the values; only the UI bar bounds its width.
+                    let used_percent = window.get("used_pct")?.as_f64()?;
                     let resets_at = window.get("resets_at").and_then(parse_date);
                     let duration_secs = window
                         .get("duration_s")
@@ -268,7 +269,7 @@ mod tests {
                     },
                     QuotaWindow {
                         label: "week · Fable".into(),
-                        used_percent: 100.0,
+                        used_percent: 120.0,
                         resets_at: None,
                         duration_secs: Some(WEEK)
                     },
@@ -293,6 +294,19 @@ mod tests {
         );
         assert_eq!(accounts[3].provider, "codex");
         assert!(accounts[3].windows.is_empty());
+    }
+
+    #[test]
+    fn preserves_raw_percentages_outside_zero_to_one_hundred() {
+        let accounts = parse_board(
+            br#"{"accounts":[{"provider":"opencode-go","account":"a","windows":[
+                {"window":"5h","used_pct":130},
+                {"window":"week","used_pct":-4}
+            ]}]}"#,
+        )
+        .unwrap();
+        assert_eq!(accounts[0].windows[0].used_percent, 130.0);
+        assert_eq!(accounts[0].windows[1].used_percent, -4.0);
     }
 
     #[test]
@@ -380,6 +394,97 @@ mod tests {
         assert_eq!(calls(tmp.path()), "ledger quota --json\n");
     }
 
+    async fn wait_for_file(path: &Path) {
+        tokio::time::timeout(Duration::from_secs(5), async {
+            while !path.exists() {
+                tokio::time::sleep(Duration::from_millis(10)).await;
+            }
+        })
+        .await
+        .expect("fake cta did not reach its checkpoint");
+    }
+
+    #[tokio::test]
+    async fn captures_read_at_after_the_read_completes() {
+        let tmp = tempfile::tempdir().unwrap();
+        let cta = fake(
+            tmp.path(),
+            &format!(
+                "touch \"$(dirname \"$0\")/ready\"\n\
+                 while [ ! -f \"$(dirname \"$0\")/release\" ]; do sleep 0.01; done\n\
+                 echo '{ONE}'"
+            ),
+        );
+        let task = tokio::spawn(async move { run(&cta, false, FAST).await });
+        wait_for_file(&tmp.path().join("ready")).await;
+        // The read has started but cannot finish until we release the fake.
+        // Separate the millisecond clock bounds to catch a timestamp taken at start.
+        tokio::time::sleep(Duration::from_millis(30)).await;
+        let before_release = chrono::Utc::now().timestamp_millis();
+        std::fs::write(tmp.path().join("release"), "").unwrap();
+        let CtaQuota::Ok { read_at, .. } = task.await.unwrap() else {
+            panic!("not ok")
+        };
+        let after_read = chrono::Utc::now().timestamp_millis();
+        assert!(
+            read_at >= before_release,
+            "read_at predates the completed read"
+        );
+        assert!(read_at <= after_read, "read_at is in the future");
+    }
+
+    #[tokio::test]
+    async fn kills_and_reaps_a_timed_out_read_process() {
+        let tmp = tempfile::tempdir().unwrap();
+        let cta = fake(
+            tmp.path(),
+            // exec keeps the recorded PID and avoids leaving a shell's sleep child.
+            "echo $$ > \"$(dirname \"$0\")/pid.tmp\"\n\
+             mv \"$(dirname \"$0\")/pid.tmp\" \"$(dirname \"$0\")/pid\"\n\
+             exec sleep 30",
+        );
+        let short = Timeouts {
+            read: Duration::from_secs(1),
+            poll: Duration::from_secs(1),
+        };
+        let task = tokio::spawn(async move { run(&cta, false, short).await });
+        wait_for_file(&tmp.path().join("pid")).await;
+        let pid: i32 = std::fs::read_to_string(tmp.path().join("pid"))
+            .unwrap()
+            .trim()
+            .parse()
+            .unwrap();
+        assert!(pid > 0);
+        assert_eq!(
+            unsafe { libc::kill(pid, 0) },
+            0,
+            "fake cta must be alive before timeout"
+        );
+        let result = task.await.unwrap();
+        // kill_on_drop and Tokio's reaper need not finish at the same instant
+        // that the timeout returns. ESRCH, not just a nonzero exit, proves gone.
+        let gone = tokio::time::timeout(Duration::from_secs(5), async {
+            loop {
+                if unsafe { libc::kill(pid, 0) } == -1 {
+                    return std::io::Error::last_os_error().raw_os_error();
+                }
+                tokio::time::sleep(Duration::from_millis(10)).await;
+            }
+        })
+        .await;
+        if gone.is_err() {
+            // Clean up even when a regression leaves the fake process alive.
+            unsafe { libc::kill(pid, libc::SIGKILL) };
+        }
+        assert_eq!(gone, Ok(Some(libc::ESRCH)), "timed-out cta still exists");
+        assert_eq!(
+            result,
+            CtaQuota::Failed {
+                reason: "cta timed out".into()
+            }
+        );
+    }
+
     #[tokio::test]
     async fn polls_first_and_ignores_the_poll_exit_status() {
         let tmp = tempfile::tempdir().unwrap();
@@ -418,7 +523,7 @@ mod tests {
             let cta = fake(tmp.path(), body);
             assert_eq!(run(&cta, false, FAST).await, want, "body: {body}");
         }
-        let slow = fake(tmp.path(), "sleep 5");
+        let slow = fake(tmp.path(), "exec sleep 5");
         let short = Timeouts {
             read: Duration::from_millis(200),
             poll: Duration::from_millis(200),
