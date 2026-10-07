@@ -20,12 +20,13 @@ export function dismissToast(id: number) {
   emit();
 }
 
-/** Show a toast that dismisses itself after 5 s. */
-export function showToast(text: string, { alert = true }: { alert?: boolean } = {}) {
+/** Show a toast that dismisses itself after `ms` (5 s by default); returns its id for dismissToast. */
+export function showToast(text: string, { alert = true, ms = DISMISS_MS }: { alert?: boolean; ms?: number } = {}): number {
   const id = nextId++;
   items = [...items, { id, text, alert }];
   emit();
-  setTimeout(() => dismissToast(id), DISMISS_MS);
+  setTimeout(() => dismissToast(id), ms);
+  return id;
 }
 
 const subscribe = (cb: () => void) => {

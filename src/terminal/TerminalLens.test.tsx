@@ -52,6 +52,7 @@ vi.mock("@xterm/addon-fit", () => ({ FitAddon: class { fit() {} } }));
 vi.mock("./unicode", () => ({ applyUnicode11: vi.fn() }));
 vi.mock("./osc52", () => ({ applyOsc52: vi.fn() }));
 vi.mock("./copyOnSelect", () => ({ applyCopyOnSelect: () => () => {} }));
+vi.mock("./selectHint", () => ({ applyDragHint: () => () => {}, applyOptionCursor: () => () => {} }));
 vi.mock("./wheel", () => ({ applyWheelScroll: vi.fn() }));
 vi.mock("./webgl", () => ({ showWebgl: vi.fn(), forgetWebgl: vi.fn() }));
 vi.mock("../settings/theme", () => ({ watchTermTheme: () => () => {} }));
