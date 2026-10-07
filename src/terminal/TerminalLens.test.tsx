@@ -17,7 +17,7 @@ class FakeTerminal {
   cols = 80;
   rows = 24;
   disposed = false;
-  constructor() {
+  constructor(readonly options: Record<string, unknown> = {}) {
     terms.push(this);
   }
   open(container: HTMLElement) {
@@ -114,6 +114,13 @@ afterEach(async () => {
 
 // Each test uses its own terminal id so entries left cached by one cannot leak into another.
 const mount = () => render(<TerminalLens pane={pane} terminalId={`t${n++}`} />);
+
+describe("TerminalLens colours", () => {
+  it("raises any text colour below 4.5:1 against its cell, in either theme", () => {
+    mount();
+    expect(terms[0].options.minimumContrastRatio).toBe(4.5);
+  });
+});
 
 describe("TerminalLens xterm lifetime", () => {
   it("keeps the xterm of a visible pane whose process exited", async () => {

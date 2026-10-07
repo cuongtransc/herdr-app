@@ -1,5 +1,12 @@
 import type { ITheme } from "@xterm/xterm";
 
+/**
+ * xterm darkens (or lightens) any text colour below this ratio against its cell when drawing, so
+ * programs that pick colours for a dark background (white, light 256-colour greys, truecolor)
+ * stay readable in light mode. 4.5:1 is the app-wide text floor (docs/design/ui-ux-guidelines.md §3.5).
+ */
+export const TERM_MIN_CONTRAST = 4.5;
+
 /** xterm colors; `background` matches `--surface-term` in styles.css. */
 export const TERM_THEME: ITheme = {
   background: "#1a1b1f",
