@@ -3,10 +3,20 @@ use crate::{
     attach::{attach_argv, AttachEvent, AttachKey, AttachManager, Sink},
     complete::{self, SlashCommand},
     error::AppError,
+    files::{
+        all::{self, FileList},
+        changed::{self, Changed},
+        list::{self, Entry},
+        paths::{check_rel, resolve_root},
+        read::{self, FileContent},
+        transfer,
+        watch::{watch_refusal, WatchEvent},
+        watch_manager::{FilesWatch, WatchSink},
+    },
     git::{self, GitStatus},
     herdr::rpc,
     layout::LayoutStore,
-    machines::MachineManager,
+    machines::{self, MachineManager},
     sshconfig,
     transcript::{self, ChatEvent, ChatItem, ChatManager, Located},
     transport::{self, ssh::master_argv},
@@ -718,4 +728,151 @@ pub async fn layout_save(
     tokio::task::spawn_blocking(move || store.save(&layout))
         .await
         .map_err(|e| AppError::new("io", e.to_string()))?
+}
+
+/// Resolves `root` on a Machine; every `files_*` command goes through it.
+fn files_root(mgr: &MachineManager, machine_id: &str, root: &str) -> Result<String, AppError> {
+    resolve_root(&mgr.info(machine_id)?.home, root)
+}
+
+#[tauri::command]
+pub async fn files_list_dir(
+    mgr: Mgr<'_>,
+    machine_id: String,
+    root: String,
+    rel: String,
+    show_heavy: Option<bool>,
+) -> Result<Vec<Entry>, AppError> {
+    let root = files_root(&mgr, &machine_id, &root)?;
+    let t = mgr.transport(&machine_id)?;
+    list::list_dir(&*t, &root, &rel, show_heavy.unwrap_or(false)).await
+}
+
+#[tauri::command]
+pub async fn files_list_all(
+    mgr: Mgr<'_>,
+    machine_id: String,
+    root: String,
+) -> Result<FileList, AppError> {
+    let home = mgr.info(&machine_id)?.home;
+    let root = resolve_root(&home, &root)?;
+    let t = mgr.transport(&machine_id)?;
+    all::list_all(&*t, &home, &root).await
+}
+
+#[tauri::command]
+pub async fn files_read(
+    mgr: Mgr<'_>,
+    machine_id: String,
+    root: String,
+    rel: String,
+) -> Result<FileContent, AppError> {
+    let root = files_root(&mgr, &machine_id, &root)?;
+    let t = mgr.transport(&machine_id)?;
+    read::read_file(&*t, &root, &rel).await
+}
+
+/// The git changes under a Workspace root, for the Files overlay's CHANGED group.
+#[tauri::command]
+pub async fn files_changed(
+    mgr: Mgr<'_>,
+    machine_id: String,
+    root: String,
+) -> Result<Changed, AppError> {
+    let root = files_root(&mgr, &machine_id, &root)?;
+    let t = mgr.transport(&machine_id)?;
+    changed::changed(&*t, &root).await
+}
+
+#[tauri::command]
+pub async fn files_image(
+    mgr: Mgr<'_>,
+    machine_id: String,
+    root: String,
+    rel: String,
+) -> Result<tauri::ipc::Response, AppError> {
+    let root = files_root(&mgr, &machine_id, &root)?;
+    let t = mgr.transport(&machine_id)?;
+    read::read_image(&*t, &root, &rel)
+        .await
+        .map(tauri::ipc::Response::new)
+}
+
+#[tauri::command]
+pub async fn files_watch(
+    mgr: Mgr<'_>,
+    watch: State<'_, Arc<FilesWatch>>,
+    machine_id: String,
+    root: String,
+    events: Channel<WatchEvent>,
+) -> Result<u64, AppError> {
+    let info = mgr.info(&machine_id)?;
+    let root = resolve_root(&info.home, &root)?;
+    if let Some(why) = watch_refusal(&info.home, &root) {
+        return Err(AppError::new("invalid", why));
+    }
+    let transport = mgr.transport(&machine_id)?;
+    let files_watch = Arc::clone(&watch);
+    // A Channel that can no longer deliver means the UI is gone: stop this watch.
+    let sink = move |id: u64| -> WatchSink {
+        Arc::new(move |e: WatchEvent| {
+            if let Err(err) = events.send(e) {
+                tracing::warn!("files watch event send failed, stopping it: {err}");
+                files_watch.stop(id);
+            }
+        })
+    };
+    Ok(watch.start(transport, machine_id == machines::LOCAL, root, sink))
+}
+
+#[tauri::command]
+pub fn files_unwatch(watch: State<'_, Arc<FilesWatch>>, id: u64) {
+    watch.stop(id);
+}
+
+#[tauri::command]
+pub async fn files_upload(
+    mgr: Mgr<'_>,
+    machine_id: String,
+    root: String,
+    dest_rel: String,
+    sources: Vec<String>,
+) -> Result<Vec<String>, AppError> {
+    let root = files_root(&mgr, &machine_id, &root)?;
+    check_rel(&dest_rel)?;
+    let sources = transfer::check_sources(&sources)?;
+    let dest = transfer::join_abs(&root, &dest_rel);
+    let t = mgr.transport(&machine_id)?;
+    // Every name, not the tree's listing: that one hides heavy folders and is capped.
+    let existing = list::list_names(&*t, &root, &dest_rel).await?;
+    if machine_id == crate::machines::LOCAL {
+        transfer::check_upload_into_self(std::path::Path::new(&dest), &sources)?;
+    }
+    tokio::task::spawn_blocking(move || transfer::upload(&*t, &dest, &existing, sources))
+        .await
+        .map_err(|e| AppError::new("io", e.to_string()))?
+}
+
+#[tauri::command]
+pub async fn files_download(
+    mgr: Mgr<'_>,
+    machine_id: String,
+    root: String,
+    rel: String,
+) -> Result<String, AppError> {
+    let root = files_root(&mgr, &machine_id, &root)?;
+    let (parent, name) = transfer::download_target(&root, &rel)?;
+    let downloads = transfer::downloads_dir()?;
+    if machine_id == crate::machines::LOCAL {
+        transfer::check_download_contains_downloads(
+            &std::path::Path::new(&parent).join(&name),
+            &downloads,
+        )?;
+    }
+    let t = mgr.transport(&machine_id)?;
+    let saved =
+        tokio::task::spawn_blocking(move || transfer::download(&*t, &parent, &name, &downloads))
+            .await
+            .map_err(|e| AppError::new("io", e.to_string()))??;
+    Ok(saved.to_string_lossy().into_owned())
 }

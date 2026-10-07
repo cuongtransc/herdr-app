@@ -2,7 +2,7 @@
 use crate::error::AppResult;
 use crate::transport::{exec, Transport};
 
-const SKIP: &[&str] = &[
+pub const SKIP_DIRS: &[&str] = &[
     ".git",
     "node_modules",
     ".venv",
@@ -14,25 +14,39 @@ const SKIP: &[&str] = &[
     ".next",
     ".worktrees",
 ];
+
+/// A `find` expression that prunes the `SKIP_DIRS` folders (files with those names are kept);
+/// follow it with `-o` and what to print.
+pub fn find_prune() -> String {
+    let names = SKIP_DIRS
+        .iter()
+        .map(|n| format!("-name {n}"))
+        .collect::<Vec<_>>()
+        .join(" -o ");
+    format!("\\( -type d \\( {names} \\) \\) -prune")
+}
+
 const MAX_DEPTH: usize = 6;
 const MAX_FILES: usize = 5000;
+
+/// Whether `dir` is the home folder (trailing `/` ignored). Scanning it would walk
+/// `~/Library` and trigger macOS privacy prompts, so callers refuse it.
+pub fn is_home(home: &str, dir: &str) -> bool {
+    dir.trim_end_matches('/') == home.trim_end_matches('/')
+}
 
 /// Paths relative to `cwd`, `/`-separated and sorted; empty when `cwd` is missing or
 /// is the home folder, which would scan `~/Library` and trigger macOS privacy prompts.
 pub async fn list_files(t: &dyn Transport, home: &str, cwd: &str) -> AppResult<Vec<String>> {
     // The home folder holds no project files, so skip it before running anything.
-    if cwd.trim_end_matches('/') == home.trim_end_matches('/') {
+    if is_home(home, cwd) {
         return Ok(Vec::new());
     }
-    let skip = SKIP
-        .iter()
-        .map(|n| format!("-name {n}"))
-        .collect::<Vec<_>>()
-        .join(" -o ");
+    let prune = find_prune();
     // Only folders are pruned: a file named `build` is still listed.
     // -maxdepth goes first: GNU find warns when it follows other expressions.
     let script = format!(
-        "cd \"$1\" 2>/dev/null || exit 0; find . -maxdepth {MAX_DEPTH} \\( -type d \\( {skip} \\) \\) -prune -o -type f -print | head -n {MAX_FILES}"
+        "cd \"$1\" 2>/dev/null || exit 0; find . -maxdepth {MAX_DEPTH} {prune} -o -type f -print | head -n {MAX_FILES}"
     );
     let argv = vec![
         "sh".to_string(),

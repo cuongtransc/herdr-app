@@ -17,6 +17,7 @@ import { QuotaStrip } from "./sidebar/QuotaStrip";
 import { guardFileDrops } from "./sidebar/dnd";
 import { AgentList } from "./agents/AgentList";
 import { AgentDashboard } from "./dashboard/AgentDashboard";
+import { toggleFilesOverlay } from "./files/FilesEntry";
 import { openNewTabHere } from "./agents/newTabShortcut";
 import { paneKey } from "./lib/types";
 import { chosenLens, selectedPane, useApp } from "./store/app";
@@ -88,6 +89,7 @@ function EmptyMain() {
 
 const ChatLens = lazy(() => import("./chat/ChatLens").then((m) => ({ default: m.ChatLens })));
 const TerminalLens = lazy(() => import("./terminal/TerminalLens").then((m) => ({ default: m.TerminalLens })));
+const FilesOverlay = lazy(() => import("./files/FilesOverlay").then((m) => ({ default: m.FilesOverlay })));
 
 export default function App() {
   const upsert = useApp((s) => s.upsertMachine);
@@ -98,6 +100,7 @@ export default function App() {
   const starting = useApp((s) => (s.selected ? !!s.starting[paneKey(s.selected)] : false));
   const [paletteOpen, setPaletteOpen] = useState(false);
   const dashboardOpen = useApp((s) => s.dashboardOpen);
+  const filesOverlay = useApp((s) => s.filesOverlay);
   const chatFontSize = useSettings((s) => s.chatFontSize);
   const chatFontFamily = useSettings((s) => s.chatFontFamily);
   const chatMonoFamily = useSettings((s) => s.chatMonoFamily);
@@ -164,6 +167,12 @@ export default function App() {
         e.preventDefault();
         if (!e.repeat) useApp.getState().setDashboardOpen(!useApp.getState().dashboardOpen);
       }
+      if (e.metaKey && !e.shiftKey && !e.altKey && !e.ctrlKey && e.key.toLowerCase() === "e") {
+        e.preventDefault();
+        if (e.repeat) return;
+        setPaletteOpen(false);
+        toggleFilesOverlay();
+      }
       if (e.metaKey && !e.altKey && !e.ctrlKey && e.key.toLowerCase() === "b") {
         e.preventDefault();
         if (!e.repeat) useLayout.getState().toggle(e.shiftKey ? "focus" : "sidebar");
@@ -171,6 +180,7 @@ export default function App() {
       if (e.metaKey && !e.shiftKey && !e.altKey && !e.ctrlKey && e.key.toLowerCase() === "t") {
         e.preventDefault();
         if (e.repeat) return;
+        useApp.getState().setFilesOverlay(null);
         openNewTabHere().catch((err: unknown) =>
           showToast(`Could not open a new tab: ${(err as { message?: string } | null)?.message ?? String(err)}`),
         );
@@ -234,6 +244,11 @@ export default function App() {
         )}
       </main>
       {dashboardOpen && <AgentDashboard />}
+      {filesOverlay && (
+        <Suspense fallback={null}>
+          <FilesOverlay />
+        </Suspense>
+      )}
       <TriageHud />
       <Toasts />
       {paletteOpen && <Palette onClose={() => setPaletteOpen(false)} />}

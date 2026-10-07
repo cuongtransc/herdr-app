@@ -2,6 +2,7 @@ pub mod attach;
 pub mod commands;
 pub mod complete;
 pub mod error;
+pub mod files;
 pub mod fonts;
 pub mod git;
 pub mod herdr;
@@ -15,6 +16,7 @@ pub mod transport;
 pub mod view;
 
 use std::sync::Arc;
+use tauri::menu::{Menu, MenuItemKind};
 use tauri::{Emitter, Manager};
 
 use attach::AttachManager;
@@ -28,6 +30,8 @@ pub fn run() {
         .plugin(tauri_plugin_clipboard_manager::init())
         .plugin(tauri_plugin_notification::init())
         .plugin(tauri_plugin_opener::init())
+        .plugin(tauri_plugin_dialog::init())
+        .menu(app_menu)
         .invoke_handler(tauri::generate_handler![
             commands::machines_list,
             commands::machine_connect,
@@ -66,6 +70,15 @@ pub fn run() {
             commands::complete_entries,
             commands::complete_dirs,
             commands::chat_git_status,
+            commands::files_list_dir,
+            commands::files_list_all,
+            commands::files_read,
+            commands::files_image,
+            commands::files_changed,
+            commands::files_watch,
+            commands::files_unwatch,
+            commands::files_upload,
+            commands::files_download,
             commands::system_fonts,
             commands::font_face,
             commands::quota_fetch,
@@ -102,6 +115,7 @@ pub fn run() {
             app.manage(mgr.clone());
             app.manage(attach);
             app.manage(chats);
+            app.manage(Arc::new(files::watch_manager::FilesWatch::default()));
             tauri::async_runtime::spawn(async move { mgr.connect_at_startup().await });
             Ok(())
         })
@@ -116,6 +130,24 @@ pub fn run() {
                 }
             }
         });
+}
+
+/// The default menu minus "Close Window": with a single window its Cmd+W quit the app.
+fn app_menu<R: tauri::Runtime>(app: &tauri::AppHandle<R>) -> tauri::Result<Menu<R>> {
+    let menu = Menu::default(app)?;
+    for item in menu.items()? {
+        let Some(sub) = item.as_submenu() else {
+            continue;
+        };
+        for entry in sub.items()? {
+            if let MenuItemKind::Predefined(p) = &entry {
+                if p.text()? == "Close Window" {
+                    sub.remove(p)?;
+                }
+            }
+        }
+    }
+    Ok(menu)
 }
 
 /// Daily-rotating log files under `dir`, keeping the 5 most recent.

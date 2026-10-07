@@ -2,7 +2,7 @@ import { Channel, invoke } from "@tauri-apps/api/core";
 import { listen, type UnlistenFn } from "@tauri-apps/api/event";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import { showToast } from "../ui/Toast";
-import type { AttachEvent, ChatEvent, ChatItem, GitStatus, Located, MachineView, PaneRef, PaneStatusEvent, QuotaOutcome, QuotaProvider, SlashCommand } from "./types";
+import type { AttachEvent, Changed, ChatEvent, ChatItem, FileContent, FileEntry, FileList, GitStatus, Located, MachineView, PaneRef, PaneStatusEvent, QuotaOutcome, QuotaProvider, SlashCommand, WatchEvent } from "./types";
 
 export const machinesList = () => invoke<MachineView[]>("machines_list");
 export const machineConnect = (id: string) => invoke<void>("machine_connect", { id });
@@ -117,3 +117,19 @@ export const chatImage = (p: PaneRef, ref: string) =>
 export const chatClose = (p: PaneRef) =>
   invoke<void>("chat_close", { machineId: p.machine_id, session: p.session, paneId: p.pane_id });
 export const quotaFetch = (provider: QuotaProvider) => invoke<QuotaOutcome>("quota_fetch", { provider });
+
+/** `showHeavy` also lists `.git`, `node_modules` and the other heavy folders. */
+export const filesListDir = (machineId: string, root: string, rel: string, showHeavy = false) =>
+  invoke<FileEntry[]>("files_list_dir", { machineId, root, rel, showHeavy });
+export const filesListAll = (machineId: string, root: string) => invoke<FileList>("files_list_all", { machineId, root });
+export const filesRead = (machineId: string, root: string, rel: string) =>
+  invoke<FileContent>("files_read", { machineId, root, rel });
+export const filesChanged = (machineId: string, root: string) => invoke<Changed>("files_changed", { machineId, root });
+export const filesImage = (machineId: string, root: string, rel: string) =>
+  invoke<ArrayBuffer>("files_image", { machineId, root, rel });
+export const filesWatch = (machineId: string, root: string, events: Channel<WatchEvent>) => invoke<number>("files_watch", { machineId, root, events });
+export const filesUnwatch = (id: number) => invoke<void>("files_unwatch", { id });
+export const filesUpload = (machineId: string, root: string, destRel: string, sources: string[]) =>
+  invoke<string[]>("files_upload", { machineId, root, destRel, sources });
+export const filesDownload = (machineId: string, root: string, rel: string) =>
+  invoke<string>("files_download", { machineId, root, rel });

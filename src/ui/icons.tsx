@@ -22,6 +22,8 @@ function Icon({ children, ...props }: SVGProps<SVGSVGElement> & { children: Reac
 }
 
 export const ChevronIcon = (p: SVGProps<SVGSVGElement>) => <Icon {...p}><path d="M9 6l6 6-6 6" /></Icon>;
+export const MinusIcon = (p: SVGProps<SVGSVGElement>) => <Icon {...p}><path d="M5 12h14" /></Icon>;
+export const FitIcon = (p: SVGProps<SVGSVGElement>) => <Icon {...p}><path d="M15 3h6v6M9 21H3v-6M21 3l-7 7M3 21l7-7" /></Icon>;
 export const PlusIcon = (p: SVGProps<SVGSVGElement>) => <Icon {...p}><path d="M12 5v14M5 12h14" /></Icon>;
 export const GearIcon = (p: SVGProps<SVGSVGElement>) => (
   <Icon {...p}>
@@ -52,6 +54,7 @@ export const TerminalIcon = (p: SVGProps<SVGSVGElement>) => <Icon {...p}><path d
 export const ChatIcon = (p: SVGProps<SVGSVGElement>) => (
   <Icon {...p}><path d="M21 12a8 8 0 0 1-11.6 7.1L4 20l1-4.6A8 8 0 1 1 21 12z" /></Icon>
 );
+export const ArrowUpIcon = (p: SVGProps<SVGSVGElement>) => <Icon {...p}><path d="M12 19V5M6 11l6-6 6 6" /></Icon>;
 export const ArrowDownIcon = (p: SVGProps<SVGSVGElement>) => <Icon {...p}><path d="M12 5v14M6 13l6 6 6-6" /></Icon>;
 export const AlertIcon = (p: SVGProps<SVGSVGElement>) => (
   <Icon {...p}>
@@ -64,6 +67,35 @@ export const CopyIcon = (p: SVGProps<SVGSVGElement>) => (
     <rect x="9" y="9" width="11" height="11" rx="2" />
     <path d="M5 15V6a2 2 0 0 1 2-2h8" />
   </Icon>
+);
+export const FileCopyIcon = (p: SVGProps<SVGSVGElement>) => (
+  <Icon {...p}>
+    <path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z" />
+    <path d="M14 3v5h5M9 13h6M9 17h6" />
+  </Icon>
+);
+export const FileIcon = (p: SVGProps<SVGSVGElement>) => (
+  <Icon {...p}>
+    <path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z" />
+    <path d="M14 3v5h5" />
+  </Icon>
+);
+export const EyeIcon = (p: SVGProps<SVGSVGElement>) => (
+  <Icon {...p}>
+    <path d="M2.06 12.35a1 1 0 0 1 0-.7 10.75 10.75 0 0 1 19.88 0 1 1 0 0 1 0 .7 10.75 10.75 0 0 1-19.88 0" />
+    <circle cx="12" cy="12" r="3" />
+  </Icon>
+);
+export const EyeOffIcon = (p: SVGProps<SVGSVGElement>) => (
+  <Icon {...p}>
+    <path d="M10.73 5.08A10.43 10.43 0 0 1 12 5c4.29 0 8.17 2.62 9.94 6.65a1 1 0 0 1 0 .7 10.8 10.8 0 0 1-1.44 2.49" />
+    <path d="M14.08 14.16a3 3 0 0 1-4.24-4.24" />
+    <path d="M17.48 17.5A10.75 10.75 0 0 1 2.06 12.35a1 1 0 0 1 0-.7 10.8 10.8 0 0 1 4.45-5.14" />
+    <path d="m2 2 20 20" />
+  </Icon>
+);
+export const OutlineIcon = (p: SVGProps<SVGSVGElement>) => (
+  <Icon {...p}><path d="M4 6h16M8 12h12M12 18h8" /></Icon>
 );
 export const CheckIcon = (p: SVGProps<SVGSVGElement>) => <Icon {...p}><path d="M5 12l5 5 9-10" /></Icon>;
 export const StopIcon =(p: SVGProps<SVGSVGElement>) => <Icon {...p}><rect x="7" y="7" width="10" height="10" rx="1.5" /></Icon>;
