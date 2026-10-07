@@ -1,4 +1,5 @@
 import { memo } from "react";
+import type { ReactNode } from "react";
 import { herdrCall, sessionStart } from "../lib/ipc";
 import { paneKey } from "../lib/types";
 import type { AgentStatus, PaneView, SessionView, TabView, WorkspaceView } from "../lib/types";
@@ -71,30 +72,47 @@ function laneSummary(lanes: Row[]): string {
   return parts.filter(([c]) => c > 0).map(([c, w]) => `${c} ${w}`).join(", ");
 }
 
-/** The mark at a row's end: only the states that ask for a look carry one. */
-function StatusMark({ status, seen, agent }: { status: AgentStatus; seen: boolean; agent: boolean }) {
+/** The mark at a row's end: only the states that ask for a look carry one. `slot` goes between the
+ *  word and the mark: the place the lane toggle, laid over the row, covers. */
+function StatusMark({ status, seen, agent, slot }: { status: AgentStatus; seen: boolean; agent: boolean; slot?: ReactNode }) {
   if (status === "blocked")
     return (
       <>
         <span className="agent-input">Blocked</span>
+        {slot}
         <span className="mark mark-blocked" aria-hidden="true" />
       </>
     );
-  if (status === "working") return <span className="mark mark-working" aria-hidden="true" />;
+  if (status === "working")
+    return (
+      <>
+        {slot}
+        <span className="mark mark-working" aria-hidden="true" />
+      </>
+    );
   if (status === "done" && !seen)
     return (
       <>
         <span className="agent-review">Review</span>
+        {slot}
         <CheckIcon className="icon mark-done" aria-hidden="true" />
       </>
     );
   if (status === "unknown" && agent)
     return (
-      <span className="mark-unknown" title="herdr can't read this agent's state (started through a wrapper?)">
-        ?
-      </span>
+      <>
+        {slot}
+        <span className="mark-unknown" title="herdr can't read this agent's state (started through a wrapper?)">
+          ?
+        </span>
+      </>
     );
-  return <span className="mark" aria-hidden="true" />;
+  return (
+    <>
+      {slot}
+      <span className="mark" aria-hidden="true" />
+    </>
+  );
 }
 
 type Reorder = ReturnType<typeof useTabReorder>;
@@ -142,6 +160,12 @@ function AgentCard({
         { label: "Close tab", icon: CloseIcon, onSelect: () => a.confirm("Close tab", `Close tab "${tab.label}" and all its panes?`, "Close", call("tab.close", { tab_id: tab.tab_id })) },
       ]
     : [];
+  const laneToggleText = lanes && (
+    <>
+      {lanes.rows.length} lanes
+      <ChevronIcon className={"icon chev" + (lanes.open ? " open" : "")} />
+    </>
+  );
   return (
     <li
       className={"agent-card-item" + (row.role === "lane" ? " lane-row" : "") + (lanes ? " has-lanes" : "") + (tabRow ? reorder.indicatorClass(tab.tab_id) : "")}
@@ -165,12 +189,17 @@ function AgentCard({
             {idleLabel(idleFor)}
           </span>
         )}
-        <StatusMark status={pane.status} seen={seen} agent={!!pane.agent} />
+        <StatusMark
+          status={pane.status}
+          seen={seen}
+          agent={!!pane.agent}
+          // The toggle is a button of its own, so it cannot sit in this one: an invisible twin keeps its room.
+          slot={lanes && <span className="lane-toggle lane-slot" aria-hidden="true">{laneToggleText}</span>}
+        />
       </button>
       {lanes && (
         <button className="lane-toggle" aria-expanded={lanes.open} title={laneSummary(lanes.rows)} onClick={lanes.toggle}>
-          {lanes.rows.length} lanes
-          <ChevronIcon className={"icon chev" + (lanes.open ? " open" : "")} />
+          {laneToggleText}
         </button>
       )}
       <button className="agent-card-close" aria-label={`Close ${title}`} title="Close pane" onClick={() => a?.guard(close)}>
