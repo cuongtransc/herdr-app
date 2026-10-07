@@ -228,6 +228,12 @@ copy of §7.1–§7.3; a Design-canvas `.dc.html`, sample data; screenshots are 
   with no status mark: herdr reports no status for shells, so claiming "working" would be a guess
   (Q3).
 - **Order within a Workspace**: the user's tab order; Active only leaves rows out.
+- **Orchestrator and lanes**: tabs follow the ct-agent contract, `orch-*` the orchestrator,
+  `lane-<slug>` its workers, `brief-*` decision tabs (without an `orch-` tab, the first agent outside
+  lanes and briefs). Lanes sit right under the orchestrator, indented, without the `lane:` prefix,
+  folded behind a muted "N lanes ›" at the end of its row (tooltip: their states). Folded, a lane
+  still shows while it needs input or is selected. A lane's Done is the orchestrator's to read: it
+  is not counted in the head chip, ⌘J, the Board count or the sidebar.
 - **Workspace header**: 24px, label 12px/600 `--fg-2`, the folder's basename only when one is set
   (never "no folder"), a worst-status dot plus count when folded, "+" on hover/focus only. The header
   is a button that folds the Workspace; fold state persists per Workspace, and a fold never hides a

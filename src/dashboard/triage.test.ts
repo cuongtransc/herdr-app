@@ -28,6 +28,15 @@ describe("triageQueue", () => {
     ]);
   });
 
+  it("leaves a lane's Done to its orchestrator but keeps a lane that waits", () => {
+    const m = machine("a", []);
+    m.sessions[0].workspaces[0].tabs = [
+      { tab_id: "t1", label: "lane-caps", number: 1, status: "idle", panes: [pane("ld", "done"), pane("lb", "blocked")] },
+      { tab_id: "t2", label: "1", number: 2, status: "idle", panes: [pane("d", "done")] },
+    ];
+    expect(triageQueue({ a: m }, ["a"], {}, {}).map((c) => c.key)).toEqual([key("a", "lb"), key("a", "d")]);
+  });
+
   it("is empty when nothing waits", () => {
     expect(triageQueue({ a: machine("a", [pane("w", "working")]) }, ["a"], {}, {})).toEqual([]);
   });

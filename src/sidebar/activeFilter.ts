@@ -1,5 +1,6 @@
 import { useMemo } from "react";
 import { create } from "zustand";
+import { tabRole } from "../agents/roles";
 import { paneKey } from "../lib/types";
 import type { MachineView, SessionView } from "../lib/types";
 import { useApp } from "../store/app";
@@ -45,6 +46,8 @@ export function isActiveSession(machine: MachineView, session: SessionView, done
       t.panes.some((p) => {
         if (!p.agent) return false;
         if (p.status === "blocked" || p.status === "working") return true;
+        // A lane's Done is its orchestrator's to read.
+        if (tabRole(t.label) === "lane") return false;
         return p.status === "done" && !doneSeen[paneKey({ machine_id: machine.id, session: session.name, pane_id: p.pane_id })];
       }),
     ),
@@ -60,6 +63,7 @@ export function needYouCount(machine: MachineView, session: SessionView, doneSee
       for (const p of t.panes) {
         if (!p.agent) continue;
         if (p.status === "blocked") n++;
+        else if (tabRole(t.label) === "lane") continue;
         else if (p.status === "done" && !doneSeen[paneKey({ machine_id: machine.id, session: session.name, pane_id: p.pane_id })]) n++;
       }
   return n;
