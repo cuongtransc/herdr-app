@@ -84,7 +84,7 @@ and by how calm it is when nothing needs the user.
   border, no left bar (see §8, D4).
 - **Focus** is the `--ring` (`:focus-visible`), shown together with selection when both apply.
 - **`--accent`** is reserved for focus rings, links and primary buttons; it is never a status.
-- Selected + blocked: neutral fill, the amber dot and INPUT word stay.
+- Selected + blocked: neutral fill, the amber dot and the Blocked word stay.
 
 ### 3.3 Density
 
@@ -140,7 +140,7 @@ The 2026-10 audit, before the rule:
 | dark `--fg-2` / light `--fg-2` on `--surface-1` | 6.69 / 7.12 | passes |
 
 Required token changes: dark `--fg-3` → `#8f929d` (5.2–5.5:1), light `--fg-3` → `#6a6d77`
-(4.8–5.2:1), new `--amber-text` (light `#9a5f08`, 4.85:1; dark = `--amber`) for the INPUT word;
+(4.8–5.2:1), new `--amber-text` (light `#9a5f08`, 4.85:1; dark = `--amber`) for the Blocked word;
 light blue is used for marks, never for text. `--grey` becomes `var(--fg-3)` in both themes.
 Stopped and offline rows drop their `opacity: .7` / `.5`: quiet is `--fg-3` at the new value, nothing
 lower. Vibrancy makes the sidebar backdrop vary with the wallpaper, so check new pairs over both a
@@ -234,7 +234,7 @@ copy of §7.1–§7.3; a Design-canvas `.dc.html`, sample data; screenshots are 
 ### 7.1 Level 2: the Agents column
 
 - **Rows**: one line, 28px. `[16px agent mark] title … [mark slot]`; blocked adds the amber tint and
-  INPUT. No icon tile, no badge line, no unlabelled "1"/"2" tab digits.
+  the word Blocked. No icon tile, no badge line, no unlabelled "1"/"2" tab digits.
 - **PANES All | Active N**: under the column head, the Sessions section's header and vocabulary,
   never scrolled away. Active (the default, persisted) keeps what needs a look: blocked, working,
   done-unseen, an agent whose state herdr cannot read (`?`), an agent idle for under 30 minutes
@@ -334,7 +334,7 @@ trail after the last (possibly nested) Group with no header, reading as its chil
 | # | Question | Positions | Decision |
 |---|---|---|---|
 | D1 | Row height | IA 26px · visual 28 or 32px · platform ≥ 28px for drag targets | **28px**, the same as level 1 |
-| D2 | Status words | IA and visual: words only for exceptions · platform: keep words for accessibility | **Only INPUT** keeps a word; other states get a distinct shape plus an `aria-label` |
+| D2 | Status words | IA and visual: words only for exceptions · platform: keep words for accessibility | **Only Blocked and Review** keep a word; other states get a distinct shape plus an `aria-label` |
 | D3 | Idle mark | platform: a hollow ring · IA and visual: nothing | **Nothing**; idle is the default and the slot keeps titles aligned |
 | D4 | Selection style | visual (1): neutral fill, because `--accent` #7c8cff and `--blue` #5b9dff read alike · visual (2): accent fill and a bar | **Neutral** `--active` fill and weight 600, so "selected" never looks like "working" |
 | D5 | Grouping | IA (1) and visual: keep Workspaces · IA (2): a flat, status-sorted view by default | **Keep Workspaces**, sorted inside by status at settle points; no status-flat view for now (Q1) |

@@ -31,14 +31,34 @@ describe("syncSeenToHerdr", () => {
     stop();
   });
 
-  it("focuses the selected pane when it becomes done", () => {
+  it("focuses the selected pane when it becomes done while the window is focused", () => {
+    const focus = vi.spyOn(document, "hasFocus").mockReturnValue(true);
     const call = vi.fn(() => Promise.resolve());
     const stop = syncSeenToHerdr(call);
-    useApp.getState().upsertMachine(machine("idle"));
-    useApp.getState().select(ref);
-    expect(call).not.toHaveBeenCalled();
-    useApp.getState().upsertMachine(machine("done"));
-    expect(call).toHaveBeenCalledWith("devtuf", "default", "pane.focus", { pane_id: "w1:p1" });
-    stop();
+    try {
+      useApp.getState().upsertMachine(machine("idle"));
+      useApp.getState().select(ref);
+      expect(call).not.toHaveBeenCalled();
+      useApp.getState().upsertMachine(machine("done"));
+      expect(call).toHaveBeenCalledWith("devtuf", "default", "pane.focus", { pane_id: "w1:p1" });
+    } finally {
+      stop();
+      focus.mockRestore();
+    }
+  });
+
+  it("does not focus a newly Done selected pane while the window is unfocused", () => {
+    const focus = vi.spyOn(document, "hasFocus").mockReturnValue(false);
+    const call = vi.fn(() => Promise.resolve());
+    const stop = syncSeenToHerdr(call);
+    try {
+      useApp.getState().upsertMachine(machine("idle"));
+      useApp.getState().select(ref);
+      useApp.getState().upsertMachine(machine("done"));
+      expect(call).not.toHaveBeenCalled();
+    } finally {
+      stop();
+      focus.mockRestore();
+    }
   });
 });

@@ -373,16 +373,65 @@ describe("AgentList lanes", () => {
     expect(rows()).toEqual([
       "BMF-OMS review, claude, in progress",
       "caps — Wave 2, pi, in progress",
-      "search — Wave 2, pi, review",
+      "search — Wave 2, pi, done",
       "ipscope — Wave 2, claude, blocked",
       "cargo watch, shell",
     ]);
+    const done = screen.getByRole("button", { name: "search — Wave 2, pi, done" });
+    expect(within(done).queryByText("Review")).toBeNull();
+    expect(done.querySelector(".agent-review")).toBeNull();
+    expect(screen.getByRole("button", { name: "3 lanes" }).getAttribute("title")).toBe("1 in progress, 1 done, 1 blocked");
+  });
+
+  it("shows a lane-only Done as plain done, not Review, visually or accessibly", () => {
+    const only = structuredClone(lanes);
+    only.sessions[0].workspaces[0].tabs = [only.sessions[0].workspaces[0].tabs[2]];
+    useApp.setState({ machines: { local: only } });
+    usePaneFilter.setState({ filter: "all" });
+    render(<AgentList />);
+    const row = screen.getByRole("button", { name: "π - lane: search — Wave 2, pi, done" });
+    expect(within(row).queryByText("Review")).toBeNull();
+    expect(row.querySelector(".agent-review")).toBeNull();
+    expect(screen.queryByRole("button", { name: /pi, review/ })).toBeNull();
   });
 
   it("keeps a selected lane in view while folded", () => {
     useApp.setState({ selected: { machine_id: "local", session: "default", pane_id: "l1" } });
     render(<AgentList />);
     expect(rows()).toContain("caps — Wave 2, pi, in progress");
+  });
+
+  it("leaves an unseen Done lane out of a folded workspace's needs-you badge in All", () => {
+    const idle = structuredClone(lanes);
+    const ws = idle.sessions[0].workspaces[0];
+    ws.tabs[0].panes[0].status = "idle";
+    ws.tabs = [ws.tabs[0], ws.tabs[2]];
+    useApp.setState({ machines: { local: idle } });
+    usePaneFilter.setState({ filter: "all" });
+    render(<AgentList />);
+    fireEvent.click(screen.getByRole("button", { name: "bmf-oms" }));
+    expect(screen.getByRole("button", { name: "bmf-oms" }).getAttribute("aria-expanded")).toBe("false");
+    expect(screen.getByRole("group", { name: "bmf-oms" }).querySelector(".need")).toBeNull();
+  });
+
+  it("counts a blocked lane but not an unseen Done lane on a folded workspace", () => {
+    usePaneFilter.setState({ filter: "all" });
+    render(<AgentList />);
+    fireEvent.click(screen.getByRole("button", { name: "bmf-oms" }));
+    expect(screen.getByRole("button", { name: "bmf-oms, 1 needs you" }).getAttribute("aria-expanded")).toBe("false");
+    expect(screen.getByRole("group", { name: "bmf-oms" }).querySelector(".need")?.textContent).toBe("1");
+  });
+
+  it.each([false, true])("counts a non-lane's Done only when unseen on a folded workspace (seen: %s)", (seen) => {
+    const done = structuredClone(lanes);
+    done.sessions[0].workspaces[0].tabs[0].panes[0].status = "done";
+    useApp.setState({ machines: { local: done }, doneSeen: seen ? { "local/default/o": true } : {} });
+    usePaneFilter.setState({ filter: "all" });
+    render(<AgentList />);
+    fireEvent.click(screen.getByRole("button", { name: "bmf-oms" }));
+    const label = seen ? "bmf-oms, 1 needs you" : "bmf-oms, 2 need you";
+    expect(screen.getByRole("button", { name: label }).getAttribute("aria-expanded")).toBe("false");
+    expect(screen.getByRole("group", { name: "bmf-oms" }).querySelector(".need")?.textContent).toBe(seen ? "1" : "2");
   });
 
   it("leaves a lane's done to the orchestrator: the head chip counts only what waits on the user", () => {

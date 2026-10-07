@@ -50,6 +50,15 @@ describe("sessionProjects", () => {
     expect(sessionProjects(machine, seen, { ["m/s/" + done.pane_id]: true }, false)).toEqual([]);
   });
 
+  it("excludes a lane-only workspace with unseen Done from review and Active", () => {
+    const done = pane("done");
+    const s = session([ws("lane-only", [tab("lane-caps", done)])]);
+    expect(sessionProjects(machine, s, {}, false)).toEqual([]);
+    expect(sessionProjects(machine, s, {}, true)).toEqual([
+      { id: "lane-only", label: "lane-only", state: "quiet", lanes: 0, target: ref(done) },
+    ]);
+  });
+
   it("lists every workspace under All, the quiet ones too, opening the orchestrator or the first pane", () => {
     const idle = pane("idle");
     const sh = pane("unknown", null);
@@ -80,6 +89,11 @@ describe("sessionProjects, recently active", () => {
       { id: "a", label: "a", state: "recent", lanes: 0, target: ref(idle), idleFor: 12 * MIN },
       { id: "b", label: "b", state: "recent", lanes: 0, target: ref(seen), idleFor: 2 * MIN },
     ]);
+  });
+  it("does not count a recently Done lane in a lane-only workspace as Active", () => {
+    const done = pane("done");
+    const s = session([ws("lane-only", [tab("lane-caps", done)])]);
+    expect(sessionProjects(machine, s, {}, false, { ["m/s/" + done.pane_id]: now - MIN }, now)).toEqual([]);
   });
   it("does not keep a project for its lane going idle", () => {
     const orch = pane("idle");

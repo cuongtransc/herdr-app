@@ -1,5 +1,5 @@
 import type { MachineView } from "../lib/types";
-import { dashboardCards } from "./buckets";
+import { countsForUser, dashboardCards } from "./buckets";
 import type { DashCard } from "./buckets";
 
 /** The panes ⌘J walks: waiting for input first, longest waiting first, then Done and unseen,
@@ -16,7 +16,7 @@ export function triageQueue(
   // Array.prototype.sort is stable, so untimed panes keep their sidebar order.
   return [
     ...cards.filter((c) => c.bucket === "attention").sort(oldest),
-    ...cards.filter((c) => c.bucket === "done" && !c.lane).sort(oldest),
+    ...cards.filter((c) => c.bucket === "done" && countsForUser(c)).sort(oldest),
   ];
 }
 

@@ -1,5 +1,5 @@
 import { IDLE_KEPT_MS } from "../agents/paneFilter";
-import { paneRoles } from "../agents/roles";
+import { paneRoles, tabRole } from "../agents/roles";
 import { paneKey } from "../lib/types";
 import type { MachineView, PaneRef, PaneView, SessionView } from "../lib/types";
 
@@ -41,10 +41,10 @@ export function sessionProjects(
     const roles = paneRoles(panes);
     const agents = panes.filter((p) => p.pane.agent);
     const blocked = agents.find((p) => p.pane.status === "blocked");
-    const review = panes.find((p, i) => p.pane.agent && roles[i] !== "lane" && p.pane.status === "done" && !doneSeen[paneKey(ref(p.pane))]);
+    const review = panes.find((p) => p.pane.agent && tabRole(p.tabLabel) !== "lane" && p.pane.status === "done" && !doneSeen[paneKey(ref(p.pane))]);
     const working = agents.some((p) => p.pane.status === "working");
-    const ages = panes.flatMap((p, i) => {
-      const t = p.pane.agent && roles[i] !== "lane" ? since[paneKey(ref(p.pane))] : undefined;
+    const ages = panes.flatMap((p) => {
+      const t = p.pane.agent && tabRole(p.tabLabel) !== "lane" ? since[paneKey(ref(p.pane))] : undefined;
       return t === undefined || now - t > IDLE_KEPT_MS ? [] : [now - t];
     });
     const idleFor = ages.length ? Math.min(...ages) : null;
