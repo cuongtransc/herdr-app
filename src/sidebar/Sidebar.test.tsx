@@ -45,7 +45,7 @@ describe("Sidebar", () => {
     // The Session row carries no count: its project rows say what needs the user.
     expect(within(screen.getByRole("region", { name: "Sessions" })).getByText("default").closest("button")!.querySelector(".need")).toBeNull();
   });
-  it("Active keeps a session and its project for 30 minutes after its agent stopped, saying how long ago", () => {
+  it("Active keeps a session and its project for a while after its agent stopped, saying how long ago", () => {
     const idle = structuredClone(m);
     idle.sessions[0].workspaces[0].tabs[0].panes[0].status = "idle";
     useApp.setState({ machines: { box: idle }, doneSeen: {}, statusSince: { "box/default/w1:p1": Date.now() - 12 * 60_000 } });

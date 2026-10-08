@@ -67,10 +67,12 @@ describe("useSessionFilter", () => {
 
 describe("isActiveSession, recently active", () => {
   const MIN = 60_000;
-  it("keeps a session whose agent changed in the last 30 minutes", () => {
+  it("keeps a session whose agent changed within the Active window (1h by default)", () => {
     const s = session("a", [pane("p", "idle")]);
     expect(isActiveSession(machine, s, {}, { "m/a/p": 100 * MIN - 5 * MIN }, 100 * MIN)).toBe(true);
-    expect(isActiveSession(machine, s, {}, { "m/a/p": 100 * MIN - 31 * MIN }, 100 * MIN)).toBe(false);
+    expect(isActiveSession(machine, s, {}, { "m/a/p": 100 * MIN - 59 * MIN }, 100 * MIN)).toBe(true);
+    expect(isActiveSession(machine, s, {}, { "m/a/p": 100 * MIN - 61 * MIN }, 100 * MIN)).toBe(false);
+    expect(isActiveSession(machine, s, {}, { "m/a/p": 100 * MIN - 20 * MIN }, 100 * MIN, 15 * MIN)).toBe(false);
     expect(isActiveSession(machine, s, {}, {}, 100 * MIN)).toBe(false);
   });
 });

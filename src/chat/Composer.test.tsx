@@ -759,6 +759,17 @@ describe("Composer prompt history", () => {
     expect(box.value).toBe("/c");
   });
 
+  it("leaves Up to the completion list while it is still loading", () => {
+    vi.mocked(completeCommands).mockReset().mockReturnValue(new Promise(() => {}));
+    recordPrompt("devtuf/default/w1:p1", "fix the bug");
+    render(<Composer pane={pane} agent="claude" />);
+    const box = screen.getByRole<HTMLTextAreaElement>("textbox");
+    type(box, "/c");
+    expect(screen.getByRole("listbox")).toBeTruthy();
+    up(box);
+    expect(box.value).toBe("/c");
+  });
+
   it("does not record a failed send", async () => {
     vi.mocked(herdrCall).mockRejectedValueOnce({ code: "timeout", message: "timed out" });
     render(<Composer pane={pane} agent="claude" />);

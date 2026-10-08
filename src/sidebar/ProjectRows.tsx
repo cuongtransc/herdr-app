@@ -1,5 +1,5 @@
 import { useMemo } from "react";
-import { idleLabel, useMinuteClock } from "../agents/paneFilter";
+import { idleLabel, useActiveKeptMs, useMinuteClock } from "../agents/paneFilter";
 import type { MachineView, SessionView } from "../lib/types";
 import { useApp } from "../store/app";
 import { CheckIcon, StarIcon, StarOffIcon } from "../ui/icons";
@@ -27,7 +27,8 @@ export function useProjects(machine: MachineView, session: SessionView): { rows:
   const since = useApp((s) => s.statusSince);
   const now = useMinuteClock();
   const all = useSessionFilter((s) => s.filter === "all");
-  const rows = useMemo(() => sessionProjects(machine, session, doneSeen, all, since, now), [machine, session, doneSeen, all, since, now]);
+  const keptMs = useActiveKeptMs();
+  const rows = useMemo(() => sessionProjects(machine, session, doneSeen, all, since, now, keptMs), [machine, session, doneSeen, all, since, now, keptMs]);
   const selectedWs = useSelectedWorkspace(machine.id, session);
   const fromTree = useViewOrigin((s) => s.from === "sessions");
   return { rows, current: fromTree && rows.some((r) => r.id === selectedWs) ? selectedWs : null };

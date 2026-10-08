@@ -79,16 +79,18 @@ describe("sessionProjects", () => {
 describe("sessionProjects, recently active", () => {
   const MIN = 60_000;
   const now = 100 * MIN;
-  it("keeps a project whose agent went idle or was seen Done in the last 30 minutes, with its age", () => {
+  it("keeps a project whose agent went idle or was seen Done within the Active window (1h by default), with its age", () => {
     const idle = pane("idle");
     const seen = pane("done");
     const old = pane("idle");
     const s = session([ws("a", [tab("1", idle)]), ws("b", [tab("1", seen)]), ws("c", [tab("1", old)])]);
-    const since = { ["m/s/" + idle.pane_id]: now - 12 * MIN, ["m/s/" + seen.pane_id]: now - 2 * MIN, ["m/s/" + old.pane_id]: now - 31 * MIN };
+    const since = { ["m/s/" + idle.pane_id]: now - 12 * MIN, ["m/s/" + seen.pane_id]: now - 2 * MIN, ["m/s/" + old.pane_id]: now - 61 * MIN };
     expect(sessionProjects(machine, s, { ["m/s/" + seen.pane_id]: true }, false, since, now)).toEqual([
       { id: "a", label: "a", state: "recent", lanes: 0, target: ref(idle), idleFor: 12 * MIN },
       { id: "b", label: "b", state: "recent", lanes: 0, target: ref(seen), idleFor: 2 * MIN },
     ]);
+    // A 10-minute window keeps only the one Done 2 minutes ago.
+    expect(sessionProjects(machine, s, { ["m/s/" + seen.pane_id]: true }, false, since, now, 10 * MIN).map((r) => r.id)).toEqual(["b"]);
   });
   it("does not count a recently Done lane in a lane-only workspace as Active", () => {
     const done = pane("done");

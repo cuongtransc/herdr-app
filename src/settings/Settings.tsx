@@ -6,6 +6,7 @@ import { FontPicker } from "./FontPicker";
 import { NEW_AGENT_LENSES, useLensSettings } from "./lens";
 import { useNewTab } from "./newTab";
 import { AGENTS } from "../agents/openAgentTab";
+import { ACTIVE_MINUTES, idleLabel, useActiveWindow } from "../agents/paneFilter";
 import { DEFAULT_QUICK_REPLIES, moveReply, moveReplyTo, QUICK_REPLIES_MAX, QUICK_REPLY_MAX_CHARS, slotAt, useQuickReplies } from "./quickReplies";
 import { CHAT_SIZE, DEFAULTS, TERM_SIZE, useSettings } from "./store";
 import { THEME_PREFS, useTheme } from "./theme";
@@ -43,6 +44,7 @@ function Stepper({
 function GeneralSettings() {
   const [notify, setNotify] = useState(notificationsEnabled);
   const newTab = useNewTab();
+  const active = useActiveWindow();
   return (
     <>
       <div className="setting-row">
@@ -62,6 +64,23 @@ function GeneralSettings() {
         </div>
       </div>
       <p className="note">⌘T opens a tab next to the selected pane, in its workspace's folder.</p>
+      <div className="setting-row">
+        <span id="active-window-label">Active window</span>
+        <div
+          className="seg seg-n"
+          role="group"
+          aria-labelledby="active-window-label"
+          style={{ "--n": ACTIVE_MINUTES.length, "--i": ACTIVE_MINUTES.indexOf(active.minutes as (typeof ACTIVE_MINUTES)[number]) } as CSSProperties}
+        >
+          <span className="seg-thumb" />
+          {ACTIVE_MINUTES.map((m) => (
+            <button key={m} aria-pressed={m === active.minutes} onClick={() => active.setMinutes(m)}>
+              {idleLabel(m * 60_000)}
+            </button>
+          ))}
+        </div>
+      </div>
+      <p className="note">How long an idle agent stays in Active, in Sessions and Panes. Blocked, working and unread Done agents always stay.</p>
       <label className="switch">
         <span>Notifications</span>
         <input

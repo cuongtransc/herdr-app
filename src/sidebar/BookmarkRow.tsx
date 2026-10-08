@@ -1,5 +1,5 @@
 import { useMemo } from "react";
-import { useMinuteClock } from "../agents/paneFilter";
+import { useActiveKeptMs, useMinuteClock } from "../agents/paneFilter";
 import { useApp } from "../store/app";
 import { CheckIcon, StarOffIcon } from "../ui/icons";
 import { useActions } from "./actions";
@@ -20,9 +20,10 @@ export function BookmarkRow({ bookmark: b, nextKey }: { bookmark: RBookmark; nex
   const doneSeen = useApp((s) => s.doneSeen);
   const since = useApp((s) => s.statusSince);
   const now = useMinuteClock();
+  const keptMs = useActiveKeptMs();
   const row = useMemo(
-    () => (b.node ? sessionProjects(b.node.machine, b.node.session, doneSeen, true, since, now).find((r) => r.label === b.label) ?? null : null),
-    [b, doneSeen, since, now],
+    () => (b.node ? sessionProjects(b.node.machine, b.node.session, doneSeen, true, since, now, keptMs).find((r) => r.label === b.label) ?? null : null),
+    [b, doneSeen, since, now, keptMs],
   );
   const select = useApp((s) => s.select);
   const setOrigin = useViewOrigin((s) => s.set);
