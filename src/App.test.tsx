@@ -1,5 +1,5 @@
-import { act, fireEvent, render, screen } from "@testing-library/react";
-import { describe, expect, it, vi } from "vitest";
+import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("@tauri-apps/api/core", () => ({ invoke: vi.fn().mockResolvedValue([]), Channel: class {} }));
 vi.mock("@tauri-apps/api/event", () => ({ listen: vi.fn().mockResolvedValue(() => {}) }));
@@ -11,7 +11,9 @@ vi.mock("./terminal/TerminalLens", async () => {
 
 import App from "./App";
 import { useSettingsOpen } from "./settings/Settings";
-import { useApp } from "./store/app";
+import { activeItem, useApp } from "./store/app";
+import { itemKey, NO_ITEMS } from "./store/openItems";
+import { useFilesPanel } from "./files/panelStore";
 import { useLensSettings } from "./settings/lens";
 import { useLayout } from "./settings/layout";
 import { DEFAULTS as FONT_DEFAULTS, useSettings } from "./settings/store";
@@ -78,23 +80,6 @@ describe("App shell", () => {
     expect(screen.queryByRole("dialog", { name: "Agent Dashboard" })).toBeNull();
   });
 
-  it("⌘E with no selection toasts, with a selection toggles the Files overlay", () => {
-    useApp.setState({ machines: {}, order: [], selected: null, dashboardOpen: false, filesOverlay: null });
-    render(<App />);
-    fireEvent.keyDown(window, { key: "e", metaKey: true });
-    expect(screen.getByText("Select a workspace first")).toBeTruthy();
-    useApp.setState({
-      machines: { local: { id: "local", label: "local", kind: "local", state: "connected", error: null, version: null, status: "idle", sessions: [{ name: "default", running: true, status: "idle", error: null, workspaces: [
-        { workspace_id: "w1", label: "app", number: 1, status: "idle", tabs: [{ tab_id: "t1", label: "t", panes: [{ pane_id: "p1", cwd: "/r" }] }] },
-      ] }] } } as never,
-      selected: { machine_id: "local", session: "default", pane_id: "p1" },
-    });
-    fireEvent.keyDown(window, { key: "e", metaKey: true });
-    expect(useApp.getState().filesOverlay).toMatchObject({ workspace_id: "w1" });
-    fireEvent.keyDown(window, { key: "e", metaKey: true });
-    expect(useApp.getState().filesOverlay).toBeNull();
-  });
-
   it("⌘+ and ⌘− size the open terminal's font, and leave the page alone without a pane", () => {
     const pane = { machine_id: "local", session: "default", pane_id: "w1:p7" };
     useSettings.setState({ ...FONT_DEFAULTS });
@@ -115,13 +100,6 @@ describe("App shell", () => {
     useApp.setState({ machines: {}, order: [], selected: null });
     expect(fireEvent.keyDown(window, { key: "=", code: "Equal", metaKey: true })).toBe(true);
     useSettings.setState({ ...FONT_DEFAULTS });
-  });
-
-  it("⌘T closes the Files overlay", () => {
-    useApp.setState({ machines: {}, order: [], selected: null, dashboardOpen: false, filesOverlay: { machine_id: "local", session: "default", workspace_id: "w1" } });
-    render(<App />);
-    fireEvent.keyDown(window, { key: "t", metaKey: true });
-    expect(useApp.getState().filesOverlay).toBeNull();
   });
 
   it("shows the loading overlay, not the empty state, while a new pane's agent starts before herdr reports the pane", () => {
@@ -176,7 +154,7 @@ describe("App shell", () => {
       const { invoke } = await import("@tauri-apps/api/core");
       const focused = vi.spyOn(document, "hasFocus").mockReturnValue(false);
       try {
-        useApp.setState({ machines: {}, order: [], selected: null, dashboardOpen: false, filesOverlay: null, doneSeen: {}, lens: { "local/default/w1:p1": "terminal" } });
+        useApp.setState({ machines: {}, order: [], selected: null, dashboardOpen: false, doneSeen: {}, lens: { "local/default/w1:p1": "terminal" } });
         render(<App />);
         useApp.getState().upsertMachine(machine("working"));
         useApp.getState().select(ref);
@@ -201,7 +179,7 @@ describe("App shell", () => {
       const { invoke } = await import("@tauri-apps/api/core");
       const focused = vi.spyOn(document, "hasFocus").mockReturnValue(false);
       try {
-        useApp.setState({ machines: {}, order: [], selected: null, dashboardOpen: false, filesOverlay: null, doneSeen: {}, lens: { "local/default/w1:p1": "terminal" } });
+        useApp.setState({ machines: {}, order: [], selected: null, dashboardOpen: false, doneSeen: {}, lens: { "local/default/w1:p1": "terminal" } });
         render(<App />);
         useApp.getState().upsertMachine(machine("working"));
         useApp.getState().select(ref);
@@ -345,4 +323,101 @@ describe("App shell", () => {
       useLayout.setState({ layout: "normal" });
     });
   });
+  describe("open files", () => {
+    // The File viewer is lazy and drags in react-markdown and lowlight: importing it cold took
+    // 0.4 s alone and 0.8 s under load, so a loaded gate ran past findBy's 1 s on the first open.
+    beforeAll(async () => {
+      await import("./files/FileViewer");
+    });
+
+    const ws = { machine_id: "local", session: "default", workspace_id: "w1" };
+    const p1 = { machine_id: "local", session: "default", pane_id: "p1" };
+    beforeEach(async () => {
+      localStorage.clear();
+      const { invoke } = await import("@tauri-apps/api/core");
+      (invoke as any).mockImplementation((cmd: string) =>
+        Promise.resolve(cmd === "files_list_all" ? { paths: [], capped: false, refused: false } : cmd === "files_read" ? { kind: "text", text: "x", truncated: false, size: 1, mtime: 1 } : cmd === "files_watch" ? 1 : []),
+      );
+      useApp.setState({
+        machines: { local: { id: "local", label: "local", kind: "local", state: "connected", error: null, version: null, status: "idle", sessions: [{ name: "default", running: true, status: "idle", error: null, workspaces: [
+          { workspace_id: "w1", label: "app", number: 1, status: "idle", tabs: [{ tab_id: "t1", label: "t", panes: [{ pane_id: "p1", cwd: "/r", agent: "claude", title: "a", status: "idle", terminal_id: "x" }] }] },
+        ] }] } } as never,
+        order: ["local"],
+        selected: null,
+        openItems: NO_ITEMS,
+        dashboardOpen: false,
+      });
+      useFilesPanel.setState(useFilesPanel.getInitialState(), true);
+      useApp.getState().select(p1);
+    });
+
+    afterEach(async () => {
+      const { invoke } = await import("@tauri-apps/api/core");
+      (invoke as any).mockImplementation(() => Promise.resolve([]));
+      useApp.setState({ machines: {}, order: [], selected: null, openItems: NO_ITEMS });
+    });
+
+    it("shows the active file item in the main area and the lens again when it closes", async () => {
+      render(<App />);
+      act(() => useApp.getState().openFile(ws, "/r", "a.txt", { pin: false }));
+      expect(await screen.findByLabelText("Copy path")).toBeTruthy();
+      fireEvent.keyDown(window, { key: "w", metaKey: true });
+      await waitFor(() => expect(screen.queryByLabelText("Copy path")).toBeNull());
+      expect(useApp.getState().selected?.pane_id).toBe("p1");
+      expect(useApp.getState().openItems.active).toBeNull();
+      // The selected agent with no active item: its lens, not a blank main area.
+      await waitFor(() => expect(document.querySelector(".main .chat-lens, .main .term-lens")).toBeTruthy());
+      expect(document.querySelector(".main .header")).toBeTruthy();
+    });
+
+    it("keeps the strip above the empty state when no pane is selected", async () => {
+      render(<App />);
+      act(() => useApp.getState().select(null));
+      expect(screen.getByText("Select a pane")).toBeTruthy();
+      act(() => useApp.getState().openFile(ws, "/r", "a.txt", { pin: false }));
+      expect(await screen.findByLabelText("Copy path")).toBeTruthy();
+      expect(document.querySelector(".main")!.textContent).toContain("a.txt");
+      act(() => useApp.getState().closeItems(useApp.getState().openItems.active!, "one"));
+      expect(await screen.findByText("Select a pane")).toBeTruthy();
+    });
+
+    it("⌘E leaves Focus, whose hidden agents column holds the Files panel", () => {
+      useLayout.setState({ layout: "focus" });
+      render(<App />);
+      fireEvent.keyDown(window, { key: "e", metaKey: true });
+      expect(useLayout.getState().layout).toBe("normal");
+      expect(useFilesPanel.getState().focusTick).toBe(1);
+    });
+
+    it("⌘E expands the Files panel and focuses it", () => {
+      useFilesPanel.setState({ collapsed: true });
+      render(<App />);
+      fireEvent.keyDown(window, { key: "e", metaKey: true });
+      expect(useFilesPanel.getState().collapsed).toBe(false);
+      expect(useFilesPanel.getState().focusTick).toBe(1);
+    });
+
+    it("⌘P focuses Go to file, but not while the palette is open", () => {
+      render(<App />);
+      fireEvent.keyDown(window, { key: "p", metaKey: true });
+      expect(useFilesPanel.getState().gotoTick).toBe(1);
+      fireEvent.keyDown(window, { key: "k", metaKey: true });
+      expect(screen.getByRole("dialog")).toBeTruthy();
+      fireEvent.keyDown(window, { key: "p", metaKey: true });
+      expect(useFilesPanel.getState().gotoTick).toBe(1);
+    });
+
+    it("⌘⇧] moves to the next open item", () => {
+      render(<App />);
+      act(() => {
+        useApp.getState().pinItem(itemKey({ kind: "agent", ref: useApp.getState().selected! }));
+        useApp.getState().openFile(ws, "/r", "a.txt", { pin: true });
+      });
+      fireEvent.keyDown(window, { key: "]", code: "BracketRight", metaKey: true, shiftKey: true });
+      expect(activeItem(useApp.getState())?.kind).toBe("agent");
+      fireEvent.keyDown(window, { key: "[", code: "BracketLeft", metaKey: true, shiftKey: true });
+      expect(activeItem(useApp.getState())?.kind).toBe("file");
+    });
+  });
+
 });

@@ -4,7 +4,7 @@ export interface PathRef {
   line: number | null;
 }
 
-/** Where a click on a path goes: the Files overlay (inside the workspace folder) or this Mac. */
+/** Where a click on a path goes: a file tab (inside the workspace folder) or this Mac. */
 export type PathTarget = { kind: "files"; abs: string; line: number | null } | { kind: "file"; abs: string };
 
 const MAX_LEN = 512;

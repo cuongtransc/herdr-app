@@ -2,7 +2,9 @@ import { fireEvent, render, screen } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 vi.mock("../lib/ipc", () => ({ chatImage: vi.fn(), openLocalFile: vi.fn().mockResolvedValue("opened") }));
 import { openLocalFile } from "../lib/ipc";
+import { useFilesBus } from "../files/bus";
 import { useApp } from "../store/app";
+import { NO_ITEMS } from "../store/openItems";
 import { ChatItemView } from "./ChatItemView";
 import { ChatPaneContext } from "./images";
 
@@ -27,7 +29,8 @@ function show(markdown: string) {
 
 beforeEach(() => {
   vi.mocked(openLocalFile).mockClear();
-  useApp.setState({ machines: { m1: machine("local") }, filesOverlay: null, filesRequest: null });
+  useApp.setState({ machines: { m1: machine("local") }, openItems: NO_ITEMS });
+  useFilesBus.setState({ jump: null });
 });
 
 describe("paths in chat", () => {
@@ -35,8 +38,9 @@ describe("paths in chat", () => {
     show("See `src/chat/markdown.tsx:34`.");
     fireEvent.click(screen.getByRole("link", { name: "src/chat/markdown.tsx:34" }));
     const s = useApp.getState();
-    expect(s.filesOverlay).toEqual({ machine_id: "m1", session: "s", workspace_id: "w1" });
-    expect(s.filesRequest).toMatchObject({ abs: "/Users/me/app/src/chat/markdown.tsx", line: 34 });
+    const ws = { machine_id: "m1", session: "s", workspace_id: "w1" };
+    expect(s.openItems.items).toEqual([{ kind: "file", ws, root: "/Users/me/app", rel: "src/chat/markdown.tsx" }]);
+    expect(useFilesBus.getState().jump?.hash).toBe("L34");
     expect(openLocalFile).not.toHaveBeenCalled();
   });
 
@@ -44,7 +48,7 @@ describe("paths in chat", () => {
     show("Saved to `/private/tmp/shots/a.png`.");
     fireEvent.click(screen.getByRole("link", { name: "/private/tmp/shots/a.png" }));
     expect(openLocalFile).toHaveBeenCalledWith("/private/tmp/shots/a.png");
-    expect(useApp.getState().filesOverlay).toBeNull();
+    expect(useApp.getState().openItems.items).toEqual([]);
   });
 
   it("leaves a path outside the folder on another machine, and code that is not a path, as code", () => {

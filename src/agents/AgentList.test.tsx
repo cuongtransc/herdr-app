@@ -2,7 +2,10 @@ import { fireEvent, render, screen, within } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 vi.mock("../lib/ipc", () => ({ herdrCall: vi.fn().mockResolvedValue(undefined) }));
 import { herdrCall } from "../lib/ipc";
+import { useFilesPanel } from "../files/panelStore";
+import { panelWorkspace } from "../files/root";
 import { useApp } from "../store/app";
+import { itemKey, NO_ITEMS } from "../store/openItems";
 import { setFolder } from "../workspaces/folder";
 import { AgentList, workspaceGroups } from "./AgentList";
 import { useActiveWindow, usePaneFilter } from "./paneFilter";
@@ -286,11 +289,47 @@ describe("AgentList", () => {
     expect(within(screen.getByRole("group", { name: "web" })).getByText("web", { selector: ".ws-folder" })).toBeTruthy();
   });
 
-  it("opens the workspace's Files from the header menu", () => {
+  it("Browse files selects a pane of the workspace and focuses the file tree", () => {
+    useFilesPanel.setState(useFilesPanel.getInitialState(), true);
     render(<AgentList />);
     fireEvent.contextMenu(screen.getByText("web", { selector: ".ws-label" }));
     fireEvent.click(screen.getByRole("menuitem", { name: "Browse files" }));
-    expect(useApp.getState().filesOverlay).toEqual({ machine_id: "local", session: "default", workspace_id: "w2" });
+    expect(useApp.getState().selected).toEqual({ machine_id: "local", session: "default", pane_id: "p2" });
+    expect(useFilesPanel.getState().focusTick).toBe(1);
+  });
+
+  it("Browse files keeps the selected pane when it is already in that workspace", () => {
+    useFilesPanel.setState(useFilesPanel.getInitialState(), true);
+    useApp.setState({ selected: { machine_id: "local", session: "default", pane_id: "p4" } });
+    render(<AgentList />);
+    fireEvent.contextMenu(screen.getByText("web", { selector: ".ws-label" }));
+    fireEvent.click(screen.getByRole("menuitem", { name: "Browse files" }));
+    expect(useApp.getState().selected?.pane_id).toBe("p4");
+    expect(useFilesPanel.getState().focusTick).toBe(1);
+  });
+
+  it("Browse files leaves a file item of another workspace for the selected pane", () => {
+    useFilesPanel.setState(useFilesPanel.getInitialState(), true);
+    const file = { kind: "file" as const, ws: { machine_id: "local", session: "default", workspace_id: "w1" }, root: "/x", rel: "a.md" };
+    useApp.setState({
+      selected: { machine_id: "local", session: "default", pane_id: "p4" },
+      openItems: { items: [file], preview: null, active: itemKey(file) },
+    });
+    render(<AgentList />);
+    fireEvent.contextMenu(screen.getByText("web", { selector: ".ws-label" }));
+    fireEvent.click(screen.getByRole("menuitem", { name: "Browse files" }));
+    expect(useApp.getState().selected?.pane_id).toBe("p4");
+    expect(panelWorkspace(useApp.getState())).toEqual({ machine_id: "local", session: "default", workspace_id: "w2" });
+    expect(useFilesPanel.getState().focusTick).toBe(1);
+  });
+
+  it("pins the pane's tab on double click", () => {
+    useApp.setState({ openItems: NO_ITEMS });
+    render(<AgentList />);
+    fireEvent.click(screen.getByText("Guard export"));
+    fireEvent.doubleClick(screen.getByText("Guard export"));
+    expect(useApp.getState().openItems.items).toEqual([{ kind: "agent", ref: { machine_id: "local", session: "default", pane_id: "p2" } }]);
+    expect(useApp.getState().openItems.preview).toBeNull();
   });
 
   it("starts an agent from the header menu in the workspace folder", () => {

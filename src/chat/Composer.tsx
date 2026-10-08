@@ -255,6 +255,8 @@ export function Composer({
   };
 
   const call = (method: string, params: unknown) => {
+    // Chatting with an agent keeps its tab.
+    useApp.getState().pinAgent(pane);
     const [m, p] = untracked ? asPaneCall(method, params) : [method, params];
     return herdrCall(pane.machine_id, pane.session, m, p).then(
       () => setError(null),

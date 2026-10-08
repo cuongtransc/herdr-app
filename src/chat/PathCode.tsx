@@ -1,6 +1,7 @@
 import { useContext, useMemo, type ReactNode } from "react";
 import { openLocalFile } from "../lib/ipc";
 import { useApp } from "../store/app";
+import { openInFiles } from "../files/openPath";
 import { resolveRoot } from "../files/root";
 import { showToast } from "../ui/Toast";
 import type { WorkspaceRef } from "../workspaces/folder";
@@ -26,14 +27,15 @@ export function PathCode({ text, children }: { text: string; children?: ReactNod
     const cwd = ws.tabs.flatMap((t) => t.panes).find((p) => p.pane_id === pane.pane_id)?.cwd ?? null;
     const root = resolveRoot(wsRef, ws, cwd)?.path ?? null;
     const target = pathTarget(ref, { root, home: machine.home ?? null, local: machine.kind === "local" });
-    return target && { wsRef, target };
+    return target && { wsRef, root, target };
   }, [pane, ref, machine]);
 
   if (!place) return <code>{children}</code>;
-  const { wsRef, target } = place;
+  const { wsRef, root, target } = place;
   const open = () => {
-    if (target.kind === "files") {
-      useApp.getState().openInFiles(wsRef, target.abs, target.line);
+    // A "files" target is inside `root`, so it is set.
+    if (target.kind === "files" && root) {
+      openInFiles(wsRef, root, target.abs, target.line);
       return;
     }
     openLocalFile(target.abs).then(
