@@ -2,13 +2,15 @@ import { useMemo } from "react";
 import { idleLabel, useMinuteClock } from "../agents/paneFilter";
 import type { MachineView, SessionView } from "../lib/types";
 import { useApp } from "../store/app";
-import { CheckIcon } from "../ui/icons";
+import { CheckIcon, StarIcon, StarOffIcon } from "../ui/icons";
+import { useActions } from "./actions";
+import { projectKey, setBookmarked, useLayout } from "./groups";
 import { useSessionFilter, useViewOrigin } from "./activeFilter";
 import { sessionProjects } from "./projects";
 import type { ProjectRow } from "./projects";
 
 /** The word a project row carries: only the states that ask something of the user have one. */
-const WORD: Partial<Record<ProjectRow["state"], string>> = { blocked: "Blocked", review: "Review" };
+export const WORD: Partial<Record<ProjectRow["state"], string>> = { blocked: "Blocked", review: "Review" };
 
 /** The Workspace holding the selected pane, when it is in this Session. */
 function useSelectedWorkspace(machineId: string, session: SessionView): string | null {
@@ -35,9 +37,18 @@ export function useProjects(machine: MachineView, session: SessionView): { rows:
  * A Session's project rows. Folded, it keeps the ones that ask for the user (Blocked, Review) and the
  * one holding the selected pane, then counts the rest in a row that unfolds the Session.
  */
-export function ProjectRows({ rows, current, folded = false, onUnfold }: { rows: ProjectRow[]; current: string | null; folded?: boolean; onUnfold?: () => void }) {
+export function ProjectRows({ machineId, session, rows, current, folded = false, onUnfold }: {
+  machineId: string;
+  session: string;
+  rows: ProjectRow[];
+  current: string | null;
+  folded?: boolean;
+  onUnfold?: () => void;
+}) {
   const select = useApp((s) => s.select);
   const setOrigin = useViewOrigin((s) => s.set);
+  const bookmarks = useLayout((s) => s.layout.bookmarks);
+  const a = useActions();
   const shown = folded ? rows.filter((r) => WORD[r.state] || r.id === current) : rows;
   const hidden = rows.length - shown.length;
   // Folded with nothing to keep, the Session's closed chevron says it all.
@@ -54,6 +65,14 @@ export function ProjectRows({ rows, current, folded = false, onUnfold }: { rows:
           setOrigin("sessions");
           select(r.target);
         };
+        // A project is what Bookmarks hold (ADR 0006): its row's menu bookmarks it, a star says it is.
+        const key = projectKey(machineId, session, r.label);
+        const marked = bookmarks.includes(key);
+        const bookmarkItem = {
+          label: marked ? "Unbookmark" : "Bookmark",
+          icon: marked ? StarOffIcon : StarIcon,
+          onSelect: () => useLayout.getState().update((l) => setBookmarked(l, key, !marked)),
+        };
         return (
           <li key={r.id}>
             <button
@@ -62,11 +81,13 @@ export function ProjectRows({ rows, current, folded = false, onUnfold }: { rows:
               aria-current={r.id === current ? "true" : undefined}
               aria-label={[r.label, word?.toLowerCase(), lanes, age && `idle ${age}`].filter(Boolean).join(", ")}
               onClick={open}
+              onContextMenu={(e) => a?.menu(e, [bookmarkItem])}
             >
               <span className="slot" aria-hidden="true">
                 {r.state === "review" ? <CheckIcon className="icon mark-done" /> : <span className="project-dot" />}
               </span>
               <span className="label">{r.label}</span>
+              {marked && <StarIcon className="icon bookmark-mark" aria-label="bookmarked" aria-hidden={undefined} />}
               {word ? <span className={"project-word " + r.state}>{word}</span> : (lanes ?? age) && <span className="project-meta">{lanes ?? age}</span>}
             </button>
           </li>

@@ -6,7 +6,7 @@ import { paneKey } from "../lib/types";
 import type { MachineView, SessionView } from "../lib/types";
 import { useApp } from "../store/app";
 import { resolve, sessionKey, useLayout } from "./groups";
-import type { RNode, RSession } from "./groups";
+import type { RBookmark, RNode, RSession } from "./groups";
 
 /** Shared with the other settings writers: one JSON object, each writer merges its own keys. */
 const SETTINGS_KEY = "herdr-app:settings";
@@ -86,11 +86,12 @@ export const useViewOrigin = create<{ from: "bookmarks" | "sessions"; set: (from
   set: (from) => set({ from }),
 }));
 
-/** The resolved sidebar with only the sessions `keep` accepts: order kept, emptied groups dropped. */
+/** The resolved sidebar with only the sessions `keep` accepts: order kept, emptied groups dropped.
+ *  Bookmarks stay whole: a bookmarked project is wanted even while its Session is quiet. */
 export function filterResolved(
-  r: { tree: RNode[]; bookmarks: RSession[] },
+  r: { tree: RNode[]; bookmarks: RBookmark[] },
   keep: (s: RSession) => boolean,
-): { tree: RNode[]; bookmarks: RSession[]; hidden: number; kept: number } {
+): { tree: RNode[]; bookmarks: RBookmark[]; hidden: number; kept: number } {
   let hidden = 0;
   let kept = 0;
   const walk = (nodes: RNode[]): RNode[] =>
@@ -107,11 +108,11 @@ export function filterResolved(
       return children.length ? [{ ...n, children }] : [];
     });
   const tree = walk(r.tree);
-  return { tree, bookmarks: r.bookmarks.filter(keep), hidden, kept };
+  return { tree, bookmarks: r.bookmarks, hidden, kept };
 }
 
 /** The sidebar's sessions under the current filter, and how many Active leaves out. */
-export function useSidebarSessions(): { tree: RNode[]; bookmarks: RSession[]; hidden: number; kept: number; active: boolean } {
+export function useSidebarSessions(): { tree: RNode[]; bookmarks: RBookmark[]; hidden: number; kept: number; active: boolean } {
   const machines = useApp((s) => s.machines);
   const order = useApp((s) => s.order);
   const doneSeen = useApp((s) => s.doneSeen);

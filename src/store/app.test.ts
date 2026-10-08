@@ -225,7 +225,7 @@ describe("layout pruning", () => {
   const box = (state: MachineView["state"], ...names: string[]): MachineView => ({
     id: "box", label: "box", kind: "ssh", state, error: null, version: "0.9.3", status: "unknown", sessions: names.map(sess),
   });
-  const placed = (...keys: string[]) => ({ tree: keys.map((key) => ({ kind: "session" as const, key })), bookmarks: [...keys] });
+  const placed = (...keys: string[]) => ({ tree: keys.map((key) => ({ kind: "session" as const, key })), bookmarks: keys.map((k) => `${k}/app`) });
   const kept = () => useLayout.getState().layout.bookmarks;
   beforeEach(() => {
     useApp.setState({ machines: {}, order: [], selected: null });
@@ -236,26 +236,26 @@ describe("layout pruning", () => {
     useLayout.setState({ layout: placed(sessionKey("box", "a"), sessionKey("box", "b")) });
     useApp.getState().upsertMachine(box("connected", "a", "b"));
     useApp.getState().upsertMachine(box("connected", "a"));
-    expect(kept()).toEqual([sessionKey("box", "a")]);
+    expect(kept()).toEqual([`${sessionKey("box", "a")}/app`]);
     expect(useLayout.getState().layout.tree).toEqual([{ kind: "session", key: sessionKey("box", "a") }]);
   });
   it("keeps everything on a first snapshot, even an empty one", () => {
     useLayout.setState({ layout: placed(sessionKey("box", "a")) });
     useApp.getState().upsertMachine(box("connected"));
-    expect(kept()).toEqual([sessionKey("box", "a")]);
+    expect(kept()).toEqual([`${sessionKey("box", "a")}/app`]);
   });
   it("does not prune for a machine that is not connected", () => {
     useLayout.setState({ layout: placed(sessionKey("box", "a")) });
     useApp.getState().upsertMachine(box("connected", "a"));
     useApp.getState().upsertMachine(box("disconnected"));
     useApp.getState().upsertMachine(box("error"));
-    expect(kept()).toEqual([sessionKey("box", "a")]);
+    expect(kept()).toEqual([`${sessionKey("box", "a")}/app`]);
   });
   it("forgets every session of a removed machine", () => {
     useLayout.setState({ layout: placed(sessionKey("box", "a"), sessionKey("local", "x")) });
     useApp.getState().upsertMachine(box("connected", "a"));
     useApp.getState().removeMachine("box");
-    expect(kept()).toEqual([sessionKey("local", "x")]);
+    expect(kept()).toEqual([`${sessionKey("local", "x")}/app`]);
   });
 });
 

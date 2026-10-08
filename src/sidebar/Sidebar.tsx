@@ -1,7 +1,7 @@
 import { memo, useEffect, useMemo, useState } from "react";
 import { DragContext, useDragState } from "./dnd";
 import type { Drag, Indicator } from "./dnd";
-import { indicatorClass, useBookmarkRowDnd, useBookmarksDropDnd, useTreeRowDnd } from "./useRowDnd";
+import { indicatorClass, useTreeRowDnd } from "./useRowDnd";
 import type { MouseEvent, ReactNode } from "react";
 import {
   machineDisconnect,
@@ -28,16 +28,15 @@ import {
   PlusIcon,
   RefreshIcon,
   ServerIcon,
-  StarIcon,
-  StarOffIcon,
   StopIcon,
   TrashIcon,
   UnplugIcon,
 } from "../ui/icons";
-import { forgetSessions, renameSessionKey, sessionKey, setBookmarked, useLayout } from "./groups";
-import { needYouCount, useSessionFilter, useSidebarSessions, useViewOrigin } from "./activeFilter";
-import type { RSession } from "./groups";
+import { forgetSessions, renameSessionKey, sessionKey, useLayout } from "./groups";
+import { useSessionFilter, useSidebarSessions, useViewOrigin } from "./activeFilter";
+import type { RBookmark, RSession } from "./groups";
 import { GroupTree } from "./GroupTree";
+import { BookmarkRow } from "./BookmarkRow";
 import { ActiveToggle } from "./ActiveToggle";
 import { ProjectRows, useProjects } from "./ProjectRows";
 
@@ -47,53 +46,40 @@ export function Chevron({ open }: { open: boolean }) {
   return <ChevronIcon className={"icon chev" + (open ? " open" : "")} />;
 }
 
-export function SessionRow({ node, bookmark, nextKey = null }: { node: RSession; bookmark?: boolean; nextKey?: string | null }) {
+export function SessionRow({ node }: { node: RSession }) {
   const { machine, session, key } = node;
   const machineId = machine.id;
   const viewed = useApp((s) => s.viewed?.machine_id === machineId && s.viewed.session === session.name);
-  // Of a bookmarked Session's two rows, only the one clicked last reads as selected; the other is "current".
-  const section = bookmark ? "bookmarks" : "sessions";
-  const clickedHere = useViewOrigin((s) => s.from === section);
+  // Opened from a Bookmark, the Session is "current", not selected: the Bookmark row is the lit one.
+  const clickedHere = useViewOrigin((s) => s.from === "sessions");
   const setOrigin = useViewOrigin((s) => s.set);
-  const need = useApp((s) => needYouCount(machine, session, s.doneSeen));
-  // In the tree a Session lists its projects, which carry what needs the user; a Bookmark stays one line.
+  // A Session lists its projects, which carry what needs the user.
   const projects = useProjects(machine, session);
-  const tree = !bookmark;
-  // In the tree a Session with projects folds them; a fold keeps what asks for the user (ProjectRows).
+  // A Session with projects folds them; a fold keeps what asks for the user (ProjectRows).
   const foldKey = `session:${key}`;
   const unfolded = useApp((s) => s.expanded[foldKey] ?? true);
   const toggle = useApp((s) => s.toggle);
-  const foldable = tree && projects.rows.length > 0;
+  const foldable = projects.rows.length > 0;
   const view = useApp((s) => s.view);
-  const bookmarked = useLayout((s) => s.layout.bookmarks.includes(key));
-  const lit = viewed && (clickedHere || !bookmarked) && !(tree && projects.current);
+  const lit = viewed && clickedHere && !projects.current;
   const a = useActions();
   const drag = useDragState();
-  const treeDnd = useTreeRowDnd({ kind: "session", key }, `session:${key}`);
-  const bookmarkDnd = useBookmarkRowDnd(key, nextKey);
-  const dnd = bookmark ? bookmarkDnd : treeDnd;
+  const dnd = useTreeRowDnd({ kind: "session", key }, `session:${key}`);
   const online = machine.state === "connected";
-  const bookmarkItem = {
-    label: bookmarked ? "Unbookmark" : "Bookmark",
-    icon: bookmarked ? StarOffIcon : StarIcon,
-    onSelect: () => useLayout.getState().update((l) => setBookmarked(l, key, !bookmarked)),
-  };
   const moveItem = { label: "Move to group…", icon: FolderInputIcon, onSelect: () => a?.moveToGroup(key) };
   const onMenu = (e: MouseEvent) =>
     a?.menu(
       e,
       !online
-        ? [bookmarkItem, moveItem]
+        ? [moveItem]
         : session.running
         ? [
             { label: "New workspace…", icon: PlusIcon, onSelect: () => a.newWorkspace(machineId, session.name) },
             { label: "Stop session", icon: StopIcon, onSelect: () => a.confirm("Stop session", `Stop session "${session.name}"? Running agents will end.`, "Stop", () => sessionStop(machineId, session.name)) },
-            bookmarkItem,
             moveItem,
           ]
         : [
             { label: "Start session", icon: PlayIcon, onSelect: () => a.guard(() => sessionStart(machineId, session.name)) },
-            bookmarkItem,
             moveItem,
             ...(session.name === "default" ? [] : [{
               label: "Rename session…",
@@ -123,7 +109,7 @@ export function SessionRow({ node, bookmark, nextKey = null }: { node: RSession;
           ],
     );
   const open = () => {
-    setOrigin(section);
+    setOrigin("sessions");
     view({ machine_id: machineId, session: session.name });
   };
   const onClick = !online
@@ -135,7 +121,7 @@ export function SessionRow({ node, bookmark, nextKey = null }: { node: RSession;
     <li className={"session" + (session.running ? "" : " stopped") + (online ? "" : " offline")}>
       <button
         {...dnd}
-        className={"row" + (lit ? " active" : viewed && !(tree && projects.current) ? " current" : "") + (tree ? "" : hl(session.status)) + indicatorClass(drag, bookmark ? `bookmark:${key}` : `session:${key}`)}
+        className={"row" + (lit ? " active" : viewed && !projects.current ? " current" : "") + indicatorClass(drag, `session:${key}`)}
         aria-current={lit ? "true" : undefined}
         aria-label={session.running ? undefined : `Start ${session.name}`}
         aria-disabled={online ? undefined : true}
@@ -149,18 +135,16 @@ export function SessionRow({ node, bookmark, nextKey = null }: { node: RSession;
           }
         }}
       >
-        {/* A Bookmark shows its Session's state; in the tree the fold button sits over this slot. */}
-        <span className="slot" aria-hidden={bookmark ? undefined : "true"}>{bookmark && <StatusDot status={session.status} />}</span>
+        {/* The fold button sits over this slot. */}
+        <span className="slot" aria-hidden="true" />
         <span className="session-name">
           <span className="label">{session.name}</span>
-          {bookmarked && !bookmark && <StarIcon className="icon bookmark-mark" aria-label="bookmarked" aria-hidden={undefined} />}
         </span>
         {machine.kind !== "local" && (
           <span className="machine-chip">
             <span className="badge-label">{machine.label}</span>
           </span>
         )}
-        {!tree && need > 0 && <span className="need" aria-label={`${need} ${need === 1 ? "needs" : "need"} you`}>{need}</span>}
       </button>
       {foldable && (
         // A button of its own, so it cannot sit in the row's button: it covers the row's slot.
@@ -168,7 +152,7 @@ export function SessionRow({ node, bookmark, nextKey = null }: { node: RSession;
           <Chevron open={unfolded} />
         </button>
       )}
-      {foldable && <ProjectRows rows={projects.rows} current={projects.current} folded={!unfolded} onUnfold={() => toggle(foldKey, false)} />}
+      {foldable && <ProjectRows machineId={machineId} session={session.name} rows={projects.rows} current={projects.current} folded={!unfolded} onUnfold={() => toggle(foldKey, false)} />}
       {session.error && <p className="error">{session.error.message}</p>}
     </li>
   );
@@ -294,17 +278,16 @@ function SessionsSection({ kept }: { kept: number }) {
   );
 }
 
-function BookmarksSection({ bookmarks }: { bookmarks: RSession[] }) {
+/** Bookmarked projects (ADR 0006), in the user's order; a project row's menu adds one. */
+function BookmarksSection({ bookmarks }: { bookmarks: RBookmark[] }) {
   const open = useApp((s) => s.expanded["bookmarks"] ?? true);
-  const drag = useDragState();
-  const dnd = useBookmarksDropDnd();
   return (
-    <section aria-label="Bookmarks" className={indicatorClass(drag, "bookmarks").trim()} {...dnd}>
+    <section aria-label="Bookmarks">
       <SectionHeader id="bookmarks" label="Bookmarks" />
       {open && (
         // Under the section header like any section's rows, but not boxed as a Group.
         <ul className="tree section-list">
-          {bookmarks.map((n, i) => <SessionRow key={n.key} node={n} bookmark nextKey={bookmarks[i + 1]?.key ?? null} />)}
+          {bookmarks.map((b, i) => <BookmarkRow key={b.key} bookmark={b} nextKey={bookmarks[i + 1]?.key ?? null} />)}
         </ul>
       )}
     </section>
@@ -336,22 +319,10 @@ export const Sidebar = memo(function Sidebar() {
       document.removeEventListener("drop", end);
     };
   }, [dragging]);
-  // Empty Bookmarks stay hidden, except while a Session is dragged so a first Bookmark can be dropped.
-  const draggingSession = dragging?.kind === "node" && dragging.ref.kind === "session";
-  const [emptyBookmarksShown, setEmptyBookmarksShown] = useState(false);
-  useEffect(() => {
-    if (!draggingSession) {
-      setEmptyBookmarksShown(false);
-      return;
-    }
-    // Inserting the section during dragstart shifts the rows under the pointer and WebKit cancels the drag.
-    const t = setTimeout(() => setEmptyBookmarksShown(true));
-    return () => clearTimeout(t);
-  }, [draggingSession]);
   return (
     <ActionsProvider>
       <DragContext.Provider value={dragState}>
-        {(bookmarks.length > 0 || (draggingSession && emptyBookmarksShown)) && <BookmarksSection bookmarks={bookmarks} />}
+        {bookmarks.length > 0 && <BookmarksSection bookmarks={bookmarks} />}
         <SessionsSection kept={kept} />
         <section aria-label="Machines" className="machines-section">
           <div className="section-head">
