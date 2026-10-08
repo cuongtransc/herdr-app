@@ -9,6 +9,7 @@ import { applyChatFont, fontZoomKey, useSettings, zoomFont } from "./settings/st
 import { applyTheme, useTheme } from "./settings/theme";
 import { Header } from "./main/Header";
 import { LayoutControls } from "./main/LayoutControls";
+import { useDockBadge } from "./main/dockBadge";
 import { TriageHud } from "./main/TriageHud";
 import { useTriage } from "./main/triage";
 import { useLayout } from "./settings/layout";
@@ -93,6 +94,7 @@ const FilesOverlay = lazy(() => import("./files/FilesOverlay").then((m) => ({ de
 
 export default function App() {
   const upsert = useApp((s) => s.upsertMachine);
+  useDockBadge();
   // Only the selected Pane and its ids: a change elsewhere on its Machine does not re-render App.
   const selected = useApp((s) => s.selected);
   const pane = useApp((s) => selectedPane(s)?.pane ?? null);
