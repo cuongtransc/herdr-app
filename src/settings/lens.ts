@@ -6,9 +6,14 @@ const SETTINGS_KEY = "herdr-app:settings";
 
 export const NEW_AGENT_LENSES: readonly LensName[] = ["terminal", "chat"];
 
+/** How wide the chat's column runs: a reading column, a wider one, or the whole pane. */
+export const CHAT_WIDTHS = ["comfortable", "wide", "full"] as const;
+export type ChatWidth = (typeof CHAT_WIDTHS)[number];
+
 export interface LensSettings {
   /** The lens a new agent opens on. On Chat, a pane that falls back to the Terminal for want of a transcript returns to Chat once one exists. */
   newAgentLens: LensName;
+  chatWidth: ChatWidth;
 }
 
 function readRaw(): Record<string, unknown> {
@@ -30,12 +35,18 @@ function save(patch: Record<string, unknown>): void {
 }
 
 export function loadLensSettings(): LensSettings {
-  const v = readRaw().newAgentLens;
-  return { newAgentLens: NEW_AGENT_LENSES.includes(v as LensName) ? (v as LensName) : "terminal" };
+  const raw = readRaw();
+  const v = raw.newAgentLens;
+  const w = raw.chatWidth;
+  return {
+    newAgentLens: NEW_AGENT_LENSES.includes(v as LensName) ? (v as LensName) : "terminal",
+    chatWidth: CHAT_WIDTHS.includes(w as ChatWidth) ? (w as ChatWidth) : "comfortable",
+  };
 }
 
 interface LensSettingsStore extends LensSettings {
   setNewAgentLens: (lens: LensName) => void;
+  setChatWidth: (width: ChatWidth) => void;
 }
 
 export const useLensSettings = create<LensSettingsStore>((setState) => ({
@@ -43,6 +54,10 @@ export const useLensSettings = create<LensSettingsStore>((setState) => ({
   setNewAgentLens: (newAgentLens) => {
     save({ newAgentLens });
     setState({ newAgentLens });
+  },
+  setChatWidth: (chatWidth) => {
+    save({ chatWidth });
+    setState({ chatWidth });
   },
 }));
 

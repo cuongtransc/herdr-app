@@ -22,6 +22,8 @@ beforeEach(() => {
   act(() => createRoot(root).render(<Settings />));
   act(() => useSettingsOpen.getState().show());
   act(() => ([...document.querySelectorAll('[role="tab"]')].find((t) => t.textContent === "Chat") as HTMLElement).click());
+  // The list sits below other Chat settings: scroll it into view, as a user would.
+  document.querySelector(".quick-reply-list")!.scrollIntoView({ block: "center" });
 });
 
 it("drags a reply by its grip to a new place with a real mouse", async () => {

@@ -3,7 +3,7 @@ import { create } from "zustand";
 import { notificationsEnabled, setNotificationsEnabled } from "../notify";
 import { CloseIcon, GearIcon, GripIcon, SearchIcon } from "../ui/icons";
 import { FontPicker } from "./FontPicker";
-import { NEW_AGENT_LENSES, useLensSettings } from "./lens";
+import { CHAT_WIDTHS, NEW_AGENT_LENSES, useLensSettings } from "./lens";
 import { useNewTab } from "./newTab";
 import { AGENTS } from "../agents/openAgentTab";
 import { ACTIVE_MINUTES, idleLabel, useActiveWindow } from "../agents/paneFilter";
@@ -233,6 +233,23 @@ function ChatSettings() {
         </div>
       </div>
       <p className="note">Terminal keeps a new agent on the Terminal until you switch. Chat opens it on Chat once it has started, where you can type its first prompt.</p>
+      <div className="setting-row">
+        <span id="chat-width-label">Chat width</span>
+        <div
+          className="seg seg-n"
+          role="group"
+          aria-labelledby="chat-width-label"
+          style={{ "--n": CHAT_WIDTHS.length, "--i": CHAT_WIDTHS.indexOf(lens.chatWidth) } as CSSProperties}
+        >
+          <span className="seg-thumb" />
+          {CHAT_WIDTHS.map((w) => (
+            <button key={w} aria-pressed={w === lens.chatWidth} onClick={() => lens.setChatWidth(w)}>
+              {w}
+            </button>
+          ))}
+        </div>
+      </div>
+      <p className="note">Comfortable keeps a reading column; Wide gives tables and code more room; Full fills the pane.</p>
       <label className="switch">
         <span>Quick replies</span>
         <input type="checkbox" role="switch" checked={q.show} onChange={(e) => q.setShow(e.target.checked)} />

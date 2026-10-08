@@ -941,6 +941,10 @@ kbd {
 
 /* ---------- Chat lens ---------- */
 .chat-lens { flex: 1; min-height: 0; display: flex; background: var(--surface-0); container-type: inline-size; }
+/* The column's width (Settings › Chat): messages, the working line and the composer share it. */
+.chat-lens { --chat-max: 840px; }
+.chat-lens[data-width="wide"] { --chat-max: 1280px; }
+.chat-lens[data-width="full"] { --chat-max: none; }
 /* The chat's own fonts (Settings › Fonts): prose here, and every `var(--mono)` inside it becomes the chat code font. */
 .chat-lens { font-family: var(--chat-sans); --mono: var(--chat-mono); }
 .chat-main { flex: 1; min-width: 0; min-height: 0; display: flex; flex-direction: column; position: relative; }
@@ -982,7 +986,7 @@ kbd {
 .chat-outline button:hover { background: var(--hover); color: var(--fg); }
 .chat-outline button[aria-current="true"] { border-left-color: var(--accent); color: var(--fg); }
 .chat-scroll { flex: 1; min-height: 0; overflow-y: auto; padding-top: 8px; }
-.chat-row { padding: 8px 28px; max-width: 840px; margin: 0 auto; box-sizing: border-box; user-select: text; -webkit-user-select: text; }
+.chat-row { padding: 8px 28px; max-width: var(--chat-max); margin: 0 auto; box-sizing: border-box; user-select: text; -webkit-user-select: text; }
 /* A user turn stacks its images, the bubble line and its Skill chips, all at the right edge. */
 .chat-user { display: flex; flex-direction: column; align-items: flex-end; gap: 6px; }
 /* Full row width, so the bubble's max-width stays a share of the row. */
@@ -1129,7 +1133,7 @@ kbd {
 }
 .chat-new .icon { width: 14px; height: 14px; }
 .chat-working {
-  flex: none; display: flex; align-items: center; gap: 8px; width: 100%; max-width: 840px; margin: 0 auto;
+  flex: none; display: flex; align-items: center; gap: 8px; width: 100%; max-width: var(--chat-max); margin: 0 auto;
   padding: 6px 28px 0; box-sizing: border-box; color: var(--fg-3); font-size: 12px;
   animation: fade-in var(--t) var(--ease);
 }
@@ -1139,7 +1143,7 @@ kbd {
 .chat-working-dots i:nth-child(3) { animation-delay: 0.3s; }
 @keyframes working-dot { 0%, 60%, 100% { opacity: 0.25; transform: translateY(0); } 30% { opacity: 1; transform: translateY(-3px); } }
 
-.composer { flex: none; padding: 8px 20px 16px; display: flex; flex-direction: column; gap: 6px; width: 100%; max-width: 840px; margin: 0 auto; box-sizing: border-box; }
+.composer { flex: none; padding: 8px 20px 16px; display: flex; flex-direction: column; gap: 6px; width: 100%; max-width: var(--chat-max); margin: 0 auto; box-sizing: border-box; }
 .composer-box {
   position: relative; display: flex; flex-direction: column; gap: 4px; padding: 10px 10px 8px 14px;
   background: var(--surface-2); border: 1px solid var(--line-2); border-radius: var(--r-lg);
