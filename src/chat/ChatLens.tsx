@@ -19,6 +19,7 @@ import { WorkingIndicator } from "./WorkingIndicator";
 import { usePiModelPicker } from "./usePiModelPicker";
 import { usePendingTranscript } from "./pendingTranscript";
 import { ArrowDownIcon } from "../ui/icons";
+import { useLensSettings } from "../settings/lens";
 import { forgetTranscript, rememberedTranscript, rememberTranscript, TranscriptPicker } from "./TranscriptPicker";
 
 /** How long an open that has not answered yet may go without saying the transcript is loading. */
@@ -31,6 +32,7 @@ export function ChatLens({ pane, view }: { pane: PaneRef; view: PaneView }) {
   const key = paneKey(pane);
   const setLensOverride = useApp((s) => s.setLensOverride);
   const machineState = useApp((s) => s.machines[pane.machine_id]?.state);
+  const chatWidth = useLensSettings((s) => s.chatWidth);
   const sawDown = useRef(false);
   const [state, dispatch] = useReducer(reducer, emptyChat);
   const latest = useRef(state);
@@ -268,7 +270,7 @@ export function ChatLens({ pane, view }: { pane: PaneRef; view: PaneView }) {
   return (
     <ChatPaneContext.Provider value={pane}>
     <ChatOpenContext.Provider value={opened}>
-    <div className="chat-lens">
+    <div className="chat-lens" data-width={chatWidth}>
     <div className="chat-main">
       {located && <TranscriptPicker located={located} onChoose={choose} />}
       {err && <div className="chat-notice chat-error">{err.code}: {err.message}</div>}

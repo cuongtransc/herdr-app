@@ -45,6 +45,7 @@ vi.mock("./chatSession", () => ({
 import { chatLocate, herdrCall } from "../lib/ipc";
 import type { PaneView } from "../lib/types";
 import { ChatLens } from "./ChatLens";
+import { useLensSettings } from "../settings/lens";
 
 const pane = { machine_id: "devtuf", session: "default", pane_id: "w1:p1" };
 const idlePi = { status: "idle", agent: "pi", title: "pi" } as PaneView;
@@ -180,6 +181,15 @@ describe("ChatLens", () => {
     render(<ChatLens pane={pane} view={idlePi} />);
     act(() => channels[channels.length - 1].onmessage({ type: "error", error: { code: "io", message: "gone" } }));
     expect(screen.queryByText("Loading transcript…")).toBeNull();
+  });
+
+  it("runs at the chat width chosen in Settings, and follows a change", () => {
+    useLensSettings.setState({ chatWidth: "comfortable" });
+    const { container } = render(<ChatLens pane={pane} view={idlePi} />);
+    const lens = container.querySelector<HTMLElement>(".chat-lens")!;
+    expect(lens.dataset.width).toBe("comfortable");
+    act(() => useLensSettings.getState().setChatWidth("full"));
+    expect(lens.dataset.width).toBe("full");
   });
 
   it("outlines the user turns beside the transcript", () => {

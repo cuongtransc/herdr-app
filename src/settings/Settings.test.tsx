@@ -108,6 +108,24 @@ describe("Settings quick replies", () => {
     expect(loadLensSettings().newAgentLens).toBe("chat");
   });
 
+  it("chooses how wide the chat runs, and remembers it", () => {
+    useLensSettings.setState({ chatWidth: "comfortable" });
+    openChat();
+    const group = screen.getByRole("group", { name: "Chat width" });
+    expect(within(group).getByRole("button", { name: "comfortable" }).getAttribute("aria-pressed")).toBe("true");
+    fireEvent.click(within(group).getByRole("button", { name: "wide" }));
+    expect(useLensSettings.getState().chatWidth).toBe("wide");
+    expect(loadLensSettings().chatWidth).toBe("wide");
+    // Both lens settings share one key: setting one keeps the other.
+    useLensSettings.getState().setNewAgentLens("chat");
+    expect(loadLensSettings()).toEqual({ newAgentLens: "chat", chatWidth: "wide" });
+  });
+
+  it("reads an unknown chat width as comfortable", () => {
+    localStorage.setItem("herdr-app:settings", JSON.stringify({ chatWidth: "huge" }));
+    expect(loadLensSettings().chatWidth).toBe("comfortable");
+  });
+
   it("edits, removes, adds and resets replies", () => {
     openChat();
     fireEvent.change(screen.getByRole("textbox", { name: "Quick reply 1" }), { target: { value: "go on" } });
