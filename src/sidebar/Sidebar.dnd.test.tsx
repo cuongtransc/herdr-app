@@ -2,7 +2,7 @@ import { act, createEvent, fireEvent, render, screen, within } from "@testing-li
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 vi.mock("../lib/ipc", () => ({ sessionStart: vi.fn().mockResolvedValue(undefined) }));
 import { useApp } from "../store/app";
-import { sessionKey, useLayout } from "./groups";
+import { projectKey, sessionKey, useLayout } from "./groups";
 import { useSessionFilter } from "./activeFilter";
 import type { GroupNode } from "./groups";
 import { Sidebar } from "./Sidebar";
@@ -43,14 +43,6 @@ describe("Sidebar drag and drop", () => {
     expect(document.querySelector(".drop-into, .drop-before, .drop-after")).toBeNull();
     // The dragged row was remounted under the group, so its dragend never reached React.
     expect(screen.queryByRole("region", { name: "Bookmarks" })).toBeNull();
-  });
-  it("does not bookmark a session dropped on a bookmark row", () => {
-    useLayout.setState({ layout: { tree: [], bookmarks: [ky] } });
-    render(<Sidebar />);
-    const bm = screen.getByRole("region", { name: "Bookmarks" });
-    const before = useLayout.getState().layout;
-    drag(rowOf("x"), within(bm).getByText("y").closest("button")!);
-    expect(useLayout.getState().layout).toBe(before);
   });
   it("shows an into indicator and inserts first when dropping below an open group with children", () => {
     useLayout.setState({ layout: { tree: [{ kind: "group", id: "a", label: "A", children: [{ kind: "session", key: ky }] }], bookmarks: [] } });
@@ -93,49 +85,16 @@ describe("Sidebar drag and drop", () => {
     expect(dataTransfer.dropEffect).toBe("none");
     fireEvent.dragEnd(rowOf("x"), { dataTransfer });
   });
-  it("clears the Bookmarks highlight when a session drag moves onto a bookmark row", () => {
-    useLayout.setState({ layout: { tree: [], bookmarks: [ky] } });
+  it("reorders bookmarks by drag; a bookmark drag over the tree changes nothing", () => {
+    const [px, py] = [projectKey("local", "x", "app"), projectKey("local", "y", "api")];
+    act(() => useLayout.getState().update((l) => ({ ...l, bookmarks: [px, py] })));
     render(<Sidebar />);
     const bm = screen.getByRole("region", { name: "Bookmarks" });
-    const dataTransfer = dt();
-    fireEvent.dragStart(rowOf("x"), { dataTransfer });
-    fireEvent.dragOver(within(bm).getByText("Bookmarks"), { dataTransfer });
-    expect(document.querySelector(".drop-into")).not.toBeNull();
-    fireEvent.dragOver(within(bm).getByText("y").closest("button")!, { dataTransfer });
-    expect(document.querySelector(".drop-into, .drop-before, .drop-after")).toBeNull();
-    fireEvent.dragEnd(rowOf("x"), { dataTransfer });
-  });
-  it("waits until after dragstart to show empty Bookmarks", () => {
-    vi.useFakeTimers();
-    render(<Sidebar />);
-    const dataTransfer = dt();
-    fireEvent.dragStart(rowOf("x"), { dataTransfer });
-    // Inserting the section during dragstart shifts the rows under the pointer and WebKit cancels the drag.
-    expect(screen.queryByRole("region", { name: "Bookmarks" })).toBeNull();
-    act(() => vi.runOnlyPendingTimers());
-    expect(screen.queryByRole("region", { name: "Bookmarks" })).not.toBeNull();
-    fireEvent.dragEnd(rowOf("x"), { dataTransfer });
-    expect(screen.queryByRole("region", { name: "Bookmarks" })).toBeNull();
-  });
-  it("bookmarks a session dropped on the Bookmarks header and reorders bookmarks", () => {
-    vi.useFakeTimers();
-    render(<Sidebar />);
-    const dataTransfer = dt();
-    fireEvent.dragStart(rowOf("x"), { dataTransfer });
-    act(() => vi.runOnlyPendingTimers());
-    const header = within(screen.getByRole("region", { name: "Bookmarks" })).getByText("Bookmarks");
-    fireEvent.dragOver(header, { dataTransfer });
-    fireEvent.drop(header, { dataTransfer });
-    fireEvent.dragEnd(rowOf("x"), { dataTransfer });
-    expect(useLayout.getState().layout.bookmarks).toEqual([kx]);
-    act(() => useLayout.getState().update((l) => ({ ...l, bookmarks: [...l.bookmarks, ky] })));
-    const bm = screen.getByRole("region", { name: "Bookmarks" });
-    // jsdom rows have no height, so a session row resolves to "after": x moves after y.
-    drag(within(bm).getByText("x").closest("button")!, within(bm).getByText("y").closest("button")!);
-    expect(useLayout.getState().layout.bookmarks).toEqual([ky, kx]);
-    // A bookmark drag over the tree changes nothing.
+    // jsdom rows have no height, so a row resolves to "after": app moves after api.
+    drag(within(bm).getByText("app").closest("button")!, within(bm).getByText("api").closest("button")!);
+    expect(useLayout.getState().layout.bookmarks).toEqual([py, px]);
     const before = useLayout.getState().layout;
-    drag(within(bm).getByText("x").closest("button")!, rowOf("A"));
+    drag(within(bm).getByText("app").closest("button")!, rowOf("A"));
     expect(useLayout.getState().layout).toBe(before);
   });
   it("opens a closed group after hovering 600 ms during a drag", () => {
@@ -157,12 +116,12 @@ describe("Sidebar drag and drop", () => {
     const tree = useLayout.getState().layout.tree;
     expect(tree.map((n) => (n.kind === "group" ? n.id : n.key))).toEqual(["a", ky, kx]);
   });
-  it("does not bookmark a group", () => {
+  it("bookmarks nothing a Session or a Group drag drops on Bookmarks: they hold projects", () => {
+    act(() => useLayout.getState().update((l) => ({ ...l, bookmarks: [projectKey("local", "y", "api")] })));
     render(<Sidebar />);
-    const dataTransfer = dt();
-    fireEvent.dragStart(rowOf("A"), { dataTransfer });
-    expect(screen.queryByRole("region", { name: "Bookmarks" })).toBeNull();
-    fireEvent.dragEnd(rowOf("A"), { dataTransfer });
-    expect(useLayout.getState().layout.bookmarks).toEqual([]);
+    const header = within(screen.getByRole("region", { name: "Bookmarks" })).getByText("Bookmarks");
+    drag(rowOf("x"), header);
+    drag(rowOf("A"), header);
+    expect(useLayout.getState().layout.bookmarks).toEqual([projectKey("local", "y", "api")]);
   });
 });

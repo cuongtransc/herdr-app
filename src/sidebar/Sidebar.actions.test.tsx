@@ -10,7 +10,7 @@ vi.mock("../lib/ipc", () => ({
 import { machineConnect, sessionDelete, sessionRename, sessionsRefresh, sessionStart } from "../lib/ipc";
 import { getFolder, setFolder } from "../workspaces/folder";
 import { useApp } from "../store/app";
-import { EMPTY_LAYOUT, sessionKey, useLayout } from "./groups";
+import { EMPTY_LAYOUT, projectKey, sessionKey, useLayout } from "./groups";
 import { useSessionFilter } from "./activeFilter";
 import { Sidebar } from "./Sidebar";
 import type { MachineView } from "../lib/types";
@@ -100,9 +100,9 @@ describe("Sidebar machine actions", () => {
     set([local]);
     setFolder({ machine_id: "local", session: "x", workspace_id: "w1" }, "/srv/x");
     setFolder({ machine_id: "local", session: "xy", workspace_id: "w1" }, "/srv/xy");
-    useLayout.setState({ layout: { tree: [], bookmarks: [sessionKey("local", "x")] } });
+    useLayout.setState({ layout: { tree: [], bookmarks: [projectKey("local", "x", "app")] } });
     render(<Sidebar />);
-    fireEvent.contextMenu(screen.getAllByText("x")[0]);
+    fireEvent.contextMenu(within(screen.getByRole("region", { name: "Sessions" })).getByText("x"));
     fireEvent.click(screen.getByRole("menuitem", { name: "Delete session…" }));
     expect(sessionDelete).not.toHaveBeenCalled();
     fireEvent.click(screen.getByRole("button", { name: "Delete" }));
@@ -122,14 +122,14 @@ describe("Sidebar machine actions", () => {
     setFolder({ machine_id: "local", session: "x", workspace_id: "w1" }, "/srv/x");
     setFolder({ machine_id: "local", session: "xy", workspace_id: "w1" }, "/srv/xy");
     const [kx, ky] = [sessionKey("local", "x"), sessionKey("local", "y")];
-    useLayout.setState({ layout: { tree: [{ kind: "group", id: "g", label: "Work", children: [{ kind: "session", key: kx }] }], bookmarks: [kx] } });
+    useLayout.setState({ layout: { tree: [{ kind: "group", id: "g", label: "Work", children: [{ kind: "session", key: kx }] }], bookmarks: [projectKey("local", "x", "app")] } });
     render(<Sidebar />);
-    fireEvent.contextMenu(screen.getAllByText("x")[0]);
+    fireEvent.contextMenu(within(screen.getByRole("region", { name: "Sessions" })).getByText("x"));
     fireEvent.click(screen.getByRole("menuitem", { name: "Rename session…" }));
     fireEvent.change(screen.getByRole("textbox"), { target: { value: "y" } });
     fireEvent.click(screen.getByRole("button", { name: "Rename" }));
     expect(sessionRename).toHaveBeenCalledWith("local", "x", "y");
-    await waitFor(() => expect(useLayout.getState().layout.bookmarks).toEqual([ky]));
+    await waitFor(() => expect(useLayout.getState().layout.bookmarks).toEqual([projectKey("local", "y", "app")]));
     expect(useLayout.getState().layout.tree).toEqual([{ kind: "group", id: "g", label: "Work", children: [{ kind: "session", key: ky }] }]);
     expect(getFolder({ machine_id: "local", session: "y", workspace_id: "w1" })).toBe("/srv/x");
     expect(getFolder({ machine_id: "local", session: "x", workspace_id: "w1" })).toBeNull();
@@ -138,10 +138,10 @@ describe("Sidebar machine actions", () => {
   it("keeps everything when the rename fails", async () => {
     vi.mocked(sessionRename).mockRejectedValueOnce({ code: "herdr_error", message: "could not rename x: y already exists" });
     set([local]);
-    const kx = sessionKey("local", "x");
+    const kx = projectKey("local", "x", "app");
     useLayout.setState({ layout: { tree: [], bookmarks: [kx] } });
     render(<Sidebar />);
-    fireEvent.contextMenu(screen.getAllByText("x")[0]);
+    fireEvent.contextMenu(within(screen.getByRole("region", { name: "Sessions" })).getByText("x"));
     fireEvent.click(screen.getByRole("menuitem", { name: "Rename session…" }));
     fireEvent.change(screen.getByRole("textbox"), { target: { value: "y" } });
     fireEvent.click(screen.getByRole("button", { name: "Rename" }));
@@ -160,28 +160,21 @@ describe("Sidebar machine actions", () => {
     fireEvent.contextMenu(screen.getByText("default"));
     expect(screen.queryByRole("menuitem", { name: "Rename session…" })).toBeNull();
   });
-  it("bookmarks and unbookmarks a session from its menu", () => {
-    set([local]);
+  it("bookmarks a project from its row's menu, unbookmarks it from Bookmarks; a Session has no Bookmark item", () => {
+    set([{ ...local, sessions: [{ name: "x", running: true, status: "working", error: null, workspaces: [
+      { workspace_id: "w1", label: "app", number: 1, status: "working", tabs: [{ tab_id: "t", label: "1", number: 1, status: "working", panes: [
+        { pane_id: "p", terminal_id: "t", title: "p", cwd: "/x", agent: "claude", status: "working" }] }] }] }] }]);
     render(<Sidebar />);
     fireEvent.contextMenu(screen.getByText("x"));
+    expect(screen.queryByRole("menuitem", { name: "Bookmark" })).toBeNull();
+    fireEvent.keyDown(document, { key: "Escape" });
+    fireEvent.contextMenu(screen.getByRole("button", { name: "app" }));
     fireEvent.click(screen.getByRole("menuitem", { name: "Bookmark" }));
-    expect(useLayout.getState().layout.bookmarks).toEqual([sessionKey("local", "x")]);
-    fireEvent.contextMenu(screen.getAllByText("x")[0]);
-    fireEvent.click(screen.getByRole("menuitem", { name: "Unbookmark" }));
-    expect(useLayout.getState().layout.bookmarks).toEqual([]);
-  });
-  it("unbookmarking a session in a group keeps its group row", () => {
-    set([local]);
-    const kx = sessionKey("local", "x");
-    useLayout.setState({ layout: { tree: [{ kind: "group", id: "g", label: "Work", children: [{ kind: "session", key: kx }] }], bookmarks: [kx] } });
-    render(<Sidebar />);
-    expect(screen.getAllByText("x")).toHaveLength(2);
-    fireEvent.contextMenu(within(screen.getByRole("region", { name: "Bookmarks" })).getByText("x"));
+    expect(useLayout.getState().layout.bookmarks).toEqual([projectKey("local", "x", "app")]);
+    fireEvent.contextMenu(within(screen.getByRole("region", { name: "Bookmarks" })).getByRole("button", { name: /^app/ }));
     fireEvent.click(screen.getByRole("menuitem", { name: "Unbookmark" }));
     expect(useLayout.getState().layout.bookmarks).toEqual([]);
     expect(screen.queryByRole("region", { name: "Bookmarks" })).toBeNull();
-    expect(screen.getAllByText("x")).toHaveLength(1);
-    expect(screen.getByText("x").closest("li.group")?.textContent).toContain("Work");
   });
   it("creates, renames, nests and deletes groups", async () => {
     set([local]);

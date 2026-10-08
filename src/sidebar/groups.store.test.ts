@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { EMPTY_LAYOUT, LAYOUT_KEY, initLayout, loadLayout, resolve, sessionKey, useLayout } from "./groups";
+import { EMPTY_LAYOUT, LAYOUT_KEY, initLayout, loadLayout, projectKey, resolve, sessionKey, useLayout } from "./groups";
 import type { RNode } from "./groups";
 import type { MachineView, SessionView } from "../lib/types";
 
@@ -25,11 +25,15 @@ describe("legacy localStorage layout", () => {
 });
 
 describe("layout file", () => {
-  const l = { tree: [{ kind: "session" as const, key: "local/x" }], bookmarks: ["local/x"] };
+  const l = { tree: [{ kind: "session" as const, key: "local/x" }], bookmarks: ["local/x/app"] };
   const io = (stored: unknown) => ({ load: vi.fn().mockResolvedValue(stored), save: vi.fn().mockResolvedValue(undefined) });
   const flush = () => new Promise((r) => setTimeout(r));
   beforeEach(() => { localStorage.clear(); vi.restoreAllMocks(); useLayout.setState({ layout: EMPTY_LAYOUT }); });
 
+  it("drops the Session bookmarks of an older layout: Bookmarks now hold projects (ADR 0006)", async () => {
+    await initLayout(io({ tree: l.tree, bookmarks: ["local/x", "local/x/app"] }));
+    expect(useLayout.getState().layout.bookmarks).toEqual(["local/x/app"]);
+  });
   it("loads the saved file and does not rewrite it", async () => {
     localStorage.setItem(LAYOUT_KEY, JSON.stringify({ tree: [], bookmarks: ["old/y"] }));
     const f = io(l);
@@ -110,11 +114,12 @@ describe("resolve", () => {
         { kind: "session" as const, key: sessionKey("ghost", "zz") },
         { kind: "session" as const, key: sessionKey("local", "gone") },
       ],
-      bookmarks: [sessionKey("local", "a"), sessionKey("ghost", "zz")],
+      bookmarks: [projectKey("local", "a", "app"), projectKey("ghost", "zz", "web")],
     };
     const r = resolve(layout, machines, ["local", "box"]);
     expect(names(r.tree)).toEqual(["local:a", "box:c", { Work: ["local:b"] }]);
-    expect(r.bookmarks.map((b) => b.session.name)).toEqual(["a"]);
+    // A bookmarked project stays when its Session is gone, named from its key, with no Session.
+    expect(r.bookmarks.map((b) => [b.label, b.sessionName, b.node?.session.name ?? null])).toEqual([["app", "a", "a"], ["web", "zz", null]]);
     expect(r.unplaced).toEqual([sessionKey("local", "a"), sessionKey("box", "c")]);
   });
   it("shows every session at the root for an empty layout", () => {

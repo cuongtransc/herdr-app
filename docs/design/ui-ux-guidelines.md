@@ -166,7 +166,7 @@ blocked rows.
 | ⇧⌘D (proposed, §7.2) | Open the Agent Board |
 
 Reserved for later, in this order: ⌘N (new…), ⌘W (close pane, with confirmation), ⌘1–⌘9 (jump to
-bookmarked Session). **Never** bind bare letters, Ctrl-, Alt- or Esc at `window` level:
+a bookmarked project). **Never** bind bare letters, Ctrl-, Alt- or Esc at `window` level:
 `keyHandler.ts` forwards everything but ⌘ chords to the terminal, and that contract stays. A new
 ⌘ shortcut is also gated while the palette or a dialog is open.
 
@@ -291,13 +291,15 @@ trail after the last (possibly nested) Group with no header, reading as its chil
   and QUOTA at the foot, each an 11px/600 caps label in `--fg-2` at x=16 with its fold chevron right
   after it, never at the left edge, where it would share a column with the rows' own chevrons. No fill:
   fill means selection. A 1px `--line` and 12px separate sections. A section's controls sit at the
-  header's right end, well apart from its chevron: SESSIONS' `Active N` toggle (it filters Bookmarks
-  too) and MACHINES' `+`, which centres over the machines' status dots.
-- **Bookmarks are shortcuts, not a container.** Their rows sit under the section header like any
-  section's rows, without a Group's guide line or fold chevron, and keep the user's order. Their
-  slot shows the Session's status dot.
+  header's right end, well apart from its chevron: SESSIONS' `Active N` toggle (it never hides
+  a Bookmark) and MACHINES' `+`, which centres over the machines' status dots.
+- **Bookmarks are shortcuts to projects, not a container** (ADR 0006). Their rows sit under the
+  section header like any section's rows, without a guide line or fold chevron, and keep the user's
+  order: the project's status dot in the slot, its name, its Session muted after it, then Blocked /
+  Review or its lanes. A click opens the pane behind it. Active never hides one; one whose Workspace
+  is gone stays, muted, saying `closed`. A project row's menu bookmarks it.
 - **Two columns, one step.** Every row's first glyph sits in a 16px slot at x=16, centred in it: a
-  fold chevron, a Bookmark's status dot, a machine icon, a quota tile, or nothing for a Session with
+  fold chevron, a Bookmark's project dot, a machine icon, a quota tile, or nothing for a Session with
   no projects. Every name starts at x=40 (a Group's after its folder, at 64). A child level steps
   24, so its slot sits under its parent's first letter, with a 1px `--line-2` guide under the
   parent's glyph. `sidebarTree.browser.test.tsx` holds these numbers.
@@ -314,7 +316,8 @@ trail after the last (possibly nested) Group with no header, reading as its chil
 
 **Rows.**
 
-- A bookmarked Session keeps its place in its Group too (Q4); that row carries a small star.
+- A bookmarked project keeps its row in the tree too (Q4); that row carries a small star after its
+  name.
 - Machine badge only for remote Machines; local Sessions show none.
 - **A Session is the user's area; its projects show under it.** Under each Session the tree lists its
   Workspaces with agent work (Blocked, Review, or In progress; every Workspace under All, the quiet
@@ -323,7 +326,7 @@ trail after the last (possibly nested) Group with no header, reading as its chil
   click opens the pane behind the row (the one asking, else the orchestrator), and that project row
   is the lit one.
 - So in the tree the project rows carry what needs the user and the Session row has no count or
-  tint; a Bookmark row (one line, no projects) keeps the amber count.
+  tint; a Bookmark row carries its project's word, as its row in the tree does.
 - SESSIONS starts on **Active**; the "N hidden · idle or stopped · Show" line lists the rest.
   Like PANES, Active keeps a Session and a project for 30 minutes after its agent (not a lane)
   stopped, muted with its age (`12m`): the user just looked at it and is likely to return. Rows
@@ -369,6 +372,7 @@ trail after the last (possibly nested) Group with no header, reading as its chil
 - **Q3. Long-running shell commands?** Shown as a normal quiet row, not folded, with no status mark
   (§7.1). herdr gives shells no status, so the app shows that the process runs without claiming
   how it is doing.
-- **Q4. A bookmarked Session in its Group too?** Yes, as `CONTEXT.md` defines a Bookmark
-  (independent of its Group): Groups stay complete and unbookmarking never moves a Session. Only
-  the clicked row is "selected"; the Group row carries a star (§7.3).
+- **Q4. A bookmarked project in the tree too?** Yes, as `CONTEXT.md` defines a Bookmark
+  (independent of where it sits): the tree stays complete and unbookmarking never moves anything.
+  Only the clicked row is "selected"; the tree's project row carries a star (§7.3). (Before ADR 0006
+  this asked the same of a bookmarked Session.)

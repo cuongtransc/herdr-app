@@ -9,13 +9,25 @@ export type SessionKey = string;
 export const sessionKey = (machineId: string, session: string): SessionKey =>
   `${encodeURIComponent(machineId)}/${encodeURIComponent(session)}`;
 
+/** A bookmarked project: its Session's key and its Workspace's label (not herdr's id), so a
+ *  Workspace opened again under the same name finds its bookmark (ADR 0006). */
+export type ProjectKey = string;
+
+export const projectKey = (machineId: string, session: string, workspace: string): ProjectKey =>
+  `${sessionKey(machineId, session)}/${encodeURIComponent(workspace)}`;
+
+/** The Session a bookmarked project belongs to. */
+const sessionOf = (k: ProjectKey): SessionKey => k.slice(0, k.lastIndexOf("/"));
+/** A key from before Bookmarks held projects: a Session's, `machine/session`. */
+const isProjectKey = (k: unknown): k is ProjectKey => typeof k === "string" && k.split("/").length === 3;
+
 export type GroupNode = { kind: "group"; id: string; label: string; children: LayoutNode[] };
 export type SessionNode = { kind: "session"; key: SessionKey };
 export type LayoutNode = GroupNode | SessionNode;
 
 export interface Layout {
   tree: LayoutNode[];
-  bookmarks: SessionKey[];
+  bookmarks: ProjectKey[];
 }
 
 export const EMPTY_LAYOUT: Layout = { tree: [], bookmarks: [] };
@@ -242,7 +254,7 @@ function forgetWhere(layout: Layout, drop: (key: SessionKey) => boolean): Layout
     return changed ? out : nodes;
   };
   const tree = prune(layout.tree);
-  const kept = layout.bookmarks.filter((k) => !drop(k));
+  const kept = layout.bookmarks.filter((k) => !drop(sessionOf(k)));
   const bookmarks = kept.length === layout.bookmarks.length ? layout.bookmarks : kept;
   return tree === layout.tree && bookmarks === layout.bookmarks ? layout : { tree, bookmarks };
 }
@@ -271,7 +283,9 @@ export function renameSessionKey(layout: Layout, from: SessionKey, to: SessionKe
     return changed ? out : nodes;
   };
   const tree = walk(layout.tree);
-  const bookmarks = layout.bookmarks.includes(from) ? layout.bookmarks.map((k) => (k === from ? to : k)) : layout.bookmarks;
+  const bookmarks = layout.bookmarks.some((k) => sessionOf(k) === from)
+    ? layout.bookmarks.map((k) => (sessionOf(k) === from ? to + k.slice(from.length) : k))
+    : layout.bookmarks;
   return tree === layout.tree && bookmarks === layout.bookmarks ? layout : { tree, bookmarks };
 }
 
@@ -297,9 +311,10 @@ export function groupPaths(layout: Layout): { id: string; path: string }[] {
 /** Where the layout lived before it moved to a file; read once to migrate, removed once the file holds it. */
 export const LAYOUT_KEY = "herdr-app:sidebar-layout";
 
+// Session bookmarks from before ADR 0006 are dropped on read; the next change saves the layout without them.
 function parseLayout(v: unknown): Layout | null {
   const p = v as Partial<Layout> | null;
-  return p && Array.isArray(p.tree) && Array.isArray(p.bookmarks) ? { tree: p.tree, bookmarks: p.bookmarks } : null;
+  return p && Array.isArray(p.tree) && Array.isArray(p.bookmarks) ? { tree: p.tree, bookmarks: p.bookmarks.filter(isProjectKey) } : null;
 }
 
 /** The legacy localStorage layout; empty when missing, corrupt or unreadable. */
@@ -384,6 +399,8 @@ export const useLayout = create<LayoutState>((set, get) => ({
 }));
 
 export type RSession = { kind: "session"; key: SessionKey; machine: MachineView; session: SessionView };
+/** A bookmarked project joined with its live Session, which is null while the Session is not known. */
+export type RBookmark = { kind: "bookmark"; key: ProjectKey; label: string; sessionName: string; node: RSession | null };
 export type RGroup = { kind: "group"; id: string; label: string; children: RNode[] };
 export type RNode = RGroup | RSession;
 
@@ -393,7 +410,7 @@ export function resolve(
   layout: Layout,
   machines: Record<string, MachineView>,
   order: string[],
-): { tree: RNode[]; bookmarks: RSession[]; unplaced: SessionKey[] } {
+): { tree: RNode[]; bookmarks: RBookmark[]; unplaced: SessionKey[] } {
   const live = new Map<SessionKey, RSession>();
   for (const id of order) {
     const machine = machines[id];
@@ -430,9 +447,16 @@ export function resolve(
   }
   tree.unshift(...loose);
 
-  const bookmarks = layout.bookmarks.flatMap((k) => {
-    const r = live.get(k);
-    return r ? [r] : [];
+  // A bookmarked project stays when its Session or Workspace is gone: the row says it is closed.
+  const bookmarks = layout.bookmarks.map((key): RBookmark => {
+    const session = sessionOf(key);
+    return {
+      kind: "bookmark",
+      key,
+      label: decodeURIComponent(key.slice(session.length + 1)),
+      sessionName: decodeURIComponent(session.slice(session.indexOf("/") + 1)),
+      node: live.get(session) ?? null,
+    };
   });
   return { tree, bookmarks, unplaced };
 }

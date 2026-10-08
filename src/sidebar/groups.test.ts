@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   EMPTY_LAYOUT, addGroup, canMove, deleteGroup, forgetMachine, forgetSessions, groupPaths, moveBookmark, moveNode,
-  renameGroup, renameSessionKey, sessionKey, setBookmarked,
+  projectKey, renameGroup, renameSessionKey, sessionKey, setBookmarked,
 } from "./groups";
 import type { GroupNode, Layout, LayoutNode, SessionNode } from "./groups";
 
@@ -16,6 +16,13 @@ describe("sessionKey", () => {
   it("encodes both parts", () => {
     expect(sessionKey("local", "default")).toBe("local/default");
     expect(sessionKey("a/b", "x y")).toBe("a%2Fb/x%20y");
+  });
+});
+
+describe("projectKey", () => {
+  it("names a project by its Session's key and its Workspace's label, encoded", () => {
+    expect(projectKey("local", "ai-tools", "herdr-app")).toBe("local/ai-tools/herdr-app");
+    expect(projectKey("a/b", "x y", "w/1")).toBe("a%2Fb/x%20y/w%2F1");
   });
 });
 
@@ -109,17 +116,18 @@ describe("bookmarks and forgetting", () => {
     expect(moveBookmark(l, "x", null).bookmarks).toEqual(["y", "x"]);
     expect(setBookmarked(l, "x", false).bookmarks).toEqual(["y"]);
   });
-  it("forgets sessions in the tree and in bookmarks", () => {
-    const l = { tree: [g("a", s("x"), s("y"))], bookmarks: ["x", "z"] };
-    const r = forgetSessions(l, ["x", "z"]);
-    expect(shape(r.tree)).toEqual([{ a: ["y"] }]);
-    expect(r.bookmarks).toEqual([]);
+  it("forgets sessions in the tree, and the bookmarked projects in them", () => {
+    const x = sessionKey("m", "x"), y = sessionKey("m", "y"), z = sessionKey("m", "z");
+    const l = { tree: [g("a", s(x), s(y))], bookmarks: [projectKey("m", "x", "app"), projectKey("m", "y", "api"), projectKey("m", "z", "web")] };
+    const r = forgetSessions(l, [x, z]);
+    expect(shape(r.tree)).toEqual([{ a: [y] }]);
+    expect(r.bookmarks).toEqual([projectKey("m", "y", "api")]);
   });
   it("forgets every session of a machine", () => {
     const k1 = sessionKey("box", "a"), k2 = sessionKey("boxy", "b");
-    const r = forgetMachine({ tree: [s(k1), s(k2)], bookmarks: [k1] }, "box");
+    const r = forgetMachine({ tree: [s(k1), s(k2)], bookmarks: [projectKey("box", "a", "app"), projectKey("boxy", "b", "app")] }, "box");
     expect(shape(r.tree)).toEqual([k2]);
-    expect(r.bookmarks).toEqual([]);
+    expect(r.bookmarks).toEqual([projectKey("boxy", "b", "app")]);
   });
 });
 
@@ -142,7 +150,7 @@ describe("no-ops return the same object", () => {
     expect(deleteGroup(l, "nope")).toBe(l);
   });
   it("bookmark and forget no-ops", () => {
-    const l = { tree: [s("x")], bookmarks: ["x", "y"] };
+    const l = { tree: [s("m/x")], bookmarks: ["x", "y"] };
     expect(setBookmarked(l, "x", true)).toBe(l);
     expect(setBookmarked(l, "z", false)).toBe(l);
     expect(moveBookmark(l, "x", "y")).toBe(l);
@@ -153,15 +161,15 @@ describe("no-ops return the same object", () => {
 });
 
 describe("renameSessionKey", () => {
-  it("swaps the key in place, nested or bookmarked, and leaves other sessions alone", () => {
-    const l: Layout = { tree: [s("a"), g("w", s("x"), g("n", s("x2")))], bookmarks: ["x", "a"] };
+  it("swaps the key in place, nested or in its bookmarked projects, and leaves other sessions alone", () => {
+    const l: Layout = { tree: [s("a"), g("w", s("x"), g("n", s("x2")))], bookmarks: ["x/app", "x2/app", "a/web"] };
     const r = renameSessionKey(l, "x", "y");
     expect(shape(r.tree)).toEqual(["a", { w: ["y", { n: ["x2"] }] }]);
-    expect(r.bookmarks).toEqual(["y", "a"]);
+    expect(r.bookmarks).toEqual(["y/app", "x2/app", "a/web"]);
     expect(r.tree[0]).toBe(l.tree[0]);
   });
   it("returns the same layout when the session is not in it", () => {
-    const l: Layout = { tree: [g("w", s("a"))], bookmarks: ["a"] };
+    const l: Layout = { tree: [g("w", s("a"))], bookmarks: ["a/app"] };
     expect(renameSessionKey(l, "x", "y")).toBe(l);
   });
 });
