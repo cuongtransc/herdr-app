@@ -1028,8 +1028,11 @@ kbd {
 .chat-assistant h1 { font-size: 1.333em; } .chat-assistant h2 { font-size: 1.185em; } .chat-assistant h3 { font-size: 1.037em; }
 .chat-assistant ul, .chat-assistant ol { padding-left: 22px; }
 .chat-assistant blockquote { margin: 0; padding-left: 12px; border-left: 3px solid var(--line-3); color: var(--fg-2); }
+/* A table wider than the row scrolls on its own, not the row. */
+.chat-table { overflow-x: auto; margin: 1em 0; }
 .chat-assistant table { border-collapse: collapse; font-size: 0.926em; }
-.chat-assistant th, .chat-assistant td { border: 1px solid var(--line-2); padding: 5px 9px; }
+/* break-word, not the row's anywhere: anywhere lets a cell's min width shrink to one letter, so a short column like "!303" broke a letter per line. */
+.chat-assistant th, .chat-assistant td { border: 1px solid var(--line-2); padding: 5px 9px; overflow-wrap: break-word; }
 .chat-assistant pre {
   background: var(--surface-code); border: 1px solid var(--line); border-radius: var(--r-md);
   padding: 12px 14px; overflow-x: auto; line-height: 1.5;
