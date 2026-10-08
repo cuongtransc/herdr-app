@@ -163,6 +163,10 @@ export function ChatLens({ pane, view }: { pane: PaneRef; view: PaneView }) {
   // Tool results render inside their call; each turn's work folds into one row.
   const { rows, results } = useMemo(() => buildRows(state.items, state.total - state.items.length), [state.items, state.total]);
   const asked = useMemo(() => pendingQuestions(state.items), [state.items]);
+  const sessionPrompts = useMemo(
+    () => state.items.flatMap((i) => (i.kind === "user" && i.text.trim() ? [i.text] : [])),
+    [state.items],
+  );
   const toggle = useCallback((id: string, wasOpen: boolean) => {
     setChosenOpen((m) => new Map(m).set(id, !wasOpen));
   }, []);
@@ -311,7 +315,7 @@ export function ChatLens({ pane, view }: { pane: PaneRef; view: PaneView }) {
       {view.status === "blocked" || picker.open ? (
         <PromptPanel pane={pane} view={view} fallback={view.status === "blocked"} asked={asked} />
       ) : (
-        <Composer pane={pane} agent={view.agent} status={view.status} untracked={view.untracked} onPiModel={() => setModelFor(key)} meta={state.meta} />
+        <Composer pane={pane} agent={view.agent} status={view.status} untracked={view.untracked} onPiModel={() => setModelFor(key)} meta={state.meta} sessionPrompts={sessionPrompts} />
       )}
     </div>
     <ChatOutline entries={entries} current={current} onJump={jumpTo} />

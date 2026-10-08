@@ -8,7 +8,7 @@ import { GitStatusLine } from "./GitStatus";
 import { rankCommands, rankFiles, readUsage, recordUse, splitParentQuery } from "./complete";
 import { dirSuggestions } from "../lib/pathInput";
 import { readDraft, useDraft } from "./drafts";
-import { HistoryCursor, readHistory, recordPrompt, withSent } from "./promptHistory";
+import { HistoryCursor, readHistory, recallList, recordPrompt } from "./promptHistory";
 import { useApp } from "../store/app";
 import { usePaneImages, type Attachment } from "./draftImages";
 import { activeTrigger, applyCompletion } from "./mentions";
@@ -80,6 +80,8 @@ const revoke = (a: Attachment) => {
   if (a.preview) URL.revokeObjectURL(a.preview);
 };
 
+const NO_PROMPTS: string[] = [];
+
 export function Composer({
   pane,
   agent,
@@ -87,6 +89,7 @@ export function Composer({
   onPiModel,
   meta,
   untracked,
+  sessionPrompts = NO_PROMPTS,
 }: {
   pane: PaneRef;
   agent: string | null;
@@ -96,6 +99,8 @@ export function Composer({
   meta?: ChatMeta;
   /** herdr's agent API does not know this agent (started through a wrapper): drive its pane. */
   untracked?: boolean;
+  /** The user's prompts in the session on screen, oldest first: Up recalls them first. */
+  sessionPrompts?: string[];
 }) {
   const key = paneKey(pane);
   const [text, setText] = useState(() => readDraft(key));
@@ -163,8 +168,14 @@ export function Composer({
     };
   }, [agent, historyScope, pane.machine_id, pane.session, pane.pane_id]);
   const history = useMemo(
-    () => new HistoryCursor(() => (claudeHistory.length > 0 ? withSent(claudeHistory, sentHere.current) : readHistory(historyScope))),
-    [historyScope, claudeHistory],
+    () =>
+      new HistoryCursor(() =>
+        // Herdr's store already holds what was sent here; Claude's file may not yet.
+        claudeHistory.length > 0
+          ? recallList(claudeHistory, sessionPrompts, sentHere.current)
+          : recallList(readHistory(historyScope), sessionPrompts, []),
+      ),
+    [historyScope, claudeHistory, sessionPrompts],
   );
   // A recalled prompt replaces the text, with the caret at its end and no completion list on it.
   const recall = (t: string) => {

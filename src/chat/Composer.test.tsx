@@ -699,6 +699,27 @@ describe("Composer prompt history", () => {
     expect(box.value).toBe("from yesterday");
   });
 
+  it("recalls this session's prompts first, Claude's or pi's", async () => {
+    vi.mocked(claudePromptHistory).mockResolvedValue(["mine", "another session's"]);
+    render(<Composer pane={pane} agent="claude" sessionPrompts={["mine"]} />);
+    const box = screen.getByRole<HTMLTextAreaElement>("textbox");
+    await act(async () => {});
+    up(box);
+    expect(box.value).toBe("mine");
+    up(box);
+    expect(box.value).toBe("another session's");
+  });
+
+  it("gives a pi pane its session's prompts before Herdr's for the folder", async () => {
+    recordPrompt("devtuf/default/w1:p1", "sent from Herdr");
+    render(<Composer pane={pane} agent="pi" sessionPrompts={["typed in pi"]} />);
+    const box = screen.getByRole<HTMLTextAreaElement>("textbox");
+    up(box);
+    expect(box.value).toBe("typed in pi");
+    up(box);
+    expect(box.value).toBe("sent from Herdr");
+  });
+
   it("falls back to Herdr's own history when Claude's cannot be read", async () => {
     vi.mocked(claudePromptHistory).mockRejectedValue({ code: "io", message: "no ssh" });
     recordPrompt("devtuf/default/w1:p1", "only in Herdr");
