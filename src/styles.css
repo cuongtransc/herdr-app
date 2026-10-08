@@ -262,10 +262,15 @@ kbd {
 
 /* All | Active above the session list; the footer says what Active leaves out. */
 /* All | Active in a section header: two text buttons at their own width, the chosen one filled. */
-.section-head .seg { flex: none; display: flex; gap: 2px; margin: var(--s-2) var(--s-2) 0 var(--s-4); padding: 0; border: 0; background: none; }
-.section-head .seg-thumb { display: none; }
-.seg-sm button { height: 20px; padding: 0 7px; border-radius: 5px; font-size: var(--fs-xs); }
-.section-head .seg button[aria-pressed="true"] { background: var(--active); color: var(--fg); font-weight: 600; }
+/* Active N: one toggle where All | Active took two buttons. Off, a hairline; on, the accent tint. */
+.active-toggle {
+  flex: none; display: inline-flex; align-items: center; gap: 5px; height: 20px; padding: 0 7px; box-sizing: border-box;
+  border: 1px solid var(--line-2); border-radius: 5px; background: none; color: var(--fg-2);
+  font: inherit; font-size: var(--fs-xs); font-weight: 500; cursor: pointer;
+}
+.active-toggle:hover { color: var(--fg); }
+.active-toggle[aria-pressed="true"] { border-color: transparent; background: var(--accent-soft); color: var(--fg); }
+.active-toggle .n { color: var(--fg-2); font-variant-numeric: tabular-nums; }
 .filter-hidden {
   display: flex; align-items: center; gap: 8px; margin: 8px 0 0; padding: 7px 10px;
   border: 1px dashed var(--line-2); border-radius: var(--r-sm); color: var(--fg-3); font-size: 12px;
@@ -357,12 +362,21 @@ kbd {
 
 /* ---------- Machine tree ---------- */
 .tree, .children { list-style: none; margin: 0; padding: 0; }
-/* Each level's text starts under its parent's label: a section's rows under the header text
-   (8 padding + 12 chevron + 6 gap = 26, rows pad 8), a Group's children under the Group's name
-   (8 + 12 chevron + 8 + 14 folder + 8 = 50) with the guide under the chevron. */
-.section-list { padding-left: 18px; }
-.children { padding-left: 28px; margin-left: 13px; border-left: 1px solid var(--line); }
-.machine + .machine { margin-top: 6px; }
+/* Two columns (docs/design/ui-ux-guidelines.md §7.3): every row's first glyph in a 16px slot at
+   x=16, centred in it; every name at 40. A child level steps 24, so its slot sits under its
+   parent's first letter, with the guide under the parent's glyph (8 + 16 = 24). */
+.section-list { padding-left: 0; }
+.children { padding-left: 7px; margin-left: 16px; border-left: 1px solid var(--line-2); }
+.slot { flex: 0 0 16px; width: 16px; height: 16px; display: grid; place-items: center; color: var(--fg-3); }
+.slot .chev { width: 12px; height: 12px; }
+/* A Session's fold button lies over its row's slot: a button cannot sit inside the row's button. */
+.session { position: relative; }
+.fold-toggle {
+  position: absolute; top: 1px; left: 8px; width: 16px; height: 28px; padding: 0; display: grid; place-items: center;
+  border: 0; background: none; color: var(--fg-3); cursor: pointer;
+}
+.fold-toggle:hover { color: var(--fg); }
+.fold-toggle .chev { width: 12px; height: 12px; }
 
 .row {
   display: flex; align-items: center; gap: 8px;
@@ -378,9 +392,7 @@ kbd {
 .chev { width: 12px; height: 12px; color: var(--fg-3); transition: transform var(--t) var(--ease); }
 .chev.open { transform: rotate(90deg); }
 .machine-icon { color: var(--fg-3); }
-.machine > .row { color: var(--fg); }
-.machine > .row .label { font-weight: 600; flex: 1; min-width: 0; }
-.machine > .row .dot { margin-right: 2px; }
+.machine > .row .label { flex: 1; min-width: 0; }
 .label, .title { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .title, .mono { font-family: var(--mono); font-size: 12px; }
 .agent { margin-left: auto; color: var(--fg-3); font-size: 11px; }
@@ -396,7 +408,7 @@ kbd {
 /* The name and its bookmark star share the free space, so the star sits right after the name. */
 .session .row .session-name { flex: 1; min-width: 0; display: flex; align-items: center; gap: 5px; }
 .machine-chip { flex: none; color: var(--fg-3); font-size: var(--fs-xs); }
-.bookmark-mark { width: 11px; height: 11px; color: var(--fg-3); }
+.bookmark-mark { width: 12px; height: 12px; color: var(--fg-3); }
 .need {
   flex: none; min-width: 16px; height: 16px; padding: 0 5px; box-sizing: border-box; display: grid; place-items: center;
   border-radius: 999px; background: color-mix(in srgb, var(--amber) 14%, transparent); color: var(--amber-text);
@@ -404,7 +416,8 @@ kbd {
 }
 /* A Session's projects (its Workspaces with agent work) under it, on the guide line: a status dot, the
    name, then Blocked / Review when the user is asked something, else the lane count. */
-.project-list { list-style: none; margin: 0 0 2px 16px; padding: 0 0 0 10px; border-left: 1px solid var(--line); }
+.project-list { list-style: none; margin: 0 0 2px 16px; padding: 0 0 0 7px; border-left: 1px solid var(--line-2); }
+.project-row.more-row { color: var(--fg-3); }
 .project-row {
   display: flex; align-items: center; gap: 8px; width: 100%; height: 24px; box-sizing: border-box; margin: 1px 0; padding: 0 8px;
   border: 0; border-radius: var(--r-sm); background: none; color: var(--fg-2); font: inherit; font-size: var(--fs-s);
@@ -419,7 +432,7 @@ kbd {
 .project-dot { flex: 0 0 7px; width: 7px; height: 7px; border-radius: 50%; background: var(--grey); }
 .project-row.blocked .project-dot { background: var(--amber); }
 .project-row.working .project-dot { background: var(--blue); }
-.project-row .mark-done { flex: none; width: 12px; height: 12px; margin: 0 -2.5px; color: var(--green); }
+.project-row .mark-done { flex: none; width: 12px; height: 12px; color: var(--green); }
 .project-meta { flex: none; color: var(--fg-3); font-size: var(--fs-xs); }
 .project-word { flex: none; font-size: var(--fs-xs); font-weight: 700; letter-spacing: .04em; }
 .project-word.blocked { color: var(--amber-text); }
@@ -429,9 +442,12 @@ kbd {
 .group > .row { color: var(--fg-2); }
 .group > .row .label { font-weight: 500; }
 .group-icon, .star-icon { width: 14px; height: 14px; color: var(--fg-3); }
+.group > .row .group-icon { width: 16px; height: 16px; }
+/* A section header: its label at x=16 (where the rows' glyphs start), the chevron after it, the
+   section's own controls at the right end, far from the chevron. No fill: fill means selection. */
 .section-toggle {
-  display: flex; align-items: center; gap: 6px; width: 100%; height: var(--row-xs); padding: 0 8px; margin-top: var(--s-2); border: 0; background: none;
-  color: var(--fg-3); font-size: 11px; font-weight: 600; letter-spacing: .04em; text-transform: uppercase; cursor: pointer; text-align: left;
+  display: flex; align-items: center; gap: 6px; width: 100%; height: var(--row-xs); padding: 0 8px; margin-top: 0; border: 0; background: none;
+  color: var(--fg-2); font-size: 11px; font-weight: 600; letter-spacing: .04em; text-transform: uppercase; cursor: pointer; text-align: left;
 }
 .session.stopped .row { color: var(--fg-3); }
 .error { margin: 0; padding: 2px 8px 6px 28px; color: var(--err); font-size: 11.5px; line-height: 1.4; }
@@ -443,10 +459,12 @@ kbd {
 }
 .machine-actions input:focus { border-color: var(--accent); box-shadow: var(--ring); }
 
-.section-head { display: flex; align-items: center; gap: 4px; }
+.sidebar-scroll > section + section { border-top: 1px solid var(--line); margin-top: 12px; padding-top: 6px; }
+.section-head { display: flex; align-items: center; gap: 4px; padding-right: 8px; }
 .section-head .section-toggle { flex: 1; min-width: 0; }
+/* Its + centres over the status dots under it (their centres 20.5px from the edge). */
 .section-action {
-  display: grid; place-items: center; flex: 0 0 22px; width: 22px; height: 22px; margin-top: 4px; padding: 0;
+  display: grid; place-items: center; flex: 0 0 22px; width: 22px; height: 22px; margin: 0 -7.5px 0 0; padding: 0;
   border: 0; border-radius: var(--r-sm); background: none; color: var(--fg-3); cursor: pointer;
   transition: background var(--t-fast), color var(--t-fast);
 }
@@ -510,12 +528,15 @@ kbd {
 .ws-add svg { width: 14px; height: 14px; }
 /* A workspace's "+" shows on hover or keyboard focus; the column head's stays. */
 .ws-head .ws-add { opacity: 0; transition: opacity var(--t-fast); }
+/* The head's + centres over the rows' status marks (21px from the edge). */
+.agents-head .ws-add { margin-right: -7px; }
 .ws-head:hover .ws-add, .ws-head:focus-within .ws-add { opacity: 1; }
 /* PANES  All | Active N under the column head: the Sessions section's header, not scrolled with the list. */
-.panes-head { flex: none; padding: 0 var(--s-2) 0 var(--s-4); }
+.panes-head { flex: none; display: flex; align-items: center; padding: 0 var(--s-2) 0 var(--s-4); }
+.panes-head .active-toggle { margin: var(--s-2) 12px 0 0; }
 .panes-head .section-label {
   flex: 1; min-width: 0; height: var(--row-xs); margin-top: var(--s-2); padding: 0 8px; display: flex; align-items: center;
-  color: var(--fg-3); font-size: 11px; font-weight: 600; letter-spacing: .04em; text-transform: uppercase;
+  color: var(--fg-2); font-size: 11px; font-weight: 600; letter-spacing: .04em; text-transform: uppercase;
 }
 /* A pane Active leaves out, shown in All: quiet text. */
 .agent-card.quiet .agent-card-title { color: var(--fg-3); font-weight: 400; }
@@ -1425,7 +1446,7 @@ button.composer-model:disabled { cursor: default; }
 .quota-strip { position: relative; flex: none; display: flex; flex-direction: column; gap: 1px; padding: 6px 8px; border-top: 1px solid var(--line); }
 .quota-row {
   display: grid; grid-template-columns: 16px minmax(0, 1fr) 36px 64px; align-items: center; column-gap: 8px;
-  width: 100%; height: 26px; padding: 0 8px; box-sizing: border-box;
+  width: 100%; height: 28px; padding: 0 8px; box-sizing: border-box;
   border: 0; border-radius: var(--r-sm); background: none; color: var(--fg-2); font: inherit; font-size: var(--fs-s);
   text-align: left; cursor: pointer; transition: background var(--t-fast), color var(--t-fast);
 }
@@ -1442,7 +1463,7 @@ button.composer-model:disabled { cursor: default; }
 .quota-row.problem .agent-tile { filter: grayscale(1); }
 /* The strip folds like the Sidebar's sections; its header lines up with theirs (the strip pads 8px). */
 /* Its right edge meets the rows' values, inside the rows' own 8px padding. */
-.quota-toggle { margin: 0 -8px; width: calc(100% + 16px); padding-right: 16px; }
+.quota-toggle { padding-right: 8px; }
 .quota-fold-line { margin-left: auto; min-width: 0; display: flex; gap: 4px; overflow: hidden; white-space: nowrap; text-transform: none; letter-spacing: 0; font-weight: 400; font-size: var(--fs-xs); font-variant-numeric: tabular-nums; }
 .quota-fold { min-width: 0; overflow: hidden; text-overflow: ellipsis; color: var(--fg-2); }
 .quota-fold.tone-warn { color: var(--amber-text); font-weight: 600; }

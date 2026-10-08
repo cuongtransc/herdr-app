@@ -38,6 +38,7 @@ import { forgetSessions, renameSessionKey, sessionKey, setBookmarked, useLayout 
 import { needYouCount, useSessionFilter, useSidebarSessions, useViewOrigin } from "./activeFilter";
 import type { RSession } from "./groups";
 import { GroupTree } from "./GroupTree";
+import { ActiveToggle } from "./ActiveToggle";
 import { ProjectRows, useProjects } from "./ProjectRows";
 
 const hl = (status: string) => (status === "blocked" ? " blocked" : "");
@@ -58,6 +59,11 @@ export function SessionRow({ node, bookmark, nextKey = null }: { node: RSession;
   // In the tree a Session lists its projects, which carry what needs the user; a Bookmark stays one line.
   const projects = useProjects(machine, session);
   const tree = !bookmark;
+  // In the tree a Session with projects folds them; a fold keeps what asks for the user (ProjectRows).
+  const foldKey = `session:${key}`;
+  const unfolded = useApp((s) => s.expanded[foldKey] ?? true);
+  const toggle = useApp((s) => s.toggle);
+  const foldable = tree && projects.rows.length > 0;
   const view = useApp((s) => s.view);
   const bookmarked = useLayout((s) => s.layout.bookmarks.includes(key));
   const lit = viewed && (clickedHere || !bookmarked) && !(tree && projects.current);
@@ -135,7 +141,16 @@ export function SessionRow({ node, bookmark, nextKey = null }: { node: RSession;
         aria-disabled={online ? undefined : true}
         onClick={onClick}
         onContextMenu={onMenu}
+        onKeyDown={(e) => {
+          if (!foldable) return;
+          if ((e.key === "ArrowLeft" && unfolded) || (e.key === "ArrowRight" && !unfolded)) {
+            e.preventDefault();
+            toggle(foldKey, unfolded);
+          }
+        }}
       >
+        {/* A Bookmark shows its Session's state; in the tree the fold button sits over this slot. */}
+        <span className="slot" aria-hidden={bookmark ? undefined : "true"}>{bookmark && <StatusDot status={session.status} />}</span>
         <span className="session-name">
           <span className="label">{session.name}</span>
           {bookmarked && !bookmark && <StarIcon className="icon bookmark-mark" aria-label="bookmarked" aria-hidden={undefined} />}
@@ -147,7 +162,13 @@ export function SessionRow({ node, bookmark, nextKey = null }: { node: RSession;
         )}
         {!tree && need > 0 && <span className="need" aria-label={`${need} ${need === 1 ? "needs" : "need"} you`}>{need}</span>}
       </button>
-      {tree && projects.rows.length > 0 && <ProjectRows rows={projects.rows} current={projects.current} />}
+      {foldable && (
+        // A button of its own, so it cannot sit in the row's button: it covers the row's slot.
+        <button type="button" className="fold-toggle" aria-label={`${unfolded ? "Fold" : "Unfold"} ${session.name}`} aria-expanded={unfolded} onClick={() => toggle(foldKey, unfolded)}>
+          <Chevron open={unfolded} />
+        </button>
+      )}
+      {foldable && <ProjectRows rows={projects.rows} current={projects.current} folded={!unfolded} onUnfold={() => toggle(foldKey, false)} />}
       {session.error && <p className="error">{session.error.message}</p>}
     </li>
   );
@@ -247,15 +268,16 @@ function SectionHeader({ id, label, icon, defaultOpen = true }: { id: string; la
   const open = useApp((s) => s.expanded[id] ?? defaultOpen);
   const toggle = useApp((s) => s.toggle);
   return (
+    // The chevron follows the label, so it never shares a column with the rows' own chevrons.
     <button className="section-toggle" aria-expanded={open} onClick={() => toggle(id, open)}>
-      <Chevron open={open} />
       {icon}
       {label}
+      <Chevron open={open} />
     </button>
   );
 }
 
-/** The Sessions section: its header carries All | Active (Active leaves out sessions with no agent
+/** The Sessions section: its header carries Active N (Active leaves out sessions with no agent
  *  work, see `isActiveSession`, in Bookmarks too), then the Groups tree. */
 function SessionsSection({ kept }: { kept: number }) {
   const filter = useSessionFilter((s) => s.filter);
@@ -265,11 +287,7 @@ function SessionsSection({ kept }: { kept: number }) {
     <section aria-label="Sessions" className="sessions-section">
       <div className="section-head">
         <SectionHeader id="sessions" label="Sessions" />
-        <div className={"seg seg-sm" + (filter === "active" ? " seg-right" : "")} role="group" aria-label="Show sessions">
-        <span className="seg-thumb" aria-hidden="true" />
-        <button type="button" aria-pressed={filter === "all"} onClick={() => setFilter("all")}>All</button>
-        <button type="button" aria-pressed={filter === "active"} onClick={() => setFilter("active")}>Active {kept}</button>
-        </div>
+        <ActiveToggle on={filter === "active"} count={kept} onChange={(on) => setFilter(on ? "active" : "all")} />
       </div>
       {open && <GroupTree />}
     </section>

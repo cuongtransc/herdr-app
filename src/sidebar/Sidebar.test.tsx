@@ -5,7 +5,7 @@ import { sessionStart } from "../lib/ipc";
 import { useApp } from "../store/app";
 import { EMPTY_LAYOUT, sessionKey, useLayout } from "./groups";
 import { Sidebar } from "./Sidebar";
-import { useSessionFilter } from "./activeFilter";
+import { useSessionFilter, useViewOrigin } from "./activeFilter";
 import type { MachineView } from "../lib/types";
 
 const m: MachineView = {
@@ -80,7 +80,7 @@ describe("Sidebar", () => {
     fireEvent.click(rows[0]);
     expect(useApp.getState().selected?.pane_id).toBe("o");
     // All lists the quiet projects too.
-    fireEvent.click(screen.getByRole("button", { name: /^All/ }));
+    fireEvent.click(screen.getByRole("button", { name: /^Active/ }));
     expect(within(tree).getByRole("button", { name: "journal" }).className).toContain("quiet");
   });
   it("puts Bookmarks first as its own section, flush, and lights only the row that was clicked", () => {
@@ -188,5 +188,77 @@ describe("Sidebar", () => {
     expect(screen.getByRole("menuitem", { name: "Bookmark" })).toBeTruthy();
     for (const name of ["Delete session…", "Start session", "Stop session", "New workspace…"])
       expect(screen.queryByRole("menuitem", { name })).toBeNull();
+  });
+});
+
+describe("Sidebar tree", () => {
+  const p = (pane_id: string, status: "working" | "blocked" | "done" | "idle") => ({ pane_id, terminal_id: "t" + pane_id, title: pane_id, cwd: "/x", agent: "claude", status });
+  const t = (label: string, pane: ReturnType<typeof p>) => ({ tab_id: label, label, number: 1, status: pane.status, panes: [pane] });
+  const projects = () => {
+    const s = structuredClone(m);
+    s.sessions[0].workspaces = [
+      { workspace_id: "w1", label: "herdr-app", number: 1, status: "working", tabs: [t("1", p("o", "working"))] },
+      { workspace_id: "w2", label: "ccpoke", number: 2, status: "blocked", tabs: [t("1", p("c", "blocked"))] },
+      { workspace_id: "w3", label: "journal", number: 3, status: "idle", tabs: [t("1", p("j", "idle"))] },
+    ];
+    return s;
+  };
+  beforeEach(() => {
+    useApp.setState({ machines: { box: projects() }, order: ["box"], selected: null, viewed: null, expanded: {}, doneSeen: {} });
+    useLayout.setState({ layout: EMPTY_LAYOUT });
+    useSessionFilter.setState({ filter: "all" });
+  });
+  const tree = () => screen.getByRole("region", { name: "Sessions" });
+  const projectNames = () => [...tree().querySelectorAll(".project-row")].map((b) => b.textContent);
+
+  it("folds a Session's projects, keeping the one that asks, and counts the rest in a row that unfolds it", () => {
+    render(<Sidebar />);
+    const fold = within(tree()).getByRole("button", { name: "Fold default" });
+    expect(fold.getAttribute("aria-expanded")).toBe("true");
+    fireEvent.click(fold);
+    expect(useApp.getState().expanded[`session:${sessionKey("box", "default")}`]).toBe(false);
+    expect(projectNames()).toEqual(["ccpokeBlocked", "2 more"]);
+    expect(within(tree()).getByRole("button", { name: "Unfold default" }).getAttribute("aria-expanded")).toBe("false");
+    fireEvent.click(within(tree()).getByRole("button", { name: "2 more" }));
+    expect(projectNames()).toEqual(["herdr-app", "ccpokeBlocked", "journal"]);
+  });
+
+  it("folded, still shows the project holding the selected pane", () => {
+    useApp.setState({ expanded: { [`session:${sessionKey("box", "default")}`]: false }, selected: { machine_id: "box", session: "default", pane_id: "j" } });
+    useViewOrigin.setState({ from: "sessions" });
+    render(<Sidebar />);
+    expect(projectNames()).toEqual(["ccpokeBlocked", "journal", "1 more"]);
+  });
+
+  it("folds and unfolds a Session row with the arrow keys", () => {
+    render(<Sidebar />);
+    const session = within(tree()).getByText("default").closest("button")!;
+    fireEvent.keyDown(session, { key: "ArrowLeft" });
+    expect(projectNames()).toEqual(["ccpokeBlocked", "2 more"]);
+    fireEvent.keyDown(session, { key: "ArrowRight" });
+    expect(projectNames()).toHaveLength(3);
+  });
+
+  it("gives no fold control to a Session without projects", () => {
+    render(<Sidebar />);
+    expect(within(tree()).queryByRole("button", { name: /fold ai-radar/i })).toBeNull();
+  });
+
+  it("filters with one Active toggle that names how many sessions it keeps", () => {
+    render(<Sidebar />);
+    const active = within(tree()).getByRole("button", { name: "Active 1" });
+    expect(active.getAttribute("aria-pressed")).toBe("false");
+    fireEvent.click(active);
+    expect(useSessionFilter.getState().filter).toBe("active");
+    expect(active.getAttribute("aria-pressed")).toBe("true");
+    fireEvent.click(active);
+    expect(useSessionFilter.getState().filter).toBe("all");
+  });
+
+  it("marks a Bookmark row with its Session's status", () => {
+    useLayout.setState({ layout: { tree: [], bookmarks: [sessionKey("box", "default")] } });
+    render(<Sidebar />);
+    const bm = within(screen.getByRole("region", { name: "Bookmarks" })).getByText("default").closest("button")!;
+    expect(bm.querySelector(".slot .dot")!.className).toContain("dot-working");
   });
 });

@@ -55,7 +55,7 @@ function GroupRow({ group }: { group: RGroup }) {
         onClick={() => toggle(key, open)}
         onContextMenu={onMenu}
       >
-        <Chevron open={open} />
+        <span className="slot" aria-hidden="true"><Chevron open={open} /></span>
         <FolderIcon className="icon group-icon" />
         <span className="label">{group.label}</span>
       </button>

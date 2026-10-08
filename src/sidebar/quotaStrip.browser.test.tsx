@@ -59,10 +59,13 @@ it("opens the panel beside the strip, inside the window, every cell readable", a
   for (const n of document.querySelectorAll(".qp-num, .qp-name")) expect(fits(n), n.textContent!).toBe(true);
 });
 
-it("folds to a header that lines up with the Sidebar's sections, its line fitting the width", async () => {
+it("folds to a header whose label starts where the other sections' do, its line fitting the width", async () => {
   const head = document.querySelector<HTMLElement>(".quota-toggle")!;
   const nav = document.querySelector(".sidebar")!.getBoundingClientRect();
-  expect(Math.round(head.getBoundingClientRect().left)).toBe(Math.round(nav.left));
+  // Its label starts at 16, as every section header's does (sidebarTree.browser.test.tsx).
+  const label = document.createRange();
+  label.selectNodeContents([...head.childNodes].find((n) => n.nodeType === 3 && n.textContent!.trim())!);
+  expect(Math.round(label.getBoundingClientRect().left - nav.left)).toBe(16);
   await act(async () => head.click());
   expect(document.querySelectorAll(".quota-row")).toHaveLength(0);
   const line = document.querySelector<HTMLElement>(".quota-fold")!;
