@@ -1,6 +1,6 @@
 import { useMemo } from "react";
 import { create } from "zustand";
-import { IDLE_KEPT_MS, useMinuteClock } from "../agents/paneFilter";
+import { DEFAULT_KEPT_MS, useActiveKeptMs, useMinuteClock } from "../agents/paneFilter";
 import { tabRole } from "../agents/roles";
 import { paneKey } from "../lib/types";
 import type { MachineView, SessionView } from "../lib/types";
@@ -41,13 +41,14 @@ export const useSessionFilter = create<{ filter: SessionFilter; setFilter: (f: S
 }));
 
 /** A running session on a connected machine with an agent waiting, working, Done and not yet seen, or
- *  changed in the last 30 minutes (`since`), as the Agents column keeps it. */
+ *  changed within the Active window (`since`, `keptMs`), as the Agents column keeps it. */
 export function isActiveSession(
   machine: MachineView,
   session: SessionView,
   doneSeen: Record<string, true>,
   since: Record<string, number> = {},
   now = Date.now(),
+  keptMs = DEFAULT_KEPT_MS,
 ): boolean {
   if (machine.state !== "connected" || !session.running) return false;
   return session.workspaces.some((w) =>
@@ -59,7 +60,7 @@ export function isActiveSession(
         if (tabRole(t.label) === "lane") return false;
         const key = paneKey({ machine_id: machine.id, session: session.name, pane_id: p.pane_id });
         if (p.status === "done" && !doneSeen[key]) return true;
-        return since[key] !== undefined && now - since[key] <= IDLE_KEPT_MS;
+        return since[key] !== undefined && now - since[key] <= keptMs;
       }),
     ),
   );
@@ -118,13 +119,14 @@ export function useSidebarSessions(): { tree: RNode[]; bookmarks: RBookmark[]; h
   const doneSeen = useApp((s) => s.doneSeen);
   const since = useApp((s) => s.statusSince);
   const now = useMinuteClock();
+  const keptMs = useActiveKeptMs();
   // A key, not the ref: select() replaces `viewed` with an equal object, which must not re-render the sidebar.
   const viewedKey = useApp((s) => (s.viewed ? sessionKey(s.viewed.machine_id, s.viewed.session) : null));
   const layout = useLayout((s) => s.layout);
   const filter = useSessionFilter((s) => s.filter);
   return useMemo(() => {
     const r = resolve(layout, machines, order);
-    const f = filterResolved(r, (s) => s.key === viewedKey || isActiveSession(s.machine, s.session, doneSeen, since, now));
+    const f = filterResolved(r, (s) => s.key === viewedKey || isActiveSession(s.machine, s.session, doneSeen, since, now, keptMs));
     return filter === "active" ? { ...f, active: true } : { ...f, tree: r.tree, bookmarks: r.bookmarks, active: false };
-  }, [layout, machines, order, doneSeen, since, now, viewedKey, filter]);
+  }, [layout, machines, order, doneSeen, since, now, keptMs, viewedKey, filter]);
 }

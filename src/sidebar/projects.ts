@@ -1,9 +1,9 @@
-import { IDLE_KEPT_MS } from "../agents/paneFilter";
+import { DEFAULT_KEPT_MS } from "../agents/paneFilter";
 import { paneRoles, tabRole } from "../agents/roles";
 import { paneKey } from "../lib/types";
 import type { MachineView, PaneRef, PaneView, SessionView } from "../lib/types";
 
-/** What a project asks of the user, most urgent first. `recent`: its agent stopped in the last 30 minutes,
+/** What a project asks of the user, most urgent first. `recent`: its agent stopped within the Active window,
  *  so it stays in Active while the user is likely to return; `quiet` only shows under All. */
 export type ProjectState = "blocked" | "review" | "working" | "recent" | "quiet";
 
@@ -23,7 +23,7 @@ export interface ProjectRow {
 /**
  * The Session's Workspaces with agent work: one blocked (a lane's question included), one with a
  * Done not yet seen (a lane's Done is its orchestrator's), one working, one whose agent (not a lane)
- * stopped in the last 30 minutes, as the Agents column keeps it (`since`: when a pane's status last
+ * stopped within the Active window, as the Agents column keeps it (`since`: when a pane's status last
  * changed). Under All, every Workspace.
  */
 export function sessionProjects(
@@ -33,6 +33,7 @@ export function sessionProjects(
   all: boolean,
   since: Record<string, number> = {},
   now = Date.now(),
+  keptMs = DEFAULT_KEPT_MS,
 ): ProjectRow[] {
   if (machine.state !== "connected" || !session.running) return [];
   const ref = (p: PaneView): PaneRef => ({ machine_id: machine.id, session: session.name, pane_id: p.pane_id });
@@ -45,7 +46,7 @@ export function sessionProjects(
     const working = agents.some((p) => p.pane.status === "working");
     const ages = panes.flatMap((p) => {
       const t = p.pane.agent && tabRole(p.tabLabel) !== "lane" ? since[paneKey(ref(p.pane))] : undefined;
-      return t === undefined || now - t > IDLE_KEPT_MS ? [] : [now - t];
+      return t === undefined || now - t > keptMs ? [] : [now - t];
     });
     const idleFor = ages.length ? Math.min(...ages) : null;
     const state: ProjectState = blocked ? "blocked" : review ? "review" : working ? "working" : idleFor !== null ? "recent" : "quiet";

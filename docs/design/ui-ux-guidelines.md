@@ -239,8 +239,8 @@ copy of §7.1–§7.3; a Design-canvas `.dc.html`, sample data; screenshots are 
   toggle, `Active N`: on keeps what Active keeps, off shows All; the head's `+` centres over the rows'
   status marks),
   never scrolled away. Active (the default, persisted) keeps what needs a look: blocked, working,
-  done-unseen, an agent whose state herdr cannot read (`?`), an agent idle for under 30 minutes
-  (with its idle time, `12m`, so a Pane just looked at does not vanish), a shell running a command,
+  done-unseen, an agent whose state herdr cannot read (`?`), an agent idle for under the Active
+  window (Settings › General, 15m–4h, default 1h; with its idle time, `12m`, so a Pane just looked at does not vanish), a shell running a command,
   and the selected Pane. It leaves out idle shells and agents idle longer; a Workspace left with
   nothing goes too (an empty one stays, to add to). All shows every Pane in order, the ones Active
   leaves out in quiet text. No per-Workspace fold line: a control that scrolls away cannot be found
@@ -329,7 +329,7 @@ trail after the last (possibly nested) Group with no header, reading as its chil
 - So in the tree the project rows carry what needs the user and the Session row has no count or
   tint; a Bookmark row carries its project's word, as its row in the tree does.
 - SESSIONS starts on **Active**; the "N hidden · idle or stopped · Show" line lists the rest.
-  Like PANES, Active keeps a Session and a project for 30 minutes after its agent (not a lane)
+  Like PANES, Active keeps a Session and a project for the Active window after its agent (not a lane)
   stopped, muted with its age (`12m`): the user just looked at it and is likely to return. Rows
   keep the user's order: never re-sort by status (spatial memory).
 - The Machines section stays at the bottom and folds by default once more than one Machine exists.

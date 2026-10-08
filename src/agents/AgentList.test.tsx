@@ -5,7 +5,7 @@ import { herdrCall } from "../lib/ipc";
 import { useApp } from "../store/app";
 import { setFolder } from "../workspaces/folder";
 import { AgentList, workspaceGroups } from "./AgentList";
-import { usePaneFilter } from "./paneFilter";
+import { useActiveWindow, usePaneFilter } from "./paneFilter";
 import type { MachineView, PaneView } from "../lib/types";
 
 const pane = (id: string, title: string, agent: string | null, status: PaneView["status"]): PaneView => ({
@@ -78,17 +78,25 @@ describe("AgentList", () => {
     expect(JSON.parse(localStorage.getItem("herdr-app:settings")!).paneFilter).toBe("all");
   });
 
-  it("keeps an agent idle under 30 minutes in Active, with its idle time", () => {
+  it("keeps an agent idle under the Active window (1h by default), with its idle time", () => {
     useApp.setState({ statusSince: { "local/default/p4": ago(12 * MIN) } });
     render(<AgentList />);
     const row = screen.getByRole("button", { name: "Ship flag, pi, idle" });
     expect(within(row).getByText("12m").getAttribute("title")).toBe("Idle for 12m");
   });
 
-  it("hides an agent idle for more than 30 minutes", () => {
-    useApp.setState({ statusSince: { "local/default/p4": ago(31 * MIN) } });
+  it("hides an agent idle for longer than the Active window", () => {
+    useApp.setState({ statusSince: { "local/default/p4": ago(61 * MIN) } });
     render(<AgentList />);
     expect(screen.queryByText("Ship flag")).toBeNull();
+  });
+
+  it("follows the Active window set in Settings", () => {
+    useApp.setState({ statusSince: { "local/default/p4": ago(20 * MIN) } });
+    useActiveWindow.setState({ minutes: 15 });
+    render(<AgentList />);
+    expect(screen.queryByText("Ship flag")).toBeNull();
+    useActiveWindow.setState({ minutes: 60 });
   });
 
   it("names a pane's tab only in its tooltip", () => {

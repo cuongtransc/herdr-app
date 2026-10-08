@@ -11,6 +11,7 @@ import { DEFAULT_QUICK_REPLIES, QUICK_REPLIES_MAX, useQuickReplies } from "./qui
 import { Settings, useSettingsOpen } from "./Settings";
 import { DEFAULTS, loadFonts, useSettings } from "./store";
 import { useTheme } from "./theme";
+import { useActiveWindow } from "../agents/paneFilter";
 
 beforeEach(() => {
   useSettingsOpen.setState({ open: false });
@@ -46,6 +47,16 @@ describe("Settings dialog", () => {
     expect(useTheme.getState()).toMatchObject({ pref: "light", theme: "light" });
     expect(screen.getByRole("button", { name: "Light" }).getAttribute("aria-pressed")).toBe("true");
     expect(JSON.parse(localStorage.getItem("herdr-app:settings")!).theme).toBe("light");
+  });
+
+  it("sets how long Active keeps an idle agent, 1h by default, and remembers it", () => {
+    useActiveWindow.setState({ minutes: 60 });
+    render(<Settings />);
+    fireEvent.click(screen.getByRole("button", { name: "Settings" }));
+    expect(screen.getByRole("button", { name: "1h" }).getAttribute("aria-pressed")).toBe("true");
+    fireEvent.click(screen.getByRole("button", { name: "15m" }));
+    expect(useActiveWindow.getState().minutes).toBe(15);
+    expect(JSON.parse(localStorage.getItem("herdr-app:settings")!).activeMinutes).toBe(15);
   });
 
   it("opens as a dialog on the General section and switches sections", () => {

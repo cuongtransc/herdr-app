@@ -11,7 +11,7 @@ import { ActiveToggle } from "../sidebar/ActiveToggle";
 import { BotIcon, CheckIcon, ChevronIcon, CloseIcon, FolderOpenIcon, PencilIcon, PlusIcon, SplitDownIcon, SplitRightIcon, TabPlusIcon, TerminalIcon } from "../ui/icons";
 import { folderName, suggestFolder, useFolder } from "../workspaces/folder";
 import { AgentIcon } from "./AgentIcon";
-import { idleLabel, paneState, useMinuteClock, usePaneFilter } from "./paneFilter";
+import { idleLabel, paneState, useActiveKeptMs, useMinuteClock, usePaneFilter } from "./paneFilter";
 import { laneTitle, paneRoles, tabRole } from "./roles";
 import { AGENTS, openAgentTab } from "./openAgentTab";
 import { useTabReorder } from "./tabDnd";
@@ -400,12 +400,13 @@ function SessionPanes({ machineId, session }: { machineId: string; session: Sess
   const since = useApp((s) => s.statusSince);
   const selected = useApp((s) => (s.selected ? paneKey(s.selected) : null));
   const now = useMinuteClock();
+  const keptMs = useActiveKeptMs();
   const groups = workspaceGroups(session).map((g) => ({
     workspace: g.workspace,
     rows: ((roles) =>
       g.entries.map((entry, i): Row => {
         const key = paneKey({ machine_id: machineId, session: session.name, pane_id: entry.pane.pane_id });
-        return { entry, key, role: roles[i], ...paneState(entry.pane, !!doneSeen[key], since[key], now) };
+        return { entry, key, role: roles[i], ...paneState(entry.pane, !!doneSeen[key], since[key], now, keptMs) };
       }))(paneRoles(g.entries.map((e) => ({ tabLabel: e.tab.label, pane: e.pane })))),
   }));
   // A lane counts only while it needs the user: the rest is its orchestrator's.
