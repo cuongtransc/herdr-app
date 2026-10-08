@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it } from "vitest";
-import { HISTORY_MAX, HistoryCursor, readHistory, recordPrompt } from "./promptHistory";
+import { HISTORY_MAX, HistoryCursor, readHistory, recordPrompt, withSent } from "./promptHistory";
 
 beforeEach(() => localStorage.clear());
 
@@ -77,5 +77,14 @@ describe("HistoryCursor", () => {
     const c = new HistoryCursor(() => []);
     expect(c.back("draft")).toBeNull();
     expect(c.browsing).toBe(false);
+  });
+});
+
+describe("withSent", () => {
+  it("adds what was sent after the agent's history, skipping a repeat of the last, newest kept", () => {
+    expect(withSent(["a", "b"], ["b", "c", "c", "d"])).toEqual(["a", "b", "c", "d"]);
+    const long = Array.from({ length: HISTORY_MAX }, (_, i) => `p${i}`);
+    expect(withSent(long, ["new"]).slice(-2)).toEqual([`p${HISTORY_MAX - 1}`, "new"]);
+    expect(withSent(long, ["new"])).toHaveLength(HISTORY_MAX);
   });
 });

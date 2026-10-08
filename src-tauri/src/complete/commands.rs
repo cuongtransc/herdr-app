@@ -425,7 +425,7 @@ done
 
 const PLUGIN_FILES: &str = r#"cat "$1/.claude/settings.json" 2>/dev/null; printf '\036'; cat "$1/.claude/plugins/installed_plugins.json" 2>/dev/null"#;
 
-fn sh(script: &str, args: impl IntoIterator<Item = String>) -> Vec<String> {
+pub(super) fn sh(script: &str, args: impl IntoIterator<Item = String>) -> Vec<String> {
     let mut argv: Vec<String> = vec!["sh".into(), "-c".into(), script.into(), "sh".into()];
     argv.extend(args);
     argv

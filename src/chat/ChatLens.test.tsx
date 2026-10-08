@@ -3,6 +3,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 vi.mock("@tauri-apps/api/core", () => ({ invoke: vi.fn().mockResolvedValue([]), Channel: class {} }));
 vi.mock("../lib/ipc", () => ({
   herdrCall: vi.fn(),
+  claudePromptHistory: vi.fn().mockResolvedValue([]),
   chatPage: vi.fn().mockResolvedValue([]),
   chatLocate: vi.fn(() => opened),
   imageSaveTemp: vi.fn(),

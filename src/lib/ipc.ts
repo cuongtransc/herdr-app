@@ -105,6 +105,9 @@ export const chatLocate = (p: PaneRef) =>
   invoke<Located>("chat_locate", { machineId: p.machine_id, session: p.session, paneId: p.pane_id });
 export const completeCommands = (p: PaneRef) =>
   invoke<SlashCommand[]>("complete_commands", { machineId: p.machine_id, session: p.session, paneId: p.pane_id });
+/** Claude Code's own prompts for the Pane's folder (`~/.claude/history.jsonl` on its Machine), oldest first. */
+export const claudePromptHistory = (p: PaneRef) =>
+  invoke<string[]>("claude_prompt_history", { machineId: p.machine_id, session: p.session, paneId: p.pane_id });
 export const completeFiles = (p: PaneRef) =>
   invoke<string[]>("complete_files", { machineId: p.machine_id, session: p.session, paneId: p.pane_id });
 /** Entries of `dir` (relative to the Pane's folder, e.g. `../`), folders ending in `/`; empty when it is missing. */
