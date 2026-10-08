@@ -118,6 +118,25 @@ export const useSettings = create<SettingsStore>((setState, get) => ({
   },
 }));
 
+/** ⌘= / ⌘+ larger, ⌘− smaller, ⌘0 the default size; null for any other key. By `code` too, so
+ *  ⇧⌘= (which types "+") and other layouts read the same. */
+export type FontZoom = 1 | -1 | 0;
+type ZoomKeyEvent = Pick<KeyboardEvent, "key" | "code" | "metaKey" | "ctrlKey" | "altKey" | "shiftKey">;
+export function fontZoomKey(e: ZoomKeyEvent): FontZoom | null {
+  if (!e.metaKey || e.ctrlKey || e.altKey) return null;
+  if (e.key === "=" || e.key === "+" || e.code === "Equal") return 1;
+  if (e.key === "-" || e.key === "_" || e.code === "Minus") return -1;
+  if (!e.shiftKey && (e.key === "0" || e.code === "Digit0")) return 0;
+  return null;
+}
+
+/** One step of the open view's font size, as the Settings steppers (0.5px, clamped, saved). */
+export function zoomFont(lens: "chat" | "terminal", z: FontZoom): void {
+  const s = useSettings.getState();
+  const field = lens === "chat" ? "chatFontSize" : "terminalFontSize";
+  s.set({ [field]: z === 0 ? DEFAULTS[field] : s[field] + z * 0.5 });
+}
+
 export function termFontFamily(family: string): string {
   return `"${family}", Menlo, monospace`;
 }

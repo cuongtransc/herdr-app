@@ -14,6 +14,7 @@ import { useSettingsOpen } from "./settings/Settings";
 import { useApp } from "./store/app";
 import { useLensSettings } from "./settings/lens";
 import { useLayout } from "./settings/layout";
+import { DEFAULTS as FONT_DEFAULTS, useSettings } from "./settings/store";
 import { initialSlots, useQuota } from "./quota/store";
 
 describe("App shell", () => {
@@ -92,6 +93,28 @@ describe("App shell", () => {
     expect(useApp.getState().filesOverlay).toMatchObject({ workspace_id: "w1" });
     fireEvent.keyDown(window, { key: "e", metaKey: true });
     expect(useApp.getState().filesOverlay).toBeNull();
+  });
+
+  it("⌘+ and ⌘− size the open terminal's font, and leave the page alone without a pane", () => {
+    const pane = { machine_id: "local", session: "default", pane_id: "w1:p7" };
+    useSettings.setState({ ...FONT_DEFAULTS });
+    useApp.setState({
+      machines: { local: { id: "local", label: "local", kind: "local", state: "connected", error: null, version: "0.9.3", status: "idle",
+        sessions: [{ name: "default", running: true, status: "idle", error: null, workspaces: [
+          { workspace_id: "w1", label: "x", number: 1, status: "idle", tabs: [
+            { tab_id: "w1:t1", label: "1", number: 1, status: "idle", panes: [
+              { pane_id: "w1:p7", terminal_id: "t7", title: "sh", cwd: null, agent: null, status: "idle" } ] } ] } ] }] } },
+      order: ["local"], selected: pane, dashboardOpen: false, lens: {}, lensOverride: {},
+    });
+    render(<App />);
+    fireEvent.keyDown(window, { key: "+", code: "Equal", metaKey: true, shiftKey: true });
+    expect(useSettings.getState().terminalFontSize).toBe(FONT_DEFAULTS.terminalFontSize + 0.5);
+    fireEvent.keyDown(window, { key: "-", code: "Minus", metaKey: true });
+    fireEvent.keyDown(window, { key: "-", code: "Minus", metaKey: true });
+    expect(useSettings.getState().terminalFontSize).toBe(FONT_DEFAULTS.terminalFontSize - 0.5);
+    useApp.setState({ machines: {}, order: [], selected: null });
+    expect(fireEvent.keyDown(window, { key: "=", code: "Equal", metaKey: true })).toBe(true);
+    useSettings.setState({ ...FONT_DEFAULTS });
   });
 
   it("⌘T closes the Files overlay", () => {

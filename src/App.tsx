@@ -5,7 +5,7 @@ import { machinesList, onMachine, onMenuSettings, onNotifyActivate, onPaneStatus
 import { notifyPaneStatus } from "./notify";
 import { Palette } from "./palette/Palette";
 import { Settings, useSettingsOpen } from "./settings/Settings";
-import { applyChatFont, useSettings } from "./settings/store";
+import { applyChatFont, fontZoomKey, useSettings, zoomFont } from "./settings/store";
 import { applyTheme, useTheme } from "./settings/theme";
 import { Header } from "./main/Header";
 import { LayoutControls } from "./main/LayoutControls";
@@ -173,6 +173,16 @@ export default function App() {
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
+      // ⌘+ / ⌘− / ⌘0: the font of the view on screen, Terminal or Chat (iTerm, Ghostty).
+      const zoom = fontZoomKey(e);
+      if (zoom !== null) {
+        const s = useApp.getState();
+        const open = s.selected ? selectedPane(s)?.pane : null;
+        if (!open || !s.selected) return;
+        e.preventDefault();
+        zoomFont(defaultLens(open, chosenLens(s, paneKey(s.selected))), zoom);
+        return;
+      }
       // While the dashboard is open, ⌘K focuses its search instead.
       if (e.metaKey && e.key.toLowerCase() === "k" && !useApp.getState().dashboardOpen) {
         e.preventDefault();
