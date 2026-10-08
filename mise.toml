@@ -8,6 +8,9 @@ experimental = true # [deps] is experimental
 [tools]
 node = "24"
 pnpm = "11"
+# stable, as CI's dtolnay/rust-toolchain@stable. Without a pin the cargo shim fails with
+# "No version is set for shim" in a shell that lacks ~/.cargo/bin on PATH.
+rust = "stable"
 
 [env]
 APP = "src-tauri/target/release/bundle/macos/Herdr.app"
