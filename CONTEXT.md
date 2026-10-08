@@ -25,7 +25,9 @@ A named, nestable set of Sessions the user arranges in the sidebar; it can hold 
 _Avoid_: folder, project
 
 **Bookmark**:
-A Session the user pinned to the top of the sidebar, independent of which Group it is in.
+A project (a Workspace, by its Session and its label) the user pinned to the top of the sidebar, so
+it is one click away however deep its Session sits, folded or filtered out (ADR 0006). It outlives
+its Workspace: closed, it waits under the same name. Before ADR 0006 a Bookmark was a Session.
 _Avoid_: favourite, pin
 
 **Tab**:
@@ -124,7 +126,8 @@ _Avoid_: INPUT, Needs you, waiting, To do
 ## Relationships
 
 - A **Machine** has zero or more **Sessions**
-- A **Session** is in at most one **Group**; a **Group** has zero or more **Sessions** and **Groups**; a Session may also be a **Bookmark**
+- A **Session** is in at most one **Group**; a **Group** has zero or more **Sessions** and **Groups**
+- A **Workspace** may be a **Bookmark**; a **Bookmark** names at most one live **Workspace** (none while it is closed)
 - A running **Session** has one or more **Workspaces**; a **Workspace** has one or more **Tabs**; a **Tab** has one or more **Panes**
 - Each **Pane** has exactly one **Terminal**
 - A **Pane** has at most one **Agent**; an **Agent** has at most one **Transcript** the app can find

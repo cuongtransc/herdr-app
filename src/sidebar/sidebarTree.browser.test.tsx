@@ -15,7 +15,7 @@ const board: CtaQuota = { kind: "ok", readAt: now, accounts: [ok("claude", "a1",
 vi.mock("../lib/ipc", async (orig) => ({ ...(await orig<typeof import("../lib/ipc")>()), herdrCall: vi.fn(async () => undefined),
   quotaFetch: vi.fn(async () => ({ kind: "notSignedIn" })), quotaCta: vi.fn(async () => board) }));
 const { useApp } = await import("../store/app");
-const { useLayout, sessionKey } = await import("./groups");
+const { useLayout, sessionKey, projectKey } = await import("./groups");
 const { Sidebar } = await import("./Sidebar");
 const { QuotaStrip } = await import("./QuotaStrip");
 const { useSessionFilter } = await import("./activeFilter");
@@ -34,7 +34,7 @@ beforeEach(async () => {
   document.body.innerHTML = "";
   document.body.style.margin = "0";
   useApp.setState({ machines: { local, lan }, order: ["local", "lan"], selected: null, viewed: null, expanded: { machines: true }, doneSeen: {} } as never);
-  useLayout.setState({ layout: { bookmarks: [sessionKey("lan", "hs-xb")], tree: [
+  useLayout.setState({ layout: { bookmarks: [projectKey("lan", "hs-xb", "xbit-vault-specs")], tree: [
     { kind: "session", key: sessionKey("local", "default") },
     { kind: "session", key: sessionKey("lan", "hs-xb") },
     { kind: "group", id: "g1", label: "Work", children: [{ kind: "session", key: sessionKey("local", "ca") }, { kind: "session", key: sessionKey("local", "ct") }] },
@@ -72,7 +72,7 @@ it("starts every header label at 16, where the rows' glyphs start", () => {
 it("centres every first glyph at 24 and starts every name at 40, children one step of 24 in", () => {
   const sessions = (name: string, region: string) =>
     all(`[aria-label="${region}"] li.session > .row`).find((r) => r.querySelector(".label")!.textContent === name)!;
-  for (const row of [sessions("hs-xb", "Bookmarks"), sessions("default", "Groups"), sessions("hs-xb", "Groups")]) {
+  for (const row of [document.querySelector('[aria-label="Bookmarks"] .bm-row')!, sessions("default", "Groups"), sessions("hs-xb", "Groups")]) {
     near(centre(row.querySelector(".slot")!), 24);
     near(left(row.querySelector(".label")!), 40);
   }

@@ -81,7 +81,7 @@ it("stopped and offline sessions are quiet by colour, not by opacity", () => {
 });
 
 it("text takes the -text variant of a mark colour; only icons use the mark colour itself", () => {
-  const icons = new Set([".project-row .mark-done", ".agent-card .mark-done"]);
+  const icons = new Set([".project-row .mark-done", ".bm-row .mark-done", ".agent-card .mark-done"]);
   const rules = [...css.matchAll(/([^{}]+)\{([^}]*)\}/g)].filter(([, , body]) => /(^|[;\s])color:\s*var\(--(amber|green|blue)\)/.test(body));
   for (const [, selector] of rules) expect(icons.has(selector.trim()), selector.trim()).toBe(true);
 });

@@ -428,10 +428,21 @@ kbd {
 .project-row.active { background: var(--active); color: var(--fg); }
 .project-row.active .label { font-weight: 500; }
 .project-row.quiet, .project-row.recent { color: var(--fg-3); }
-.project-row .label { flex: 1; }
+/* The name keeps its width, so a bookmark star follows it; the word or meta sits at the right end. */
+.project-row .label { flex: 0 1 auto; min-width: 0; }
+.project-row .project-word, .project-row .project-meta { margin-left: auto; }
 .project-dot { flex: 0 0 7px; width: 7px; height: 7px; border-radius: 50%; background: var(--grey); }
 .project-row.blocked .project-dot { background: var(--amber); }
-.project-row.working .project-dot { background: var(--blue); }
+.project-row.working .project-dot, .bm-row.working .project-dot { background: var(--blue); }
+/* A bookmarked project (ADR 0006): its project's state, its Session muted after its name. */
+.bm-row .label { flex: 0 1 auto; min-width: 0; }
+.bm-row .bm-session { flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--fg-3); font-size: var(--fs-xs); }
+.bm-row.blocked { background: color-mix(in srgb, var(--amber) 7%, transparent); color: var(--fg); }
+.bm-row.blocked .project-dot { background: var(--amber); }
+.bm-row.quiet, .bm-row.recent, .bm-row.closed { color: var(--fg-3); }
+.bm-row.closed .project-dot { background: none; border: 1px solid var(--fg-3); box-sizing: border-box; }
+.bm-row .mark-done { flex: none; width: 12px; height: 12px; color: var(--green); }
+.bm-row.active { background: var(--active); color: var(--fg); }
 .project-row .mark-done { flex: none; width: 12px; height: 12px; color: var(--green); }
 .project-meta { flex: none; color: var(--fg-3); font-size: var(--fs-xs); }
 .project-word { flex: none; font-size: var(--fs-xs); font-weight: 700; letter-spacing: .04em; }

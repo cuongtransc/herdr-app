@@ -47,9 +47,8 @@ describe("filterResolved", () => {
     s("c"),
   ];
   it("keeps the order, hides emptied groups and counts the hidden sessions", () => {
-    const r = filterResolved({ tree, bookmarks: [s("b"), s("a")] }, (s) => s.key === "a");
+    const r = filterResolved({ tree, bookmarks: [] }, (s) => s.key === "a");
     expect(r.tree).toEqual([{ kind: "group", id: "g", label: "G", children: [s("a")] }]);
-    expect(r.bookmarks.map((b) => b.key)).toEqual(["a"]);
     expect(r.hidden).toBe(2);
   });
 });

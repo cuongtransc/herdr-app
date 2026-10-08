@@ -3,7 +3,7 @@ import type { DragEvent } from "react";
 import { useApp } from "../store/app";
 import { dropZone, useDragState } from "./dnd";
 import type { Drag, DragState, Zone } from "./dnd";
-import { canMove, moveBookmark, moveNode, resolve, setBookmarked, useLayout } from "./groups";
+import { canMove, moveBookmark, moveNode, resolve, useLayout } from "./groups";
 import type { NodeRef, SessionKey, Target } from "./groups";
 
 export const NODE_TYPE = "application/x-herdr-node";
@@ -186,34 +186,6 @@ export function useBookmarkRowDnd(key: SessionKey, nextKey: SessionKey | null): 
       e.preventDefault();
       const before = rectZone(e, "session") === "before" ? key : nextKey;
       useLayout.getState().update((l) => moveBookmark(l, d.key, before));
-    },
-  };
-}
-
-/** Drop target for the Bookmarks section: a dragged Session becomes a Bookmark. */
-export function useBookmarksDropDnd(): Props {
-  const s = useDragState();
-  if (!s) return {};
-  const sessionDrag = () => (s.dragging?.kind === "node" && s.dragging.ref.kind === "session" ? s.dragging.ref : null);
-  const onDragOver = (e: DragEvent) => {
-    if (!sessionDrag()) {
-      if (s.dragging?.kind === "node") e.dataTransfer.dropEffect = "none";
-      return;
-    }
-    e.preventDefault();
-    e.dataTransfer.dropEffect = "move";
-    show(s, "bookmarks", "into");
-  };
-  return {
-    onDragEnter: onDragOver,
-    onDragOver,
-    onDragLeave: (e: DragEvent) => leftRow(e) && hide(s, "bookmarks"),
-    onDrop: (e: DragEvent) => {
-      const ref = sessionDrag();
-      endDrag(s);
-      if (!ref) return;
-      e.preventDefault();
-      useLayout.getState().update((l) => setBookmarked(l, ref.key, true));
     },
   };
 }
