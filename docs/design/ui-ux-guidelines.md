@@ -303,8 +303,9 @@ trail after the last (possibly nested) Group with no header, reading as its chil
   no projects. Every name starts at x=40 (a Group's after its folder, at 64). A child level steps
   24, so its slot sits under its parent's first letter, with a 1px `--line-2` guide under the
   parent's glyph. `sidebarTree.browser.test.tsx` holds these numbers.
-- **One fold control: the chevron.** A Group and a Session with projects fold with the chevron in
-  their slot (a Group's folder only decorates), and with ←/→ on the focused row. Folded, a Session
+- **A click folds, like a folder in VS Code.** Every click on a Group or on a Session with projects
+  folds or unfolds it (a Session also opens), as do the chevron in its slot and ←/→ on the focused
+  row. One rule, no click-then-click-again or double-click variants. Folded, a Session
   keeps its Blocked and Review projects and the one holding the selected pane, and counts the rest in
   a last child row, `N more`, which unfolds it. Fold state persists per Session.
 - **One selected row.** Selecting a Session highlights the row that was clicked. Its twin (the same
