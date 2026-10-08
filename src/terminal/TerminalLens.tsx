@@ -117,14 +117,16 @@ export function TerminalLens({ pane, terminalId }: Props) {
     void ensureTermFont(useSettings.getState().terminalFontFamily).then(() => {
       if (!live) return;
       showWebgl(cacheKey, term);
-      if (!revealed) return;
       // Cells parsed while hidden, or under the other renderer's metrics, can composite stale
-      // pixels; redraw once layout has settled.
+      // pixels; redraw once layout has settled. A new terminal was fitted under the fallback
+      // font's cells: fit it again, or a taller font's last row falls below the pane.
       frame = requestAnimationFrame(() => {
         frame = requestAnimationFrame(() => {
           if (!live) return;
-          term.clearTextureAtlas();
-          term.refresh(0, term.rows - 1);
+          if (revealed) {
+            term.clearTextureAtlas();
+            term.refresh(0, term.rows - 1);
+          }
           try {
             fit.fit();
           } catch {
