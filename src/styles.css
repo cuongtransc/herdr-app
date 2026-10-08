@@ -249,7 +249,11 @@ kbd {
   background: var(--surface-side);
   border-right: 1px solid var(--line);
 }
-.sidebar-scroll { flex: 1; min-height: 0; overflow-y: auto; padding: 0 8px 8px; display: flex; flex-direction: column; }
+.sidebar-scroll { flex: 1; min-height: 0; overflow-y: scroll; padding: 0 0 8px 8px; display: flex; flex-direction: column; }
+/* Always room for the scrollbar, which takes the right padding's place: the list scrolling or not
+ * (Active on or off) must not move the right column. */
+.sidebar-scroll::-webkit-scrollbar { width: 8px; }
+.sidebar-scroll::-webkit-scrollbar-thumb { border-width: 2px; }
 .sidebar-scroll > * { flex-shrink: 0; }
 /* Groups fill the gap so right-clicking anywhere above Machines offers "New group"; Machines sit at the bottom. */
 .sidebar-scroll > .sessions-section { flex: 1 0 auto; display: flex; flex-direction: column; }

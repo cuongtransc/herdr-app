@@ -109,3 +109,16 @@ it("keeps a header's chevron well apart from the section's controls", () => {
     expect(ctl.left - chev.right).toBeGreaterThan(40);
   }
 });
+
+it("keeps the Active toggle still when switching it changes whether the list scrolls", async () => {
+  // Quiet projects enough to overflow under All, none of them kept by Active.
+  const many = ses("many", Array.from({ length: 30 }, (_, i) => ws("q" + i, "quiet-" + i)));
+  await act(async () => useApp.setState({ machines: { local: { ...local, sessions: [...local.sessions, many] }, lan } } as never));
+  const scroller = document.querySelector(".sidebar-scroll")!;
+  const toggle = () => document.querySelector(".sessions-section .active-toggle")!;
+  expect(scroller.scrollHeight).toBeGreaterThan(scroller.clientHeight);
+  const before = toggle().getBoundingClientRect().right;
+  await act(async () => (toggle() as HTMLElement).click());
+  expect(scroller.scrollHeight).toBeLessThanOrEqual(scroller.clientHeight);
+  expect(toggle().getBoundingClientRect().right).toBe(before);
+});
