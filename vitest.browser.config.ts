@@ -12,7 +12,8 @@ export default defineConfig({
     browser: {
       enabled: true,
       headless: true,
-      provider: playwright({ launchOptions: { channel: "chrome" } }),
+      // Scrollbars shown, as in the app: headless Chrome hides them, and they take width there.
+      provider: playwright({ launchOptions: { channel: "chrome", ignoreDefaultArgs: ["--hide-scrollbars"] } }),
       instances: [{ browser: "chromium", viewport: { width: 1000, height: 600 } }],
       commands: { drag, doubleClick, hover, key },
     },
