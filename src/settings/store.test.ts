@@ -7,6 +7,8 @@ import {
   ensureTermFont,
   filterFonts,
   fontFamilies,
+  fontZoomKey,
+  zoomFont,
   loadFonts,
   termFontFamily,
   useSettings,
@@ -176,5 +178,32 @@ describe("filterFonts", () => {
     expect(filterFonts(all, "mo")).toEqual(["Monaco", "CaskaydiaCove Nerd Font Mono", "FiraCode Nerd Font Mono"]);
     expect(filterFonts(all, "  LIL ")).toEqual(["Lilex"]);
     expect(filterFonts(all, "")).toEqual(all);
+  });
+});
+
+describe("font size keys", () => {
+  const key = (key: string, code: string, mods: Partial<KeyboardEvent> = {}) => fontZoomKey({ key, code, metaKey: true, ctrlKey: false, altKey: false, shiftKey: false, ...mods });
+  it("reads ⌘= and ⌘+ (⇧⌘=) as larger, ⌘− as smaller, ⌘0 as the default size", () => {
+    expect(key("=", "Equal")).toBe(1);
+    expect(key("+", "Equal", { shiftKey: true })).toBe(1);
+    expect(key("-", "Minus")).toBe(-1);
+    expect(key("0", "Digit0")).toBe(0);
+    expect(key("=", "Equal", { metaKey: false })).toBeNull();
+    expect(key("=", "Equal", { altKey: true })).toBeNull();
+    expect(key("k", "KeyK")).toBeNull();
+  });
+  it("steps the open view's font by half a pixel within its range, and ⌘0 resets only that size", () => {
+    zoomFont("terminal", 1);
+    expect(useSettings.getState().terminalFontSize).toBe(DEFAULTS.terminalFontSize + 0.5);
+    expect(useSettings.getState().chatFontSize).toBe(DEFAULTS.chatFontSize);
+    zoomFont("chat", -1);
+    expect(useSettings.getState().chatFontSize).toBe(DEFAULTS.chatFontSize - 0.5);
+    useSettings.getState().set({ chatFontSize: 18 });
+    zoomFont("chat", 1);
+    expect(useSettings.getState().chatFontSize).toBe(18);
+    zoomFont("terminal", 0);
+    expect(useSettings.getState().terminalFontSize).toBe(DEFAULTS.terminalFontSize);
+    expect(useSettings.getState().chatFontSize).toBe(18);
+    expect(JSON.parse(localStorage.getItem(KEY)!).terminalFontSize).toBe(DEFAULTS.terminalFontSize);
   });
 });
