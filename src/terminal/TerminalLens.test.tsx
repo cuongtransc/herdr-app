@@ -48,7 +48,8 @@ class FakeTerminal {
   }
 }
 vi.mock("@xterm/xterm", () => ({ Terminal: FakeTerminal }));
-vi.mock("@xterm/addon-fit", () => ({ FitAddon: class { fit() {} } }));
+let fits = 0;
+vi.mock("@xterm/addon-fit", () => ({ FitAddon: class { fit() { fits++; } } }));
 vi.mock("./unicode", () => ({ applyUnicode11: vi.fn() }));
 vi.mock("./osc52", () => ({ applyOsc52: vi.fn() }));
 vi.mock("./selectUx", () => ({ applySelectUx: () => () => {}, copyText: vi.fn() }));
@@ -185,6 +186,20 @@ describe("TerminalLens xterm lifetime", () => {
     await settle();
     expect(terms).toHaveLength(1);
     expect(size()).toBe(baseline + 1);
+  });
+});
+
+describe("TerminalLens size", () => {
+  it("fits a new terminal again once its font has loaded, so a taller font's rows still fit", async () => {
+    fits = 0;
+    mount();
+    const atOpen = fits;
+    // The font promise, then the two frames layout takes to settle.
+    await act(async () => {
+      await Promise.resolve();
+      await new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)));
+    });
+    expect(fits).toBeGreaterThan(atOpen);
   });
 });
 
