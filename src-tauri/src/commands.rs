@@ -519,6 +519,32 @@ pub async fn complete_commands(
     complete::list_commands(&*transport, &agent, &info.home, cwd.as_deref()).await
 }
 
+/// Claude Code's own prompt history for a Pane's folder, read on the Pane's Machine; empty for
+/// another agent or a Pane whose folder is unknown.
+#[tauri::command]
+pub async fn claude_prompt_history(
+    mgr: Mgr<'_>,
+    machine_id: String,
+    session: String,
+    pane_id: String,
+) -> Result<Vec<String>, AppError> {
+    let pane_ref = PaneRef {
+        machine_id,
+        session,
+        pane_id,
+    };
+    let pane = find_pane(&mgr, &pane_ref)?;
+    if pane.agent.as_deref() != Some("claude") {
+        return Ok(Vec::new());
+    }
+    let info = mgr.info(&pane_ref.machine_id)?;
+    let transport = mgr.transport(&pane_ref.machine_id)?;
+    let Some(cwd) = foreground_cwd(&mgr, &pane_ref).await.or(pane.cwd) else {
+        return Ok(Vec::new());
+    };
+    complete::history::claude_history(&*transport, &info.home, &cwd).await
+}
+
 /// The files under a Pane's working directory, read on the Pane's Machine.
 #[tauri::command]
 pub async fn complete_files(

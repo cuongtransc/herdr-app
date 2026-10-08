@@ -7,12 +7,13 @@ vi.mock("../lib/ipc", () => ({
   completeFiles: vi.fn(),
   completeEntries: vi.fn(),
   chatGitStatus: vi.fn().mockResolvedValue(null),
+  claudePromptHistory: vi.fn().mockResolvedValue([]),
 }));
 vi.mock("./complete", async (orig) => {
   const m = await orig<typeof import("./complete")>();
   return { ...m, rankFiles: vi.fn(m.rankFiles) };
 });
-import { completeCommands, completeEntries, completeFiles, herdrCall, imageSaveTemp } from "../lib/ipc";
+import { claudePromptHistory, completeCommands, completeEntries, completeFiles, herdrCall, imageSaveTemp } from "../lib/ipc";
 import { rankFiles } from "./complete";
 import { DEFAULT_QUICK_REPLIES, useQuickReplies } from "../settings/quickReplies";
 import { Composer } from "./Composer";
@@ -37,6 +38,7 @@ beforeEach(() => {
     { name: "clear", description: "Clear the conversation", source: "builtin" },
     { name: "compact", description: "Compact conversation context", source: "builtin" },
   ]);
+  vi.mocked(claudePromptHistory).mockReset().mockResolvedValue([]);
   vi.mocked(completeFiles).mockReset().mockResolvedValue(["README.md", "src/x.ts", "src/y.ts", "my docs/a.md"]);
   vi.mocked(completeEntries)
     .mockReset()
@@ -676,6 +678,63 @@ describe("Composer prompt history", () => {
     type(box, value);
     await act(async () => fireEvent.keyDown(box, { key: "Enter" }));
   };
+
+  it("recalls Claude's own history for the folder, then what was sent since, as Claude's terminal does", async () => {
+    vi.mocked(claudePromptHistory).mockResolvedValue(["from the terminal", "from yesterday"]);
+    recordPrompt("devtuf/default/w1:p1", "only in Herdr");
+    render(<Composer pane={pane} agent="claude" />);
+    const box = screen.getByRole<HTMLTextAreaElement>("textbox");
+    await waitFor(() => expect(claudePromptHistory).toHaveBeenCalledWith(pane));
+    await act(async () => {});
+    up(box);
+    expect(box.value).toBe("from yesterday");
+    up(box);
+    expect(box.value).toBe("from the terminal");
+    down(box);
+    down(box);
+    await sendText(box, "just now");
+    up(box);
+    expect(box.value).toBe("just now");
+    up(box);
+    expect(box.value).toBe("from yesterday");
+  });
+
+  it("recalls this session's prompts first, Claude's or pi's", async () => {
+    vi.mocked(claudePromptHistory).mockResolvedValue(["mine", "another session's"]);
+    render(<Composer pane={pane} agent="claude" sessionPrompts={["mine"]} />);
+    const box = screen.getByRole<HTMLTextAreaElement>("textbox");
+    await act(async () => {});
+    up(box);
+    expect(box.value).toBe("mine");
+    up(box);
+    expect(box.value).toBe("another session's");
+  });
+
+  it("gives a pi pane its session's prompts before Herdr's for the folder", async () => {
+    recordPrompt("devtuf/default/w1:p1", "sent from Herdr");
+    render(<Composer pane={pane} agent="pi" sessionPrompts={["typed in pi"]} />);
+    const box = screen.getByRole<HTMLTextAreaElement>("textbox");
+    up(box);
+    expect(box.value).toBe("typed in pi");
+    up(box);
+    expect(box.value).toBe("sent from Herdr");
+  });
+
+  it("falls back to Herdr's own history when Claude's cannot be read", async () => {
+    vi.mocked(claudePromptHistory).mockRejectedValue({ code: "io", message: "no ssh" });
+    recordPrompt("devtuf/default/w1:p1", "only in Herdr");
+    render(<Composer pane={pane} agent="claude" />);
+    const box = screen.getByRole<HTMLTextAreaElement>("textbox");
+    await act(async () => {});
+    up(box);
+    expect(box.value).toBe("only in Herdr");
+  });
+
+  it("does not ask a pi pane for Claude's history", async () => {
+    render(<Composer pane={pane} agent="pi" />);
+    await act(async () => {});
+    expect(claudePromptHistory).not.toHaveBeenCalled();
+  });
 
   it("recalls sent prompts with Up and returns the unsent draft with Down", async () => {
     render(<Composer pane={pane} agent="claude" />);

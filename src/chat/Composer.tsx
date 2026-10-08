@@ -1,5 +1,5 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
-import { herdrCall, imageSaveTemp } from "../lib/ipc";
+import { claudePromptHistory, herdrCall, imageSaveTemp } from "../lib/ipc";
 import { paneKey, type AgentStatus, type ChatMeta, type PaneRef, type SlashCommand } from "../lib/types";
 import { quickReplyButtons, useQuickReplies } from "../settings/quickReplies";
 import { CloseIcon, SendIcon, StopIcon } from "../ui/icons";
@@ -8,7 +8,7 @@ import { GitStatusLine } from "./GitStatus";
 import { rankCommands, rankFiles, readUsage, recordUse, splitParentQuery } from "./complete";
 import { dirSuggestions } from "../lib/pathInput";
 import { readDraft, useDraft } from "./drafts";
-import { HistoryCursor, readHistory, recordPrompt } from "./promptHistory";
+import { HistoryCursor, readHistory, recallList, recordPrompt } from "./promptHistory";
 import { useApp } from "../store/app";
 import { usePaneImages, type Attachment } from "./draftImages";
 import { activeTrigger, applyCompletion } from "./mentions";
@@ -80,6 +80,8 @@ const revoke = (a: Attachment) => {
   if (a.preview) URL.revokeObjectURL(a.preview);
 };
 
+const NO_PROMPTS: string[] = [];
+
 export function Composer({
   pane,
   agent,
@@ -87,6 +89,7 @@ export function Composer({
   onPiModel,
   meta,
   untracked,
+  sessionPrompts = NO_PROMPTS,
 }: {
   pane: PaneRef;
   agent: string | null;
@@ -96,6 +99,8 @@ export function Composer({
   meta?: ChatMeta;
   /** herdr's agent API does not know this agent (started through a wrapper): drive its pane. */
   untracked?: boolean;
+  /** The user's prompts in the session on screen, oldest first: Up recalls them first. */
+  sessionPrompts?: string[];
 }) {
   const key = paneKey(pane);
   const [text, setText] = useState(() => readDraft(key));
@@ -144,7 +149,34 @@ export function Composer({
         .find((p) => p.pane_id === pane.pane_id)?.cwd ?? null,
   );
   const historyScope = cwd ? `${pane.machine_id}:${cwd}` : key;
-  const history = useMemo(() => new HistoryCursor(() => readHistory(historyScope)), [historyScope]);
+  // A Claude pane recalls Claude's own history for the folder, as its terminal does (prompts typed
+  // there and from before Herdr kept any), then what was sent here since it was read. Herdr's
+  // store stands in for pi, and when Claude's history cannot be read or is empty.
+  const [claudeHistory, setClaudeHistory] = useState<string[]>([]);
+  const sentHere = useRef<string[]>([]);
+  useEffect(() => {
+    sentHere.current = [];
+    setClaudeHistory([]);
+    if (agent !== "claude") return;
+    let live = true;
+    claudePromptHistory({ machine_id: pane.machine_id, session: pane.session, pane_id: pane.pane_id }).then(
+      (h) => live && setClaudeHistory(h),
+      () => {},
+    );
+    return () => {
+      live = false;
+    };
+  }, [agent, historyScope, pane.machine_id, pane.session, pane.pane_id]);
+  const history = useMemo(
+    () =>
+      new HistoryCursor(() =>
+        // Herdr's store already holds what was sent here; Claude's file may not yet.
+        claudeHistory.length > 0
+          ? recallList(claudeHistory, sessionPrompts, sentHere.current)
+          : recallList(readHistory(historyScope), sessionPrompts, []),
+      ),
+    [historyScope, claudeHistory, sessionPrompts],
+  );
   // A recalled prompt replaces the text, with the caret at its end and no completion list on it.
   const recall = (t: string) => {
     setText(t);
@@ -296,6 +328,7 @@ export function Composer({
         () => {
           sentImages.forEach(revoke);
           recordPrompt(scope, sent);
+          sentHere.current.push(sent);
           if (agent === "pi" && PI_MODEL_RE.test(sent.trim())) onPiModel?.();
         },
         () => {

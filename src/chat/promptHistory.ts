@@ -29,6 +29,24 @@ export function recordPrompt(scope: string, prompt: string) {
   }
 }
 
+/** The agent's own history with the prompts sent since it was read after it, skipping a repeat
+ *  of the last (the agent may have written the newest one already); the newest `HISTORY_MAX`. */
+export function withSent(agent: string[], sent: string[]): string[] {
+  const out = [...agent];
+  for (const p of sent) if (out[out.length - 1] !== p) out.push(p);
+  return out.slice(-HISTORY_MAX);
+}
+
+/** What Up walks, oldest first: the folder's other prompts, then this session's (Claude recalls
+ *  the running session's first), then those sent since the session was read. */
+export function recallList(folder: string[], session: string[], sent: string[]): string[] {
+  const inSession = new Set(session);
+  return withSent(
+    [...folder.filter((p) => !inSession.has(p)), ...session],
+    sent.filter((p) => !inSession.has(p)),
+  );
+}
+
 /**
  * Where Up and Down stand in the history. The first step back keeps the unsent draft, which a
  * step forward past the newest prompt (or `cancel`) hands back, so browsing never loses it.

@@ -75,6 +75,7 @@ pub fn run() {
             commands::chat_image,
             commands::chat_close,
             commands::complete_commands,
+            commands::claude_prompt_history,
             commands::complete_files,
             commands::complete_entries,
             commands::complete_dirs,

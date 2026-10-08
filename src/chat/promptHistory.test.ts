@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it } from "vitest";
-import { HISTORY_MAX, HistoryCursor, readHistory, recordPrompt } from "./promptHistory";
+import { HISTORY_MAX, HistoryCursor, readHistory, recallList, recordPrompt, withSent } from "./promptHistory";
 
 beforeEach(() => localStorage.clear());
 
@@ -77,5 +77,24 @@ describe("HistoryCursor", () => {
     const c = new HistoryCursor(() => []);
     expect(c.back("draft")).toBeNull();
     expect(c.browsing).toBe(false);
+  });
+});
+
+describe("withSent", () => {
+  it("adds what was sent after the agent's history, skipping a repeat of the last, newest kept", () => {
+    expect(withSent(["a", "b"], ["b", "c", "c", "d"])).toEqual(["a", "b", "c", "d"]);
+    const long = Array.from({ length: HISTORY_MAX }, (_, i) => `p${i}`);
+    expect(withSent(long, ["new"]).slice(-2)).toEqual([`p${HISTORY_MAX - 1}`, "new"]);
+    expect(withSent(long, ["new"])).toHaveLength(HISTORY_MAX);
+  });
+});
+
+describe("recallList", () => {
+  it("puts this session's prompts after the folder's others, so Up meets them first, as Claude does", () => {
+    // Oldest first: Up walks it from the end.
+    expect(recallList(["other a", "mine 1", "other b"], ["mine 1", "mine 2"], [])).toEqual(["other a", "other b", "mine 1", "mine 2"]);
+  });
+  it("adds prompts sent since, unless the session already shows them", () => {
+    expect(recallList(["x"], ["s1"], ["s1", "s2"])).toEqual(["x", "s1", "s2"]);
   });
 });
