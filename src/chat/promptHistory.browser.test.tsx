@@ -10,6 +10,7 @@ vi.mock("../lib/ipc", () => ({
   completeFiles: vi.fn(async () => []),
   completeEntries: vi.fn(async () => []),
   chatGitStatus: vi.fn(async () => null),
+  claudePromptHistory: vi.fn(async () => []),
 }));
 import { Composer } from "./Composer";
 import { recordPrompt } from "./promptHistory";
