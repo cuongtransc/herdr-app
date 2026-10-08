@@ -13,6 +13,8 @@ export const systemFonts = (monospace = true) => invoke<string[]>("system_fonts"
 export const fontFace = (family: string, style: string) => invoke<ArrayBuffer>("font_face", { family, style });
 /** Native appearance (vibrancy, traffic lights); `null` follows the system. */
 export const setWindowTheme = (theme: "light" | "dark" | null) => getCurrentWindow().setTheme(theme);
+/** The Dock icon's badge; 0 removes it. */
+export const setDockBadge = async (n: number) => getCurrentWindow().setBadgeCount(n > 0 ? n : undefined);
 export const machineAdd = (sshTarget: string, label: string | null, herdrPath: string | null) =>
   invoke<MachineView>("machine_add", { sshTarget, label, herdrPath });
 export const machineRemove = (id: string) => invoke<void>("machine_remove", { id });
