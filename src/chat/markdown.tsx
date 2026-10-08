@@ -70,6 +70,13 @@ export const mdComponents: Components = {
     if (inPre || inLink || className) return <code className={className}>{children}</code>;
     return <PathCode text={nodeText(node)}>{children}</PathCode>;
   },
+  table({ children }) {
+    return (
+      <div className="chat-table">
+        <table>{children}</table>
+      </div>
+    );
+  },
   a({ href, children }) {
     return (
       <InLinkContext.Provider value={true}>
