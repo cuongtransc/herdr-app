@@ -7,6 +7,7 @@ import { useApp } from "../store/app";
 import { stepTriage, triageQueue } from "../dashboard/triage";
 import type { MenuItem } from "../sidebar/ContextMenu";
 import { ActionsProvider, useActions } from "../sidebar/actions";
+import { ActiveToggle } from "../sidebar/ActiveToggle";
 import { BotIcon, CheckIcon, ChevronIcon, CloseIcon, FolderOpenIcon, PencilIcon, PlusIcon, SplitDownIcon, SplitRightIcon, TabPlusIcon, TerminalIcon } from "../ui/icons";
 import { folderName, suggestFolder, useFolder } from "../workspaces/folder";
 import { AgentIcon } from "./AgentIcon";
@@ -382,17 +383,13 @@ export const AgentList = memo(function AgentList() {
   return <SessionPanes machineId={viewed.machine_id} session={session} />;
 });
 
-/** The PANES header (All | Active N, as in the sidebar's Sessions section). */
+/** The PANES header (Active N, as in the sidebar's Sessions section). */
 function PanesHeader({ active, count }: { active: boolean; count: number }) {
   const setFilter = usePaneFilter((s) => s.setFilter);
   return (
     <div className="section-head panes-head">
       <span className="section-label">Panes</span>
-      <div className={"seg seg-sm" + (active ? " seg-right" : "")} role="group" aria-label="Show panes">
-        <span className="seg-thumb" aria-hidden="true" />
-        <button type="button" aria-pressed={!active} onClick={() => setFilter("all")}>All</button>
-        <button type="button" aria-pressed={active} onClick={() => setFilter("active")}>Active {count}</button>
-      </div>
+      <ActiveToggle on={active} count={count} onChange={(on) => setFilter(on ? "active" : "all")} />
     </div>
   );
 }

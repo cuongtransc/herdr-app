@@ -31,12 +31,20 @@ export function useProjects(machine: MachineView, session: SessionView): { rows:
   return { rows, current: fromTree && rows.some((r) => r.id === selectedWs) ? selectedWs : null };
 }
 
-export function ProjectRows({ rows, current }: { rows: ProjectRow[]; current: string | null }) {
+/**
+ * A Session's project rows. Folded, it keeps the ones that ask for the user (Blocked, Review) and the
+ * one holding the selected pane, then counts the rest in a row that unfolds the Session.
+ */
+export function ProjectRows({ rows, current, folded = false, onUnfold }: { rows: ProjectRow[]; current: string | null; folded?: boolean; onUnfold?: () => void }) {
   const select = useApp((s) => s.select);
   const setOrigin = useViewOrigin((s) => s.set);
+  const shown = folded ? rows.filter((r) => WORD[r.state] || r.id === current) : rows;
+  const hidden = rows.length - shown.length;
+  // Folded with nothing to keep, the Session's closed chevron says it all.
+  if (shown.length === 0) return null;
   return (
     <ul className="project-list">
-      {rows.map((r) => {
+      {shown.map((r) => {
         const word = WORD[r.state];
         const lanes = r.state === "working" && r.lanes > 0 ? `${r.lanes} ${r.lanes === 1 ? "lane" : "lanes"}` : null;
         // A project kept for having stopped recently says how long ago, as an idle pane row does.
@@ -55,13 +63,23 @@ export function ProjectRows({ rows, current }: { rows: ProjectRow[]; current: st
               aria-label={[r.label, word?.toLowerCase(), lanes, age && `idle ${age}`].filter(Boolean).join(", ")}
               onClick={open}
             >
-              {r.state === "review" ? <CheckIcon className="icon mark-done" aria-hidden="true" /> : <span className="project-dot" aria-hidden="true" />}
+              <span className="slot" aria-hidden="true">
+                {r.state === "review" ? <CheckIcon className="icon mark-done" /> : <span className="project-dot" />}
+              </span>
               <span className="label">{r.label}</span>
               {word ? <span className={"project-word " + r.state}>{word}</span> : (lanes ?? age) && <span className="project-meta">{lanes ?? age}</span>}
             </button>
           </li>
         );
       })}
+      {hidden > 0 && (
+        <li>
+          <button type="button" className="project-row more-row" onClick={onUnfold}>
+            <span className="slot" aria-hidden="true" />
+            <span className="label">{hidden} more</span>
+          </button>
+        </li>
+      )}
     </ul>
   );
 }

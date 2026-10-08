@@ -77,8 +77,8 @@ export function QuotaStrip() {
     <div ref={strip} className={"quota-strip" + (open ? " open" : "")}>
       {open && <QuotaPanel anchor={strip} onClose={() => setOpen(false)} />}
       <button type="button" className="section-toggle quota-toggle" aria-expanded={unfolded} onClick={() => toggle("quota", unfolded)}>
-        <ChevronIcon className={"icon chev" + (unfolded ? " open" : "")} />
         Quota
+        <ChevronIcon className={"icon chev" + (unfolded ? " open" : "")} />
         {fold && (
           <span className="quota-fold-line">
             <span className={"quota-fold" + (fold.warn ? " tone-warn" : "")}>{fold.text}</span>

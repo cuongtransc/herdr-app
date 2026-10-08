@@ -235,7 +235,9 @@ copy of §7.1–§7.3; a Design-canvas `.dc.html`, sample data; screenshots are 
 
 - **Rows**: one line, 28px. `[16px agent mark] title … [mark slot]`; blocked adds the amber tint and
   the word Blocked. No icon tile, no badge line, no unlabelled "1"/"2" tab digits.
-- **PANES All | Active N**: under the column head, the Sessions section's header and vocabulary,
+- **PANES Active N**: under the column head, the Sessions section's header and vocabulary (one
+  toggle, `Active N`: on keeps what Active keeps, off shows All; the head's `+` centres over the rows'
+  status marks),
   never scrolled away. Active (the default, persisted) keeps what needs a look: blocked, working,
   done-unseen, an agent whose state herdr cannot read (`?`), an agent idle for under 30 minutes
   (with its idle time, `12m`, so a Pane just looked at does not vanish), a shell running a command,
@@ -285,21 +287,30 @@ folder). Its rows are indented like a Group's children, so it reads both as a se
 Group. A bookmarked Session shows twice and both rows light up when selected, and ungrouped Sessions
 trail after the last (possibly nested) Group with no header, reading as its children. The fix:
 
-- **Three sibling sections, one header style**: BOOKMARKS (only when not empty), SESSIONS, MACHINES,
-  each an 11px/600 caps label with the same fold chevron. All|Active belongs to the SESSIONS header
-  and filters Bookmarks too.
+- **Four sibling sections, one header style**: BOOKMARKS (only when not empty), SESSIONS, MACHINES,
+  and QUOTA at the foot, each an 11px/600 caps label in `--fg-2` at x=16 with its fold chevron right
+  after it, never at the left edge, where it would share a column with the rows' own chevrons. No fill:
+  fill means selection. A 1px `--line` and 12px separate sections. A section's controls sit at the
+  header's right end, well apart from its chevron: SESSIONS' `Active N` toggle (it filters Bookmarks
+  too) and MACHINES' `+`, which centres over the machines' status dots.
 - **Bookmarks are shortcuts, not a container.** Their rows sit under the section header like any
-  section's rows, without a Group's guide line or fold chevron, and keep the user's order.
-- **Each level starts under its parent's text.** A section's rows start where its header's text does;
-  a Group's children start where the Group's name does, with the guide line under the Group's
-  chevron.
+  section's rows, without a Group's guide line or fold chevron, and keep the user's order. Their
+  slot shows the Session's status dot.
+- **Two columns, one step.** Every row's first glyph sits in a 16px slot at x=16, centred in it: a
+  fold chevron, a Bookmark's status dot, a machine icon, a quota tile, or nothing for a Session with
+  no projects. Every name starts at x=40 (a Group's after its folder, at 64). A child level steps
+  24, so its slot sits under its parent's first letter, with a 1px `--line-2` guide under the
+  parent's glyph. `sidebarTree.browser.test.tsx` holds these numbers.
+- **One fold control: the chevron.** A Group and a Session with projects fold with the chevron in
+  their slot (a Group's folder only decorates), and with ←/→ on the focused row. Folded, a Session
+  keeps its Blocked and Review projects and the one holding the selected pane, and counts the rest in
+  a last child row, `N more`, which unfolds it. Fold state persists per Session.
 - **One selected row.** Selecting a Session highlights the row that was clicked. Its twin (the same
   Session in the other section) shows only the quieter "current" mark (`--hover` fill), so two rows
   are never both "selected".
 - **Ungrouped Sessions get a place**: they come first in SESSIONS, before the Groups (or under an
   "Ungrouped" label when Groups exist), never after the last Group where they read as its children.
-- Group nesting therefore steps one Group label (42px) per level, with a 1px `--line` guide, so
-  depth stays legible past two levels.
+- Group nesting therefore steps 24px per level, the same step as every other child level.
 
 **Rows.**
 

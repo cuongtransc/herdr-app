@@ -66,11 +66,12 @@ describe("AgentList", () => {
     expect(screen.queryByText(/^(DONE|IDLE|WORKING)$/)).toBeNull();
   });
 
-  it("heads the panes with All | Active N, Active by default, like the Sessions section", () => {
+  it("heads the panes with one Active N toggle, on by default, like the Sessions section", () => {
     render(<AgentList />);
-    const seg = screen.getByRole("group", { name: "Show panes" });
-    expect(within(seg).getByRole("button", { name: "Active 3" }).getAttribute("aria-pressed")).toBe("true");
-    fireEvent.click(within(seg).getByRole("button", { name: "All" }));
+    const active = screen.getByRole("button", { name: "Active 3" });
+    expect(active.getAttribute("aria-pressed")).toBe("true");
+    fireEvent.click(active);
+    expect(active.getAttribute("aria-pressed")).toBe("false");
     expect(rowsOf("web")).toEqual(["Guard export, codex, blocked", "Tag v1.4.0, shell", "Ship flag, pi, idle"]);
     expect(screen.getByRole("button", { name: "Ship flag, pi, idle" }).className).toContain("quiet");
     expect(screen.getByRole("button", { name: "Guard export, codex, blocked" }).className).not.toContain("quiet");
