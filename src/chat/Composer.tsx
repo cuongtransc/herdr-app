@@ -419,8 +419,8 @@ export function Composer({
             }
             // After the completion list: Up on the first line and Down on the last step through the
             // sent prompts (a recalled one keeps stepping with the caret at its end); elsewhere they
-            // move the caret. Escape gives back the draft.
-            if (!e.nativeEvent.isComposing && !e.altKey && !e.metaKey && !e.ctrlKey && !e.shiftKey) {
+            // move the caret. Escape gives back the draft. An open list, even a loading one, keeps them.
+            if (!open && !e.nativeEvent.isComposing && !e.altKey && !e.metaKey && !e.ctrlKey && !e.shiftKey) {
               const { value, selectionStart: start, selectionEnd: end } = e.currentTarget;
               if (e.key === "ArrowUp" && start === end && (!value.slice(0, start).includes("\n") || (history.browsing && start === value.length))) {
                 const prev = history.back(value);
