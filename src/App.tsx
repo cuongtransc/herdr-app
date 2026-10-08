@@ -13,15 +13,18 @@ import { useDockBadge } from "./main/dockBadge";
 import { TriageHud } from "./main/TriageHud";
 import { useTriage } from "./main/triage";
 import { useLayout } from "./settings/layout";
+import { OpenStrip } from "./main/OpenStrip";
 import { Sidebar } from "./sidebar/Sidebar";
 import { QuotaStrip } from "./sidebar/QuotaStrip";
 import { guardFileDrops } from "./sidebar/dnd";
 import { AgentList } from "./agents/AgentList";
 import { AgentDashboard } from "./dashboard/AgentDashboard";
-import { toggleFilesOverlay } from "./files/FilesEntry";
+import { FilesPanel } from "./files/FilesPanel";
+import { useFilesPanel } from "./files/panelStore";
 import { openNewTabHere } from "./agents/newTabShortcut";
 import { paneKey } from "./lib/types";
-import { chosenLens, selectedPane, useApp } from "./store/app";
+import { activeItem, chosenLens, selectedPane, useApp } from "./store/app";
+import { itemKey } from "./store/openItems";
 import { syncSeenToHerdr } from "./store/seenSync";
 import { showToast, Toasts } from "./ui/Toast";
 import { openUrl } from "@tauri-apps/plugin-opener";
@@ -90,7 +93,8 @@ function EmptyMain() {
 
 const ChatLens = lazy(() => import("./chat/ChatLens").then((m) => ({ default: m.ChatLens })));
 const TerminalLens = lazy(() => import("./terminal/TerminalLens").then((m) => ({ default: m.TerminalLens })));
-const FilesOverlay = lazy(() => import("./files/FilesOverlay").then((m) => ({ default: m.FilesOverlay })));
+// react-markdown and lowlight load with the first open file, not with the app.
+const FileViewer = lazy(() => import("./files/FileViewer").then((m) => ({ default: m.FileViewer })));
 
 export default function App() {
   const upsert = useApp((s) => s.upsertMachine);
@@ -102,7 +106,8 @@ export default function App() {
   const starting = useApp((s) => (s.selected ? !!s.starting[paneKey(s.selected)] : false));
   const [paletteOpen, setPaletteOpen] = useState(false);
   const dashboardOpen = useApp((s) => s.dashboardOpen);
-  const filesOverlay = useApp((s) => s.filesOverlay);
+  const item = useApp(activeItem);
+  const online = useApp((s) => (item?.kind === "file" ? s.machines[item.ws.machine_id]?.state === "connected" : false));
   const chatFontSize = useSettings((s) => s.chatFontSize);
   const chatFontFamily = useSettings((s) => s.chatFontFamily);
   const chatMonoFamily = useSettings((s) => s.chatMonoFamily);
@@ -198,12 +203,6 @@ export default function App() {
         e.preventDefault();
         if (!e.repeat) useApp.getState().setDashboardOpen(!useApp.getState().dashboardOpen);
       }
-      if (e.metaKey && !e.shiftKey && !e.altKey && !e.ctrlKey && e.key.toLowerCase() === "e") {
-        e.preventDefault();
-        if (e.repeat) return;
-        setPaletteOpen(false);
-        toggleFilesOverlay();
-      }
       if (e.metaKey && !e.altKey && !e.ctrlKey && e.key.toLowerCase() === "b") {
         e.preventDefault();
         if (!e.repeat) useLayout.getState().toggle(e.shiftKey ? "focus" : "sidebar");
@@ -211,10 +210,33 @@ export default function App() {
       if (e.metaKey && !e.shiftKey && !e.altKey && !e.ctrlKey && e.key.toLowerCase() === "t") {
         e.preventDefault();
         if (e.repeat) return;
-        useApp.getState().setFilesOverlay(null);
         openNewTabHere().catch((err: unknown) =>
           showToast(`Could not open a new tab: ${(err as { message?: string } | null)?.message ?? String(err)}`),
         );
+      }
+      const plain = e.metaKey && !e.shiftKey && !e.altKey && !e.ctrlKey;
+      const k = e.key.toLowerCase();
+      // A dialog keeps its keys.
+      if (document.querySelector(".overlay")) return;
+      if (plain && k === "e") {
+        e.preventDefault();
+        if (e.repeat) return;
+        // Focus hides the agents column, and the Files panel with it.
+        if (useLayout.getState().layout === "focus") useLayout.getState().toggle("focus");
+        useFilesPanel.getState().focusTree();
+      } else if (plain && k === "p") {
+        e.preventDefault();
+        if (e.repeat) return;
+        if (useLayout.getState().layout === "focus") useLayout.getState().toggle("focus");
+        useFilesPanel.getState().focusGoto();
+      } else if (plain && k === "w") {
+        e.preventDefault();
+        if (e.repeat) return;
+        const active = useApp.getState().openItems.active;
+        if (active) useApp.getState().closeItems(active, "one");
+      } else if (e.metaKey && e.shiftKey && !e.altKey && !e.ctrlKey && (e.code === "BracketLeft" || e.code === "BracketRight")) {
+        e.preventDefault();
+        useApp.getState().cycleItems(e.code === "BracketLeft" ? -1 : 1);
       }
     };
     window.addEventListener("keydown", onKey);
@@ -243,11 +265,21 @@ export default function App() {
       </nav>
       <aside className="agents" aria-label="Agents" hidden={layout === "focus"}>
         <AgentList />
+        <FilesPanel />
       </aside>
       <main className="main">
-        {pane && ref ? (
+        {item?.kind === "file" ? (
+          <>
+            {pane && ref ? <Header /> : <div className="titlebar" data-tauri-drag-region />}
+            <OpenStrip />
+            <Suspense fallback={null}>
+              <FileViewer key={itemKey(item)} item={item} online={online} />
+            </Suspense>
+          </>
+        ) : pane && ref ? (
           <>
             <Header />
+            <OpenStrip />
             <Suspense fallback={null}>
               {defaultLens(pane, remembered) === "chat" ? (
                 <ChatLens key={key} pane={ref} view={pane} />
@@ -261,6 +293,7 @@ export default function App() {
           // rather than flashing the empty state.
           <>
             <div className="titlebar" data-tauri-drag-region />
+            <OpenStrip />
             <div className="term-lens">
               <StartingOverlay pane={selRef} />
             </div>
@@ -268,6 +301,7 @@ export default function App() {
         ) : (
           <>
             <div className="titlebar" data-tauri-drag-region />
+            <OpenStrip />
             <div className="main-empty">
               <EmptyMain />
             </div>
@@ -275,11 +309,6 @@ export default function App() {
         )}
       </main>
       {dashboardOpen && <AgentDashboard />}
-      {filesOverlay && (
-        <Suspense fallback={null}>
-          <FilesOverlay />
-        </Suspense>
-      )}
       <TriageHud />
       <Toasts />
       {paletteOpen && <Palette onClose={() => setPaletteOpen(false)} />}

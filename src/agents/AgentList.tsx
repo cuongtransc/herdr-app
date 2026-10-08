@@ -3,7 +3,9 @@ import type { ReactNode } from "react";
 import { herdrCall, sessionStart } from "../lib/ipc";
 import { paneKey } from "../lib/types";
 import type { AgentStatus, PaneView, SessionView, TabView, WorkspaceView } from "../lib/types";
+import { useFilesPanel } from "../files/panelStore";
 import { useApp } from "../store/app";
+import { itemKey } from "../store/openItems";
 import { stepTriage, triageQueue } from "../dashboard/triage";
 import type { MenuItem } from "../sidebar/ContextMenu";
 import { ActionsProvider, useActions } from "../sidebar/actions";
@@ -141,6 +143,7 @@ function AgentCard({
   const title = row.role === "lane" || tabRole(tab.label) === "brief" ? laneTitle(pane.title) : pane.title;
   const ref = { machine_id: machineId, session, pane_id: pane.pane_id };
   const active = useApp((s) => s.selected !== null && paneKey(s.selected) === paneKey(ref));
+  const pin = useApp((s) => s.pinItem);
   const seen = useApp((s) => !!s.doneSeen[paneKey(ref)]);
   const lane = tabRole(tab.label) === "lane";
   const word = statusWord(pane.status, seen, !!pane.agent, lane);
@@ -179,6 +182,7 @@ function AgentCard({
         aria-label={`${title}${activity ? ` · ${activity}` : ""}, ${pane.agent ?? "shell"}${word ? `, ${word}` : ""}`}
         aria-current={active ? "true" : undefined}
         onClick={() => select(ref)}
+        onDoubleClick={() => pin(itemKey({ kind: "agent", ref }))}
         onContextMenu={(e) => a?.menu(e, items)}
         // The tab's name and the folder live in the tooltip: on the row they crowded the title.
         title={[sub, pane.cwd].filter(Boolean).join(" · ") || undefined}
@@ -245,6 +249,16 @@ function WorkspaceGroup({ machineId, session, workspace: ws, rows: all, active }
     ws.tabs.map((t) => t.tab_id),
     (tab_id, insert_index) => a?.guard(call("tab.move", { tab_id, insert_index })),
   );
+  // The panel follows the active item, else the selected Pane: browsing a Workspace selects its selected
+  // pane again (or its first), which also leaves a file item of another Workspace.
+  const browse = () => {
+    const panes = ws.tabs.flatMap((t) => t.panes);
+    const sel = useApp.getState().selected;
+    const inWs = sel && sel.machine_id === machineId && sel.session === session && panes.some((p) => p.pane_id === sel.pane_id);
+    if (!inWs && !panes[0]) return;
+    useApp.getState().select(inWs ? sel : { machine_id: machineId, session, pane_id: panes[0].pane_id });
+    useFilesPanel.getState().focusTree();
+  };
   const items: MenuItem[] = a
     ? [
         // Starts straight away in the workspace folder (else a pane's cwd, else herdr's default).
@@ -253,7 +267,7 @@ function WorkspaceGroup({ machineId, session, workspace: ws, rows: all, active }
           icon: agent === "shell" ? TerminalIcon : BotIcon,
           onSelect: () => a.guard(() => openAgentTab(machineId, session, ws.workspace_id, agent, folder ?? suggestFolder(ws))),
         })),
-        { label: "Browse files", icon: FolderOpenIcon, onSelect: () => useApp.getState().setFilesOverlay(ref) },
+        { label: "Browse files", icon: FolderOpenIcon, onSelect: browse },
         { label: "Change folder…", icon: FolderOpenIcon, onSelect: () => a.changeFolder(ref, folder ?? suggestFolder(ws)) },
         { label: "Rename workspace…", icon: PencilIcon, onSelect: () => a.rename("Rename workspace", ws.label, (label) => call("workspace.rename", { workspace_id: ws.workspace_id, label })()) },
         { label: "Close workspace", icon: CloseIcon, onSelect: () => a.confirm("Close workspace", `Close workspace "${ws.label}" and all its panes?`, "Close", call("workspace.close", { workspace_id: ws.workspace_id })) },

@@ -2,8 +2,7 @@ import { memo, useLayoutEffect, useRef } from "react";
 import { triageQueue } from "../dashboard/triage";
 import { useLayout } from "../settings/layout";
 import { useApp } from "../store/app";
-import { toggleFilesOverlay } from "../files/FilesEntry";
-import { BoardIcon, FolderOpenIcon, SidebarIcon } from "../ui/icons";
+import { BoardIcon, SidebarIcon } from "../ui/icons";
 import { useTriage } from "./triage";
 
 /** Beside the traffic lights whatever the layout: the sidebar toggle and, in focus, the agents that need you (a click steps like ⌘J). */
@@ -20,7 +19,6 @@ export const LayoutControls = memo(function LayoutControls() {
   const step = useTriage((s) => s.step);
   const boardOpen = useApp((s) => s.dashboardOpen);
   const setBoardOpen = useApp((s) => s.setDashboardOpen);
-  const filesOpen = useApp((s) => !!s.filesOverlay);
   const focus = layout === "focus";
   // In focus the waiting pill carries the count; the Board shows it otherwise.
   const need = focus ? 0 : waiting + done;
@@ -61,17 +59,6 @@ export const LayoutControls = memo(function LayoutControls() {
         {/* With the sidebar hidden the controls sit over the Agents column: the word gives way. */}
         {shown && "Board"}
         {need > 0 && <span className="need" aria-hidden="true">{need}</span>}
-      </button>
-      {/* An icon only: with the Board's word the controls would run past the sidebar column. */}
-      <button
-        type="button"
-        className="icon-btn"
-        aria-pressed={filesOpen}
-        aria-label="Files of the selected workspace (⌘E)"
-        title="Files of the selected workspace (⌘E)"
-        onClick={toggleFilesOverlay}
-      >
-        <FolderOpenIcon />
       </button>
       {focus && waiting + done > 0 && (
         <button

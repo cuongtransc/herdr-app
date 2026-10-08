@@ -56,6 +56,16 @@ describe("Composer", () => {
     expect(herdrCall).toHaveBeenCalledWith("devtuf", "default", "agent.prompt", { target: "w1:p1", text: "fix the bug" });
     expect((box as HTMLTextAreaElement).value).toBe("");
   });
+  it("pins the pane's agent tab when it sends", () => {
+    useApp.setState({ openItems: { items: [{ kind: "agent", ref: pane }], preview: "agent:devtuf/default/w1:p1", active: "agent:devtuf/default/w1:p1" } });
+    render(<Composer pane={pane} agent="claude" />);
+    const box = screen.getByRole("textbox");
+    fireEvent.change(box, { target: { value: "hello" } });
+    fireEvent.keyDown(box, { key: "Enter" });
+    expect(useApp.getState().openItems.preview).toBeNull();
+    expect(useApp.getState().openItems.items).toEqual([{ kind: "agent", ref: pane }]);
+  });
+
   it("drives an agent herdr's agent API does not know (a wrapper) through its pane", async () => {
     render(<Composer pane={pane} agent="claude" untracked />);
     const box = screen.getByRole("textbox");

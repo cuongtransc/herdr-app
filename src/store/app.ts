@@ -5,6 +5,23 @@ import { pruneFolders, type WorkspaceRef } from "../workspaces/folder";
 import { shareEqual } from "./share";
 import { forgetMachine, forgetSessions, sessionKey, useLayout } from "../sidebar/groups";
 import { newAgentOnTerminal } from "../settings/lens";
+import { useFiles, filesKey } from "../files/store";
+import {
+  closeItems,
+  cycleItem,
+  dropItems,
+  findItem,
+  itemKey,
+  moveItem,
+  NO_ITEMS,
+  openItem,
+  pinItem,
+  pruneItems,
+  setActive,
+  type CloseScope,
+  type OpenItem,
+  type OpenItems,
+} from "./openItems";
 
 export interface SessionRef {
   machine_id: string;
@@ -67,20 +84,26 @@ export interface AppState {
   /** Whether the Agent Dashboard overlay is open. Not persisted. */
   dashboardOpen: boolean;
   setDashboardOpen: (open: boolean) => void;
-  /** The Workspace whose Files overlay is open, if any. Not persisted. */
-  filesOverlay: WorkspaceRef | null;
-  setFilesOverlay: (ref: WorkspaceRef | null) => void;
-  /** A file the open Files overlay should show (an absolute path, at a line), e.g. from a path
-   *  clicked in Chat; the overlay takes it and clears it. `n` makes a repeated click a new request. */
-  filesRequest: { abs: string; line: number | null; n: number } | null;
-  openInFiles: (ref: WorkspaceRef, abs: string, line: number | null) => void;
-  clearFilesRequest: () => void;
   /** Done panes the user has looked at (by paneKey); a seen Done pane counts as Idle on the
    *  dashboard. Cleared when the pane leaves done. Not persisted. */
   doneSeen: Record<string, true>;
   /** When each pane's status last changed (by paneKey, ms since epoch), as seen by this app run:
    *  panes in a machine's first snapshot have none. Orders the dashboard's Idle column. Not persisted. */
   statusSince: Record<string, number>;
+  /** The agents and files opened, across machines and workspaces, shown as tabs above the lens. Not persisted. */
+  openItems: OpenItems;
+  /** Opens a file item (pinned or as the preview) and makes it active; `selected` is unchanged. Records it in useFiles recent. */
+  openFile: (ws: WorkspaceRef, root: string, rel: string, opts: { pin: boolean }) => void;
+  /** Activates an item: an agent item selects its Pane; a file item only becomes active. */
+  activateItem: (key: string) => void;
+  pinItem: (key: string) => void;
+  /** Keeps an agent's item: opens it pinned if closed, else pins it (and makes it active). */
+  pinAgent: (ref: PaneRef) => void;
+  /** Closes relative to `key`; if the new active item is an agent, selects its Pane. */
+  closeItems: (key: string, scope: "one" | CloseScope) => void;
+  cycleItems: (delta: 1 | -1) => void;
+  /** Moves the item `from` to just `side` of `to` in the open items. */
+  moveItem: (from: string, to: string, side: "before" | "after") => void;
   upsertMachine: (v: MachineView) => void;
   removeMachine: (id: string) => void;
   select: (ref: PaneRef | null) => void;
@@ -99,22 +122,14 @@ export const useApp = create<AppState>((set, get) => ({
   lensOverride: {},
   starting: {},
   dashboardOpen: false,
-  filesOverlay: null,
-  filesRequest: null,
   doneSeen: {},
   statusSince: {},
+  openItems: NO_ITEMS,
   ...load(),
-  setFilesOverlay: (ref) =>
-    set(ref ? { filesOverlay: ref, dashboardOpen: false } : { filesOverlay: null }),
-  openInFiles: (ref, abs, line) =>
-    set((s) => ({ filesOverlay: ref, dashboardOpen: false, filesRequest: { abs, line, n: (s.filesRequest?.n ?? 0) + 1 } })),
-  clearFilesRequest: () => set({ filesRequest: null }),
   // Closing returns to the selected pane, so a done one counts as seen then.
   setDashboardOpen: (open) =>
     set((s) => ({
       dashboardOpen: open,
-      // The dashboard and Files share the main area: opening one closes the other.
-      filesOverlay: open ? null : s.filesOverlay,
       doneSeen:
         !open && s.selected && findPane(s.machines, s.selected)?.status === "done"
           ? { ...s.doneSeen, [paneKey(s.selected)]: true }
@@ -136,12 +151,14 @@ export const useApp = create<AppState>((set, get) => ({
       // The dashboard hides the selected pane, so it is not seen while the dashboard is open.
       const doneSeen = seenAfterSnapshot(s.doneSeen, shared, s.dashboardOpen || !document.hasFocus() ? null : s.selected);
       const statusSince = sinceAfterSnapshot(s.statusSince, s.machines[v.id], shared, Date.now());
+      const openItems = itemsAfterSnapshot(s.openItems, s.machines[v.id], shared, s.selected);
       return {
         machines: s.machines[v.id] === shared ? s.machines : { ...s.machines, [v.id]: shared },
         lensOverride: claudeStarted(s, shared) ? { ...s.lensOverride, [paneKey(s.selected!)]: "terminal" } : s.lensOverride,
         order: s.order.includes(v.id) ? s.order : [...s.order, v.id],
         doneSeen: sameKeys(doneSeen, s.doneSeen) ? s.doneSeen : doneSeen,
         statusSince: sameTimes(statusSince, s.statusSince) ? s.statusSince : statusSince,
+        openItems,
       };
     });
   },
@@ -153,6 +170,7 @@ export const useApp = create<AppState>((set, get) => ({
         machines,
         order: s.order.filter((o) => o !== id),
         selected: s.selected?.machine_id === id ? null : s.selected,
+        openItems: dropItems(s.openItems, (i) => (i.kind === "agent" ? i.ref : i.ws).machine_id === id),
         viewed: s.viewed?.machine_id === id ? null : s.viewed,
       };
     });
@@ -161,10 +179,16 @@ export const useApp = create<AppState>((set, get) => ({
     set((s) => ({
       selected: ref,
       dashboardOpen: ref ? false : s.dashboardOpen,
-      filesOverlay: ref ? null : s.filesOverlay,
       viewed: ref ? { machine_id: ref.machine_id, session: ref.session } : s.viewed,
       lastPane: ref ? { ...s.lastPane, [sessionKey(ref.machine_id, ref.session)]: ref } : s.lastPane,
       doneSeen: ref && findPane(s.machines, ref)?.status === "done" ? { ...s.doneSeen, [paneKey(ref)]: true } : s.doneSeen,
+      openItems: !ref
+        ? s.openItems
+        : findItem(s.openItems, itemKey({ kind: "agent", ref }))
+          ? setActive(s.openItems, itemKey({ kind: "agent", ref }))
+          : findPane(s.machines, ref)?.agent
+            ? openItem(s.openItems, { kind: "agent", ref }, { pin: false })
+            : setActive(s.openItems, null),
     })),
   // Focus returning to the window views the selected pane without selecting it again.
   acknowledgeSelectedDone: () =>
@@ -173,6 +197,31 @@ export const useApp = create<AppState>((set, get) => ({
       if (!document.hasFocus() || s.dashboardOpen || !ref || s.doneSeen[paneKey(ref)] || findPane(s.machines, ref)?.status !== "done") return s;
       return { doneSeen: { ...s.doneSeen, [paneKey(ref)]: true } };
     }),
+  openFile: (ws, root, rel, opts) => {
+    set((s) => ({ openItems: openItem(s.openItems, { kind: "file", ws, root, rel }, opts) }));
+    useFiles.getState().addRecent(filesKey(ws, root), rel);
+  },
+  activateItem: (key) => {
+    const item = findItem(get().openItems, key);
+    if (!item) return;
+    if (item.kind === "agent") get().select(item.ref);
+    else set((s) => ({ openItems: setActive(s.openItems, key) }));
+  },
+  pinItem: (key) => set((s) => ({ openItems: pinItem(s.openItems, key) })),
+  pinAgent: (ref) => set((s) => ({ openItems: openItem(s.openItems, { kind: "agent", ref }, { pin: true }) })),
+  moveItem: (from, to, side) => set((s) => ({ openItems: moveItem(s.openItems, from, to, side) })),
+  closeItems: (key, scope) => {
+    const old = get().openItems;
+    const next = closeItems(old, scope, key);
+    if (next === old) return;
+    set({ openItems: next });
+    if (next.active !== old.active) selectIfAgent(get(), next);
+  },
+  cycleItems: (delta) => {
+    const next = cycleItem(get().openItems, delta);
+    set({ openItems: next });
+    selectIfAgent(get(), next);
+  },
   // Viewing another session also opens its pane: the one last selected there, else its first.
   view: (ref) => {
     const s = get();
@@ -209,6 +258,27 @@ export const useApp = create<AppState>((set, get) => ({
     save(get());
   },
 }));
+
+/** The item being shown above the lens, if any. */
+export function activeItem(s: Pick<AppState, "openItems">): OpenItem | null {
+  return (s.openItems.active && findItem(s.openItems, s.openItems.active)) || null;
+}
+
+/** Selects the Pane of the active item when it is an agent. */
+function selectIfAgent(s: AppState, items: OpenItems) {
+  const active = items.active ? findItem(items, items.active) : undefined;
+  if (active?.kind === "agent") s.select(active.ref);
+}
+
+/** Drops closed panes' and workspaces' items (only a connected snapshot says they are gone) and opens
+ *  the item of an agent started in the selected pane. */
+function itemsAfterSnapshot(prev: OpenItems, before: MachineView | undefined, v: MachineView, selected: PaneRef | null): OpenItems {
+  const next = v.state === "connected" ? pruneItems(prev, v) : prev;
+  if (selected?.machine_id !== v.id || !findPane({ [v.id]: v }, selected)?.agent) return next;
+  const item: OpenItem = { kind: "agent", ref: selected };
+  const started = !before || !findPane({ [v.id]: before }, selected)?.agent;
+  return started && !findItem(next, itemKey(item)) ? openItem(next, item, { pin: false }) : next;
+}
 
 export function findPane(machines: Record<string, MachineView>, ref: PaneRef): PaneView | undefined {
   const session = machines[ref.machine_id]?.sessions.find((s) => s.name === ref.session);
