@@ -56,9 +56,12 @@ export function MermaidBlock({ source, children }: { source: string; children: R
   const id = "mmd" + useId().replace(/[^a-zA-Z0-9]/g, "");
   const [svg, setSvg] = useState<string | null>(() => cacheGet(cacheKey(theme, source)) ?? null);
   const [showSource, setShowSource] = useState(false);
-  const [zoomed, setZoomed] = useState<SVGSVGElement | null>(null);
-  // A redrawn diagram (theme, source) makes the zoomed copy stale.
-  useEffect(() => setZoomed(null), [svg]);
+  // The zoomed copy, with the drawing it came from: a redrawn diagram (theme, source) makes it
+  // stale. Not reset by an effect on `svg`, which a click right after the drawing showed could
+  // beat, closing the zoom it had just opened.
+  const [zoom, setZoom] = useState<{ el: SVGSVGElement; of: string } | null>(null);
+  const zoomed = zoom && zoom.of === svg ? zoom.el : null;
+  const setZoomed = (el: SVGSVGElement | null) => setZoom(el && svg !== null ? { el, of: svg } : null);
 
   useEffect(() => {
     const key = cacheKey(theme, source);
