@@ -144,6 +144,14 @@ impl Parser for ClaudeParser {
             }
         };
         let kind = v.get("type").and_then(Value::as_str).unwrap_or("");
+        // /compact writes no assistant turn; the boundary carries what the context holds now.
+        if let Some(n) = v
+            .get("compactMetadata")
+            .and_then(|m| m.get("postTokens"))
+            .and_then(Value::as_u64)
+        {
+            self.meta.context_tokens = Some(n);
+        }
         if !matches!(kind, "user" | "assistant") {
             tracing::trace!(
                 record_type = kind,
@@ -719,6 +727,17 @@ mod tests {
         .join("\n");
         let (_, _, p) = run_with(&lines);
         assert_eq!(p.meta().context_tokens, Some(329));
+    }
+    #[test]
+    fn a_compact_boundary_sets_context_tokens_to_what_is_left() {
+        let lines = [
+            serde_json::json!({"type":"assistant","message":{"model":"claude-opus-5-5","content":[],"usage":{"input_tokens":1,"cache_read_input_tokens":578_000,"output_tokens":5}}}),
+            serde_json::json!({"type":"system","subtype":"compact_boundary","content":"Conversation compacted","compactMetadata":{"trigger":"manual","preTokens":578_458,"postTokens":21_738}}),
+        ]
+        .map(|v| v.to_string())
+        .join("\n");
+        let (_, _, p) = run_with(&lines);
+        assert_eq!(p.meta().context_tokens, Some(21_738));
     }
     #[test]
     fn reads_model_and_effort_from_slash_command_output() {

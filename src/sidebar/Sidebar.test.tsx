@@ -239,6 +239,17 @@ describe("Sidebar tree", () => {
     expect(projectNames()).toHaveLength(3);
   });
 
+  it("opens a Session and folds or unfolds it on every click, like a folder in VS Code", () => {
+    render(<Sidebar />);
+    const session = within(tree()).getByText("default").closest("button")!;
+    fireEvent.click(session);
+    expect(useApp.getState().viewed).toMatchObject({ machine_id: "box", session: "default" });
+    // Folded, it keeps the project now on screen and the one that asks.
+    expect(projectNames()).toEqual(["herdr-app", "ccpokeBlocked", "1 more"]);
+    fireEvent.click(session);
+    expect(projectNames()).toHaveLength(3);
+  });
+
   it("gives no fold control to a Session without projects", () => {
     render(<Sidebar />);
     expect(within(tree()).queryByRole("button", { name: /fold ai-radar/i })).toBeNull();

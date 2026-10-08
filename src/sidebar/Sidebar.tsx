@@ -115,8 +115,12 @@ export function SessionRow({ node }: { node: RSession }) {
   const onClick = !online
     ? undefined
     : session.running
-      ? open
-      : () => a?.guard(() => sessionStart(machineId, session.name).then(open));
+      ? () => {
+          // Like a folder in VS Code: every click opens the Session and folds or unfolds it.
+          open();
+          if (foldable) toggle(foldKey, unfolded);
+        }
+      :() => a?.guard(() => sessionStart(machineId, session.name).then(open));
   return (
     <li className={"session" + (session.running ? "" : " stopped") + (online ? "" : " offline")}>
       <button
