@@ -40,7 +40,7 @@ describe("FilesPanel", () => {
     changedReply.value = { repo: false, total: 0, changes: [] };
     useFiles.setState(useFiles.getInitialState(), true);
     useFilesBus.setState(useFilesBus.getInitialState(), true);
-    useFilesPanel.setState(useFilesPanel.getInitialState(), true);
+    useFilesPanel.setState({ ...useFilesPanel.getInitialState(), collapsed: false }, true);
     useApp.setState({
       machines: { local: { id: "local", label: "local", kind: "local", state: "connected", error: null, version: null, status: "idle", sessions: [{ name: "default", running: true, status: "idle", error: null, workspaces: [
         { workspace_id: "w1", label: "app", number: 1, status: "idle", tabs: [{ tab_id: "t1", label: "t", panes: [{ pane_id: "p1", cwd: "/r" }] }] },
@@ -53,7 +53,8 @@ describe("FilesPanel", () => {
 
   it("shows the root from the pane and offers to save it as the workspace folder", () => {
     render(<FilesPanel />);
-    expect(screen.getByText(/FILES/).textContent).toBe("FILES · app");
+    expect(screen.getByRole("button", { name: "Files" })).toBeTruthy();
+    expect(screen.getByText("app")).toBeTruthy();
     expect(screen.getByTitle("/r")).toBeTruthy();
     expect(screen.getByRole("button", { name: "Set as workspace folder" })).toBeTruthy();
   });
@@ -109,7 +110,7 @@ describe("FilesPanel", () => {
   it("follows the active file item's workspace and root, not the selected pane's", async () => {
     useApp.getState().openFile({ machine_id: "local", session: "default", workspace_id: "w2" }, "/o", "a.md", { pin: true });
     render(<FilesPanel />);
-    expect(screen.getByText(/FILES/).textContent).toContain("other");
+    expect(screen.getByText("other")).toBeTruthy();
     await waitFor(() => expect(vi.mocked(invoke)).toHaveBeenCalledWith("files_list_all", expect.objectContaining({ root: "/o" })));
     expect(useApp.getState().selected?.pane_id).toBe("p1");
   });
@@ -123,11 +124,17 @@ describe("FilesPanel", () => {
     expect(useApp.getState().openItems.preview).toBe("file:local/default/w1|/r|a.md");
   });
 
-  it("collapse hides the tree; focusTree expands it and focuses the tree", async () => {
+  it("folds from its header like a sidebar section; focusTree expands it and focuses the tree", async () => {
     render(<FilesPanel />);
-    fireEvent.click(screen.getByRole("button", { name: "Collapse files" }));
+    const head = screen.getByRole("button", { name: "Files" });
+    expect(head.getAttribute("aria-expanded")).toBe("true");
+    expect(head.querySelector(".chev.open")).toBeTruthy();
+    fireEvent.click(head);
     expect(screen.queryByRole("tree")).toBeNull();
-    expect(screen.getByRole("button", { name: "Expand files" })).toBeTruthy();
+    expect(head.getAttribute("aria-expanded")).toBe("false");
+    // Its actions go with the tree.
+    expect(screen.queryByRole("button", { name: "Reload" })).toBeNull();
+    expect(screen.queryByRole("button", { name: "Show heavy folders" })).toBeNull();
     act(() => useFilesPanel.getState().focusTree());
     await waitFor(() => expect(document.activeElement?.closest("[role=tree]")).toBeTruthy());
   });
@@ -141,12 +148,12 @@ describe("FilesPanel", () => {
 
   it("a focus request that also switches the Workspace focuses the tree of the new one", async () => {
     render(<FilesPanel />);
-    expect(screen.getByText(/FILES/).textContent).toBe("FILES · app");
+    expect(screen.getByText("app")).toBeTruthy();
     act(() => {
       useApp.getState().select({ machine_id: "local", session: "default", pane_id: "p2" });
       useFilesPanel.getState().focusTree();
     });
-    expect(screen.getByText(/FILES/).textContent).toBe("FILES · other");
+    expect(screen.getByText("other")).toBeTruthy();
     await waitFor(() => expect(document.activeElement?.closest("[role=tree]")).toBeTruthy());
     expect(useFilesPanel.getState().focusHandled).toBe(useFilesPanel.getState().focusTick);
   });

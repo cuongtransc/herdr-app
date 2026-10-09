@@ -64,10 +64,8 @@ export function FilesPanel() {
           </ActionsProvider>
         ) : (
           <>
-            <header className="files-panel-head">
-              <span className="files-title">FILES</span>
-              <span className="files-head-spacer" />
-              <CollapseButton />
+            <header className="files-panel-head section-head">
+              <FilesToggle />
             </header>
             {!collapsed && <div className="files-empty">Select an agent to browse its files</div>}
           </>
@@ -77,17 +75,13 @@ export function FilesPanel() {
   );
 }
 
-function CollapseButton() {
+/** The header folds the panel the way a sidebar section header does: the label, then its chevron. */
+function FilesToggle() {
   const collapsed = useFilesPanel((s) => s.collapsed);
   return (
-    <button
-      type="button"
-      className={"icon-btn files-collapse" + (collapsed ? " collapsed" : "")}
-      aria-label={collapsed ? "Expand files" : "Collapse files"}
-      aria-expanded={!collapsed}
-      onClick={() => useFilesPanel.getState().setCollapsed(!collapsed)}
-    >
-      <ChevronIcon />
+    <button type="button" className="section-toggle" aria-expanded={!collapsed} onClick={() => useFilesPanel.getState().setCollapsed(!collapsed)}>
+      Files
+      <ChevronIcon className={"icon chev" + (collapsed ? "" : " open")} />
     </button>
   );
 }
@@ -174,16 +168,17 @@ function WorkspacePanel({ wsRef: ref, section }: { wsRef: WorkspaceRef; section:
   const label = ws?.label ?? ref.workspace_id;
   return (
     <>
-      <header className="files-panel-head">
-        <span className="files-title" title={root?.path}>
-          {`FILES · ${label}`}
+      <header className="files-panel-head section-head">
+        <FilesToggle />
+        <span className="files-ws" title={root?.path}>
+          {label}
         </span>
         {machine?.kind === "ssh" && <span className="files-machine">{machine.label}</span>}
         <span className="files-head-spacer" />
-        {root && !rootMissing && (
+        {!collapsed && root && !rootMissing && (
           <button
             type="button"
-            className="icon-btn"
+            className="section-action"
             aria-label="Show heavy folders"
             aria-pressed={showHeavy}
             title={showHeavy ? "Hide .git, node_modules and other heavy folders" : "Show .git, node_modules and other heavy folders"}
@@ -192,12 +187,11 @@ function WorkspacePanel({ wsRef: ref, section }: { wsRef: WorkspaceRef; section:
             {showHeavy ? <EyeIcon /> : <EyeOffIcon />}
           </button>
         )}
-        {root && (
-          <button type="button" className="icon-btn" aria-label="Reload" title="Reload  ⌘R" onClick={reload}>
+        {!collapsed && root && (
+          <button type="button" className="section-action" aria-label="Reload" title="Reload  ⌘R" onClick={reload}>
             <RefreshIcon />
           </button>
         )}
-        <CollapseButton />
       </header>
       {!collapsed && root?.source === "pane" && !rootMissing && (
         <div className="files-set-folder-row">

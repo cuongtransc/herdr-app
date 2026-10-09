@@ -1,5 +1,28 @@
 import { create } from "zustand";
 
+const STORAGE_KEY = "herdr-app:files-panel";
+
+/** Open or collapsed and the dragged height, kept across launches; collapsed the first time. */
+function load(): { collapsed: boolean; height: number | null } {
+  try {
+    const p = JSON.parse(localStorage.getItem(STORAGE_KEY) ?? "{}") as { collapsed?: unknown; height?: unknown };
+    return {
+      collapsed: typeof p.collapsed === "boolean" ? p.collapsed : true,
+      height: typeof p.height === "number" && p.height > 0 ? p.height : null,
+    };
+  } catch {
+    return { collapsed: true, height: null };
+  }
+}
+
+function save(s: { collapsed: boolean; height: number | null }) {
+  try {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify({ collapsed: s.collapsed, height: s.height }));
+  } catch {
+    /* storage unavailable */
+  }
+}
+
 interface FilesPanelState {
   /** Pixels of the panel; null is half the column. */
   height: number | null;
@@ -21,10 +44,9 @@ interface FilesPanelState {
   handled(which: "tree" | "goto" | "both"): void;
 }
 
-/** Layout of the Files panel for the running app; nothing here is persisted. */
+/** Layout of the Files panel: open or collapsed and its height persist, the focus requests do not. */
 export const useFilesPanel = create<FilesPanelState>((set) => ({
-  height: null,
-  collapsed: false,
+  ...load(),
   focusTick: 0,
   gotoTick: 0,
   focusHandled: 0,
@@ -39,3 +61,7 @@ export const useFilesPanel = create<FilesPanelState>((set) => ({
       gotoHandled: which === "tree" ? s.gotoHandled : s.gotoTick,
     })),
 }));
+
+useFilesPanel.subscribe((s, prev) => {
+  if (s.collapsed !== prev.collapsed || s.height !== prev.height) save(s);
+});
