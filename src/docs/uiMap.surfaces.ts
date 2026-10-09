@@ -33,7 +33,7 @@ export const SURFACES: Surface[] = [
   { group: "Agents column", name: "Go to file", selector: ".files-goto", at: [0, 0.5], d: [223, 0], what: "⌘P: find a file by name in the panel's root.", code: "src/files/GoToFile.tsx" },
   { group: "Agents column", name: "Files tree", selector: ".files-tree", at: [0.5, 0], d: [0, 56], what: "The folders and files under the root.", code: "src/files/FileTree.tsx" },
   { group: "Main area", name: "Top bar", selector: ".topbar", at: [0, 0.5], d: [562, 0], what: "The main area's one bar, as tall as the columns' heads: the Open strip, then the Lens switch.", code: "src/main/TopBar.tsx" },
-  { group: "Main area", name: "Open strip", selector: ".agent-tabs", at: [0, 0.5], d: [298, 0], what: "The tabs of open Agents and files. Two tabs of one name say where they live; the tooltip has the whole path.", code: "src/main/OpenStrip.tsx" },
+  { group: "Main area", name: "Open strip", selector: ".agent-tabs", at: [0, 0.5], d: [318, 0], what: "The tabs of open Agents and files. Two tabs of one name say where they live; the tooltip has the whole path.", code: "src/main/OpenStrip.tsx" },
   { group: "Main area", name: "Lens switch", selector: ".topbar .seg", at: [0, 0], d: [2, 1], what: "Terminal | Chat for the selected Pane, as two icons.", code: "src/main/LensSwitch.tsx" },
   { group: "Main area", name: "Chat lens", selector: ".chat-lens", at: [0, 0.5], d: [15, 27], what: "The Pane's Transcript as a conversation. Its twin is the Terminal lens.", code: "src/chat/ChatLens.tsx" },
   { group: "Main area", name: "Work block", selector: ".chat-work", at: [0, 0.5], d: [221, 0], what: "One turn's work folded under “Worked for …”.", code: "src/chat/WorkBlockView.tsx" },

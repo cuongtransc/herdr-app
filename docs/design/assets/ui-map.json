@@ -479,7 +479,7 @@
     0.5
    ],
    "d": [
-    298,
+    318,
     0
    ],
    "what": "The tabs of open Agents and files. Two tabs of one name say where they live; the tooltip has the whole path.",
@@ -491,7 +491,7 @@
     "h": 45
    },
    "badge": {
-    "x": 836,
+    "x": 856,
     "y": 22.5
    }
   },
