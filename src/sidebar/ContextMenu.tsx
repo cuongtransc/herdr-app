@@ -97,9 +97,10 @@ export function ConfirmDialog({
         </>
       )}
       <div className="actions">
-        <button className="btn" autoFocus={guarded} onClick={onClose}>Cancel</button>
+        {/* Guarded: Cancel is the default (filled, focused); closing protected panes stays a plain button in red text. */}
+        <button className={guarded ? "btn btn-primary" : "btn"} autoFocus={guarded} onClick={onClose}>Cancel</button>
         <button
-          className="btn btn-danger"
+          className={guarded ? "btn btn-danger-text" : "btn btn-danger"}
           autoFocus={!guarded}
           onClick={() => {
             onClose();

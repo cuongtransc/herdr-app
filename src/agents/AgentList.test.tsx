@@ -405,6 +405,9 @@ describe("AgentList", () => {
       const dialog = screen.getByRole("dialog", { name: "Close tab" });
       expect(within(dialog).getByText("Tag v1.4.0")).toBeTruthy();
       expect(document.activeElement?.textContent).toBe("Cancel");
+      // Cancel is the default action: filled; closing stays a plain button in red text.
+      expect(within(dialog).getByRole("button", { name: "Cancel" }).className).toBe("btn btn-primary");
+      expect(within(dialog).getByRole("button", { name: "Unprotect and close" }).className).toBe("btn btn-danger-text");
       fireEvent.click(within(dialog).getByRole("button", { name: "Cancel" }));
       expect(herdrCall).not.toHaveBeenCalled();
       fireEvent.click(within(menuOf("Tag v1.4.0")).getByRole("menuitem", { name: "Close tab" }));
