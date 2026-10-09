@@ -103,7 +103,7 @@ description = "Frontend tests that need a real browser (*.browser.test.tsx)"
 run = "pnpm vitest run --config vitest.browser.config.ts"
 
 [tasks."docs:ui-map"]
-description = "Redraw docs/design/ui-map.html from the real App (after a UI change)"
+description = "Redraw docs/design/ui-map.html and the README screenshots from the real App (after a UI change)"
 run = [
   "pnpm vitest run --config vitest.uimap.config.ts",
   "node scripts/ui-map.mjs",
