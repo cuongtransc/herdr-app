@@ -9,6 +9,10 @@ design, macOS platform & accessibility) of the app as it stood after the triage 
 (`docs/superpowers/specs/2026-10-06-triage-design.md`). Where the roles disagreed, §8 records the
 call and why. Terms follow `CONTEXT.md` (Machine › Session › Workspace › Tab › Pane).
 
+The same tokens, rules and components as a browsable page, with live previews in both themes:
+the [Herdr Design System](https://claude.ai/artifact/4xbvNjCSxGdWRzrVxgGNUq), built from
+`src/styles.css` and this page (private to its owner until shared).
+
 ## 1. Who it is for, and the loop it serves
 
 One person supervises many agents (claude, codex, pi…) running in parallel across Sessions on the
@@ -60,7 +64,7 @@ and by how calm it is when nothing needs the user.
 | State | Meaning | Colour | Mark in a list row | Word |
 |---|---|---|---|---|
 | blocked | waiting for the user's answer or approval | `--amber` | filled dot, pulsing (static under reduced motion) + 7% amber row tint | **Blocked**, in `--amber-text` |
-| working | agent busy | `--blue` | filled dot, no halo | none (*In progress* in counts and accessible names) |
+| working | agent busy | `--blue` | spinning ring (a solid circle under reduced motion) | none (*In progress* in counts and accessible names) |
 | done, unseen | finished since last viewed: its result waits for a look | `--green` | check glyph | **Review**, in `--green-text` |
 | done, seen / idle | nothing to do | — | none (slot kept so titles align) | none (*Done* in counts) |
 | shell / unknown | no agent | — | none | none |
@@ -71,9 +75,9 @@ and by how calm it is when nothing needs the user.
   Review). Avoid "INPUT" (a system word: who inputs what?), "Needs you" (long), "waiting" (who waits
   on whom?) and "To do" (a tracker's *not started*).
 
-- **One encoding per surface.** List row: mark + (for blocked) the word. Header or detail: one pill
-  with text (`.agent-status`). Never mark + badge + tint + border + glow on one row (a blocked card
-  shows five signals today).
+- **One encoding per surface.** List row and tab: mark + (for blocked) the word. The Top bar has no
+  status of its own: the open tab's mark is it (the Header's Status pill went on 2026-10-10). Never
+  mark + badge + tint + border + glow on one row (a blocked card shows five signals today).
 - **Tint is reserved for "needs you"**: `color-mix(in srgb, var(--amber) 7%, transparent)`, no border,
   no glow. Status colours are never used for anything that is not status.
 - Tints come from three steps only: 7% (row), 14% (chip), 25% (border, high-contrast mode only).
@@ -106,12 +110,14 @@ pointer targets (§5); no "compact" mode below 24px.
   setting. Weights: 400 body, 500 titles, 600 headers and the selected row.
 - **Spacing**: 2/4/6/8/12/16 as `--s-1`…`--s-6`; row inline padding 8, section gaps 12.
 - **Radius**: `--r-sm` 6 (rows, buttons, chips, tiles), `--r-md` 8 (inputs, popovers, cards),
-  `--r-lg` 12 (dialogs), 999 (pills). No 3/5/7px. Never box a row inside a boxed container.
+  `--r-lg` 12 (dialogs), 999 (pills). No 3/5/7px (`.btn-xs` still has 5px: fold it into `--r-sm`).
+  Never box a row inside a boxed container.
 - **Icons**: 16px stroke glyphs, `--fg-3` at rest, `--fg-2` on hover, `--fg` when selected. The agent's
   brand mark is 16px with no tile in lists; the 24–26px tile belongs to Board cards and the new-agent
   picker.
-- **Motion**: `--t-fast` 120ms (hover, press), `--t` 180ms (disclosure, layout), `--ease`. The only
-  looping animation is the blocked dot's pulse. The global `prefers-reduced-motion` rule
+- **Motion**: `--t-fast` 120ms (hover, press), `--t` 180ms (disclosure, layout), `--ease`. Two things
+  loop: the blocked dot's pulse and the working ring; under reduced motion the dot holds still and
+  the ring becomes a solid circle. The global `prefers-reduced-motion` rule
   (styles.css) stays and covers everything; no JS-driven animation.
 
 ### 3.5 Contrast (measured, WCAG 2.x)
