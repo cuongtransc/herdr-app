@@ -110,7 +110,7 @@ pointer targets (§5); no "compact" mode below 24px.
   setting. Weights: 400 body, 500 titles, 600 headers and the selected row.
 - **Spacing**: 2/4/6/8/12/16 as `--s-1`…`--s-6`; row inline padding 8, section gaps 12.
 - **Radius**: `--r-sm` 6 (rows, buttons, chips, tiles), `--r-md` 8 (inputs, popovers, cards),
-  `--r-lg` 12 (dialogs), 999 (pills). No 3/5/7px (`.btn-xs` still has 5px: fold it into `--r-sm`).
+  `--r-lg` 12 (dialogs), 999 (pills). No 3/5/7px.
   Never box a row inside a boxed container.
 - **Icons**: 16px stroke glyphs, `--fg-3` at rest, `--fg-2` on hover, `--fg` when selected. The agent's
   brand mark is 16px with no tile in lists; the 24–26px tile belongs to Board cards and the new-agent
