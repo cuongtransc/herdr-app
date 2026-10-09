@@ -6,7 +6,7 @@ export function WorkingIndicator({ status }: { status: AgentStatus }) {
   if (status !== "working") return null;
   return (
     <div className="chat-working" role="status">
-      <span className="chat-working-dots" aria-hidden="true"><i /><i /><i /></span>
+      <span className="spin" aria-hidden="true" />
       Working…
     </div>
   );

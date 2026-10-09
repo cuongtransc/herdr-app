@@ -41,6 +41,13 @@ describe("WorkBlockView", () => {
     expect(screen.getByRole("button", { name: /Working…/ })).toBeTruthy();
   });
 
+  it("spins in the header only while the agent runs", () => {
+    const { rerender } = render(<WorkBlockView block={block} results={results} open={false} onToggle={() => {}} live />);
+    expect(screen.getByRole("button", { name: /Working…/ }).querySelector(".spin")).toBeTruthy();
+    rerender(<WorkBlockView block={block} results={results} open={false} onToggle={() => {}} live={false} />);
+    expect(screen.getByRole("button", { name: /Worked for 7s/ }).querySelector(".spin")).toBeNull();
+  });
+
   it("reads Worked when the span is unknown", () => {
     const untimed: WorkBlock = { ...block, start: null };
     render(<WorkBlockView block={untimed} results={results} open={false} onToggle={() => {}} live={false} />);

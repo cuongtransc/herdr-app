@@ -29,6 +29,7 @@ export const WorkBlockView = memo(function WorkBlockView({
     <div className="chat-row chat-work">
       <button className="chat-work-head" aria-expanded={open} onClick={() => onToggle(block.id, open)}>
         <ChevronIcon className={"icon chev" + (open ? " open" : "")} />
+        {live && <span className="spin" aria-hidden="true" />}
         <span className="chat-work-title">{title}</span>
         {summary && (
           <>

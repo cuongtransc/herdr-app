@@ -204,6 +204,8 @@ kbd {
 
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { animation-duration: 1ms !important; animation-iteration-count: 1 !important; transition-duration: 1ms !important; }
+  /* html: outranks the ring rules further down. */
+  html .spin, html .agent-card .mark-working { border-color: var(--blue); }
 }
 
 /* ---------- Buttons ---------- */
@@ -589,7 +591,11 @@ kbd {
 .agent-card.shell .agent-card-title { color: var(--fg-2); font-weight: 400; }
 /* The mark slot at a row's end; idle and shells keep it empty so titles align. */
 .agent-card .mark { flex: none; width: 8px; height: 8px; border-radius: 50%; }
-.agent-card .mark-working { background: var(--blue); }
+.agent-card .mark-working {
+  width: 10px; height: 10px; margin: 0 -1px; box-sizing: border-box; background: none; /* 8px slot, like the dot */
+  border: 1.5px solid color-mix(in srgb, var(--blue) 35%, transparent); border-top-color: var(--blue);
+  animation: spin 0.9s linear infinite;
+}
 /* An agent whose state herdr cannot read: a question, not an alarm. */
 .agent-card .mark-unknown {
   flex: none; width: 14px; height: 14px; box-sizing: border-box; display: grid; place-items: center;
@@ -1137,11 +1143,13 @@ kbd {
   padding: 6px 28px 0; box-sizing: border-box; color: var(--fg-3); font-size: 12px;
   animation: fade-in var(--t) var(--ease);
 }
-.chat-working-dots { display: inline-flex; gap: 3px; }
-.chat-working-dots i { width: 5px; height: 5px; border-radius: 50%; background: var(--accent); animation: working-dot 1.2s ease-in-out infinite; }
-.chat-working-dots i:nth-child(2) { animation-delay: 0.15s; }
-.chat-working-dots i:nth-child(3) { animation-delay: 0.3s; }
-@keyframes working-dot { 0%, 60%, 100% { opacity: 0.25; transform: translateY(0); } 30% { opacity: 1; transform: translateY(-3px); } }
+/* The working spinner, one ring everywhere an agent runs: a turn is busy, not waiting on you
+   (that is Blocked's amber pulse). Reduced motion stops it as a solid blue ring. */
+.spin {
+  flex: none; display: inline-block; width: 12px; height: 12px; box-sizing: border-box; border-radius: 50%;
+  border: 2px solid color-mix(in srgb, var(--blue) 35%, transparent); border-top-color: var(--blue);
+  animation: spin 0.9s linear infinite;
+}
 
 .composer { flex: none; padding: 8px 20px 16px; display: flex; flex-direction: column; gap: 6px; width: 100%; max-width: var(--chat-max); margin: 0 auto; box-sizing: border-box; }
 .composer-box {
