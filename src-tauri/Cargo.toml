@@ -43,6 +43,13 @@ opt-level = 3
 panic = "abort"
 strip = true
 
+# What `mise run app:install` builds: the release profile without LTO, so a rebuild takes about
+# 50s instead of 2.5 minutes. Shipped releases and `mise run app:install:release` keep `release`.
+[profile.local]
+inherits = "release"
+lto = false
+codegen-units = 16
+
 [target.'cfg(target_os = "macos")'.dependencies]
 core-foundation = "0.10"
 core-text = "22.0.0"

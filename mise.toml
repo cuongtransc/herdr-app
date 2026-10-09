@@ -14,6 +14,7 @@ rust = "stable"
 
 [env]
 APP = "src-tauri/target/release/bundle/macos/Herdr.app"
+LOCAL_APP = "src-tauri/target/local/bundle/macos/Herdr.app"
 
 # Frontend dependencies install before any `mise run` when the lockfile changed.
 # By hand: `mise deps`.
@@ -50,6 +51,12 @@ run = "pnpm tauri dev --config src-tauri/tauri.dev.conf.json"
 description = "Build the release bundle (Herdr.app)"
 run = "pnpm tauri build --bundles app"
 
+# The release build minus LTO (src-tauri/Cargo.toml [profile.local]): same behaviour, about 3x
+# faster to rebuild. For the bundle a release ships, use `build`.
+[tasks."build:local"]
+description = "Build the bundle without LTO (Herdr.app under target/local)"
+run = "pnpm tauri build --bundles app -- --profile local"
+
 [tasks.start]
 description = "Build the release bundle and open it"
 depends = ["build"]
@@ -57,7 +64,12 @@ run = "open $APP"
 
 # Replaces any previous copy so files removed from the bundle don't linger.
 [tasks."app:install"]
-description = "Build the release bundle and install it into /Applications"
+description = "Build without LTO (profile.local) and install it into /Applications"
+depends = ["build:local"]
+run = ["rm -rf /Applications/Herdr.app", "ditto $LOCAL_APP /Applications/Herdr.app"]
+
+[tasks."app:install:release"]
+description = "Build the release bundle, as shipped, and install it into /Applications"
 depends = ["build"]
 run = ["rm -rf /Applications/Herdr.app", "ditto $APP /Applications/Herdr.app"]
 
