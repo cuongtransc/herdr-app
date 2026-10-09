@@ -1,4 +1,5 @@
 import { memo } from "react";
+import { useSecondClock } from "../dashboard/QuotaColumn";
 import { ChevronIcon } from "../ui/icons";
 import { ChatItemView } from "./ChatItemView";
 import { SkillChips, turnSkills } from "./skills";
@@ -23,14 +24,14 @@ export const WorkBlockView = memo(function WorkBlockView({
   live: boolean;
 }) {
   const duration = formatWorkDuration(block.start, block.end);
-  const title = live ? "Working…" : duration ? `Worked for ${duration}` : "Worked";
+  const title = duration ? `Worked for ${duration}` : "Worked";
   const summary = workSummary(block.items, results);
   return (
     <div className="chat-row chat-work">
       <button className="chat-work-head" aria-expanded={open} onClick={() => onToggle(block.id, open)}>
         <ChevronIcon className={"icon chev" + (open ? " open" : "")} />
         {live && <span className="spin" aria-hidden="true" />}
-        <span className="chat-work-title">{title}</span>
+        <span className="chat-work-title">{live ? <LiveTitle start={block.start} /> : title}</span>
         {summary && (
           <>
             {" · "}
@@ -51,3 +52,9 @@ export const WorkBlockView = memo(function WorkBlockView({
     </div>
   );
 });
+
+/** "Working 1m 23s", counted from the prompt each second; mounted only while live, so only it re-renders. */
+function LiveTitle({ start }: { start: string | null }) {
+  const elapsed = formatWorkDuration(start, new Date(useSecondClock()).toISOString());
+  return elapsed ? `Working ${elapsed}` : "Working…";
+}
