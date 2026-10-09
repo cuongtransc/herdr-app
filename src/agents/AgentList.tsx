@@ -16,7 +16,8 @@ import { AgentIcon } from "./AgentIcon";
 import { isProtected, protectedIn, useProtect } from "./protect";
 import { forkBlocked, forkSession } from "./forkSession";
 import { idleLabel, paneState, useActiveKeptMs, useMinuteClock, usePaneFilter } from "./paneFilter";
-import { laneTitle, paneRoles, tabRole } from "./roles";
+import { useLaneRecords } from "./laneOwners";
+import { laneTitle, sessionRoles, tabRole } from "./roles";
 import { AGENTS, openAgentTab } from "./openAgentTab";
 import { useTabReorder } from "./tabDnd";
 
@@ -66,9 +67,18 @@ interface Row {
   quiet: boolean;
   /** Set on an agent kept in Active for having gone idle recently. */
   idleFor: number | null;
-  /** The workspace's orchestrator, or one of the lanes it dispatched (roles.ts). */
+  /** An orchestrator, or a lane (roles.ts `sessionRoles`). */
   role: "orch" | "lane" | null;
+  /** A lane's owner (a pane id): the lane folds under that pane's row. */
+  owner?: string;
+  /** A lane whose owner is unknown or gone: it shows on its own, marked. */
+  orphan?: true;
 }
+
+/** A folded lane: one with an owner to fold under. */
+const folded = (r: Row) => r.role === "lane" && !r.orphan;
+
+const ROLE_BADGE = { orch: "ORCH", lane: "LANE", brief: "BRIEF" } as const;
 
 /** "1 in progress, 1 done, 1 blocked" over some lanes. */
 function laneSummary(lanes: Row[]): string {
@@ -152,8 +162,9 @@ function AgentCard({
 }) {
   const { entry, quiet, idleFor } = row;
   const { pane, workspace: ws, tab } = entry;
-  // A lane's place under its orchestrator already says "lane".
-  const title = row.role === "lane" || tabRole(tab.label) === "brief" ? laneTitle(pane.title) : pane.title;
+  // The badge says "lane" or "brief", so the title drops the prefix that said it.
+  const tabKind = tabRole(tab.label);
+  const title = row.role === "lane" || tabKind === "lane" || tabKind === "brief" ? laneTitle(pane.title) : pane.title;
   const ref = { machine_id: machineId, session, pane_id: pane.pane_id };
   const active = useApp((s) => s.selected !== null && paneKey(s.selected) === paneKey(ref));
   const pin = useApp((s) => s.pinItem);
@@ -200,7 +211,7 @@ function AgentCard({
   );
   return (
     <li
-      className={"agent-card-item" + (row.role === "lane" ? " lane-row" : "") + (lanes ? " has-lanes" : "") + (tabRow ? reorder.indicatorClass(tab.tab_id) : "")}
+      className={"agent-card-item" + (folded(row) ? " lane-row" : "") + (lanes ? " has-lanes" : "") + (tabRow ? reorder.indicatorClass(tab.tab_id) : "")}
       {...(tabRow ? reorder.target(tab.tab_id) : {})}
     >
       <button
@@ -216,6 +227,12 @@ function AgentCard({
       >
         <AgentIcon agent={pane.agent} />
         <span className={"agent-card-title" + (activity ? " has-activity" : "")}>{title}</span>
+        {tabKind && <span className={"role-badge " + tabKind}>{ROLE_BADGE[tabKind]}</span>}
+        {row.orphan && (
+          <span className="role-badge orphan" title="No orchestrator owns this lane: the lane store names none, or its pane is gone">
+            orphan
+          </span>
+        )}
         {isProt && (
           <span className="agent-card-lock" role="img" aria-label={`Protected: ${title}`} title="Protected: close is turned off (right-click to unprotect)">
             <LockIcon />
@@ -264,17 +281,22 @@ function WorkspaceGroup({ machineId, session, workspace: ws, rows: all, active }
   const entries = all.map((r) => r.entry);
   const keyOf = (e: PaneEntry) => paneKey({ machine_id: machineId, session, pane_id: e.pane.pane_id });
   // The selected pane always shows, so ⌘J and the palette never land on a hidden row.
-  // Lanes sit right under their orchestrator and fold behind it; one that needs input, or the
-  // selected one, still shows.
-  const lanesKey = `lanes:${machineId}/${session}/${ws.workspace_id}`;
-  const lanesOpen = useApp((s) => s.expanded[lanesKey] ?? false);
-  const laneRows = all.filter((r) => r.role === "lane");
-  const orch = all.find((r) => r.role === "orch");
-  const ordered = orch ? all.filter((r) => r.role !== "lane").flatMap((r) => (r === orch ? [r, ...laneRows] : [r])) : all;
+  // Lanes sit right under the pane that owns them and fold behind it; one that needs input, or the
+  // selected one, still shows. An orphan lane is a row of its own.
+  const expanded = useApp((s) => s.expanded);
+  const lanesKey = (owner: string) => `lanes:${machineId}/${session}/${owner}`;
+  const lanesOf = (r: Row) => all.filter((l) => folded(l) && l.owner === r.entry.pane.pane_id);
+  const ordered = all.filter((r) => !folded(r)).flatMap((r) => [r, ...lanesOf(r)]);
   const inView = (r: Row) =>
-    r.role === "lane" ? lanesOpen || r.entry.pane.status === "blocked" : !active || !r.quiet;
+    folded(r) ? (expanded[lanesKey(r.owner!)] ?? false) || r.entry.pane.status === "blocked" : !active || !r.quiet;
   const shown = ordered.filter((r) => r.key === selected || (open && inView(r)));
-  const lanes = orch && { rows: laneRows, open: lanesOpen, toggle: () => toggle(lanesKey, lanesOpen) };
+  const lanesFor = (r: Row) => {
+    const rows = lanesOf(r);
+    if (rows.length === 0) return undefined;
+    const key = lanesKey(r.entry.pane.pane_id);
+    const isOpen = expanded[key] ?? false;
+    return { rows, open: isOpen, toggle: () => toggle(key, isOpen) };
+  };
   const need = entries.filter((e) => {
     if (!e.pane.agent) return false;
     return e.pane.status === "blocked" || (e.pane.status === "done" && tabRole(e.tab.label) !== "lane" && !doneSeen[keyOf(e)]);
@@ -348,12 +370,12 @@ function WorkspaceGroup({ machineId, session, workspace: ws, rows: all, active }
               >
                 <ul className="agent-cards">
                   {run.map((r) => (
-                    <AgentCard key={r.entry.pane.pane_id} machineId={machineId} session={session} row={r} reorder={reorder} lanes={r === orch ? lanes || undefined : undefined} />
+                    <AgentCard key={r.entry.pane.pane_id} machineId={machineId} session={session} row={r} reorder={reorder} lanes={lanesFor(r)} />
                   ))}
                 </ul>
               </li>
             ) : (
-              <AgentCard key={run[0].entry.pane.pane_id} machineId={machineId} session={session} row={run[0]} reorder={reorder} lanes={run[0] === orch ? lanes || undefined : undefined} tabRow />
+              <AgentCard key={run[0].entry.pane.pane_id} machineId={machineId} session={session} row={run[0]} reorder={reorder} lanes={lanesFor(run[0])} tabRow />
             ),
           )}
         </ul>
@@ -455,16 +477,29 @@ function SessionPanes({ machineId, session }: { machineId: string; session: Sess
   const selected = useApp((s) => (s.selected ? paneKey(s.selected) : null));
   const now = useMinuteClock();
   const keptMs = useActiveKeptMs();
-  const groups = workspaceGroups(session).map((g) => ({
+  const built = workspaceGroups(session);
+  // Read from the lane store only while the session has lane tabs; it names each lane's owner.
+  const lanePanes = built.flatMap((g) => g.entries.filter((e) => tabRole(e.tab.label) === "lane").map((e) => e.pane.pane_id)).join(" ");
+  const records = useLaneRecords(machineId, lanePanes);
+  const roles = sessionRoles(session.name, built.map((g) => g.entries.map((e) => ({ tabLabel: e.tab.label, pane: e.pane }))), records);
+  const placed = built.map((g, gi) => ({
     workspace: g.workspace,
-    rows: ((roles) =>
-      g.entries.map((entry, i): Row => {
-        const key = paneKey({ machine_id: machineId, session: session.name, pane_id: entry.pane.pane_id });
-        return { entry, key, role: roles[i], ...paneState(entry.pane, !!doneSeen[key], since[key], now, keptMs) };
-      }))(paneRoles(g.entries.map((e) => ({ tabLabel: e.tab.label, pane: e.pane })))),
+    rows: g.entries.map((entry, i): Row => {
+      const key = paneKey({ machine_id: machineId, session: session.name, pane_id: entry.pane.pane_id });
+      return { entry, key, ...roles[gi][i], ...paneState(entry.pane, !!doneSeen[key], since[key], now, keptMs) };
+    }),
+  }));
+  // A lane owned by a pane of another workspace moves to that workspace's group, under its owner.
+  const groupOf = new Map(placed.flatMap((g, gi) => g.rows.map((r) => [r.entry.pane.pane_id, gi] as const)));
+  const groups = placed.map((g, gi) => ({
+    workspace: g.workspace,
+    rows: [
+      ...g.rows.filter((r) => !folded(r) || groupOf.get(r.owner!) === gi),
+      ...placed.flatMap((o, oi) => (oi === gi ? [] : o.rows.filter((r) => folded(r) && groupOf.get(r.owner!) === gi))),
+    ],
   }));
   // A lane counts only while it needs the user: the rest is its orchestrator's.
-  const kept = (r: Row) => r.key === selected || (r.role === "lane" ? r.entry.pane.status === "blocked" : !r.quiet);
+  const kept = (r: Row) => r.key === selected || (folded(r) ? r.entry.pane.status === "blocked" : !r.quiet);
   const count = groups.reduce((n, g) => n + g.rows.filter(kept).length, 0);
   // Active drops a workspace whose panes it all leaves out; an empty one stays, to add to it.
   const visible = active ? groups.filter((g) => g.rows.length === 0 || g.rows.some(kept)) : groups;

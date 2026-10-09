@@ -6,6 +6,7 @@ pub mod files;
 pub mod fonts;
 pub mod git;
 pub mod herdr;
+pub mod lanes;
 pub mod layout;
 pub mod machines;
 pub mod notify;
@@ -60,6 +61,7 @@ pub fn run() {
             commands::session_delete,
             commands::session_rename,
             commands::herdr_call,
+            commands::lanes_list,
             commands::notify_pane,
             commands::image_save_temp,
             commands::open_local_file,

@@ -2,6 +2,7 @@ import { Channel, invoke } from "@tauri-apps/api/core";
 import { listen, type UnlistenFn } from "@tauri-apps/api/event";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import { showToast } from "../ui/Toast";
+import type { LaneRecord } from "../agents/roles";
 import type { AttachEvent, Changed, ChatEvent, ChatItem, FileContent, FileEntry, FileList, GitStatus, Located, MachineView, PaneRef, PaneStatusEvent, QuotaOutcome, QuotaProvider, CtaQuota, SlashCommand, WatchEvent } from "./types";
 
 export const machinesList = () => invoke<MachineView[]>("machines_list");
@@ -127,6 +128,8 @@ export const chatClose = (p: PaneRef) =>
   invoke<void>("chat_close", { machineId: p.machine_id, session: p.session, paneId: p.pane_id });
 export const quotaFetch = (provider: QuotaProvider) => invoke<QuotaOutcome>("quota_fetch", { provider });
 export const quotaCta = (poll: boolean) => invoke<CtaQuota>("quota_cta", { poll });
+/** `ctc lane list --json` on the Machine; null when its ctc reports no owner. */
+export const lanesList = (machineId: string) => invoke<LaneRecord[] | null>("lanes_list", { machineId });
 
 /** `showHeavy` also lists `.git`, `node_modules` and the other heavy folders. */
 export const filesListDir = (machineId: string, root: string, rel: string, showHeavy = false) =>
