@@ -92,6 +92,22 @@ describe("OpenStrip", () => {
     expect(open()).toEqual(["p2"]);
   });
 
+  it("names where two tabs of the same name live, and leaves a unique name bare", () => {
+    const twin = structuredClone(m);
+    twin.sessions[1].workspaces[0].tabs[0].panes[0].title = "Mermaid diagram";
+    useApp.getState().upsertMachine(twin);
+    openPinned("p1", "p3");
+    useApp.getState().select(ref("p1", "pegabot"));
+    useApp.getState().pinItem(itemKey({ kind: "agent", ref: ref("p1", "pegabot") }));
+    const ws = { machine_id: "local", session: "default", workspace_id: "w2" };
+    useApp.getState().openFile(ws, "/r", "src/README.md", { pin: true });
+    useApp.getState().openFile(ws, "/r", "docs/README.md", { pin: true });
+    render(<OpenStrip />);
+    expect(screen.getAllByRole("tab").map((t) => t.textContent)).toEqual([
+      "Mermaid diagram · remora", "Bug button", "Mermaid diagram · bot", "README.md · src", "README.md · docs",
+    ]);
+  });
+
   it("shows a file item by basename with its place in the tooltip, and activates it on click", () => {
     openPinned("p1");
     useApp.getState().openFile({ machine_id: "local", session: "default", workspace_id: "w2" }, "/r", "src/main.ts", { pin: true });

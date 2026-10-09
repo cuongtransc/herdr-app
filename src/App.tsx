@@ -7,13 +7,12 @@ import { Palette } from "./palette/Palette";
 import { Settings, useSettingsOpen } from "./settings/Settings";
 import { applyChatFont, fontZoomKey, useSettings, zoomFont } from "./settings/store";
 import { applyTheme, useTheme } from "./settings/theme";
-import { Header } from "./main/Header";
 import { LayoutControls } from "./main/LayoutControls";
 import { useDockBadge } from "./main/dockBadge";
 import { TriageHud } from "./main/TriageHud";
 import { useTriage } from "./main/triage";
 import { useLayout } from "./settings/layout";
-import { OpenStrip } from "./main/OpenStrip";
+import { TopBar } from "./main/TopBar";
 import { Sidebar } from "./sidebar/Sidebar";
 import { QuotaStrip } from "./sidebar/QuotaStrip";
 import { guardFileDrops } from "./sidebar/dnd";
@@ -274,16 +273,14 @@ export default function App() {
       <main className="main">
         {item?.kind === "file" ? (
           <>
-            {pane && ref ? <Header /> : <div className="titlebar" data-tauri-drag-region />}
-            <OpenStrip />
+            <TopBar />
             <Suspense fallback={null}>
               <FileViewer key={itemKey(item)} item={item} online={online} />
             </Suspense>
           </>
         ) : pane && ref ? (
           <>
-            <Header />
-            <OpenStrip />
+            <TopBar lens />
             <Suspense fallback={null}>
               {defaultLens(pane, remembered) === "chat" ? (
                 <ChatLens key={key} pane={ref} view={pane} />
@@ -296,16 +293,14 @@ export default function App() {
           // herdr reports a new pane only in its next snapshot: keep the loading overlay up until then
           // rather than flashing the empty state.
           <>
-            <div className="titlebar" data-tauri-drag-region />
-            <OpenStrip />
+            <TopBar />
             <div className="term-lens">
               <StartingOverlay pane={selRef} />
             </div>
           </>
         ) : (
           <>
-            <div className="titlebar" data-tauri-drag-region />
-            <OpenStrip />
+            <TopBar />
             <div className="main-empty">
               <EmptyMain />
             </div>

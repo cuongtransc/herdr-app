@@ -342,7 +342,7 @@ kbd {
 /* --lead: past the traffic lights and the controls, measured by LayoutControls. */
 /* The controls take the Agents column's titlebar row, so its head moves to a row of its own below. */
 .app[data-layout="sidebar-hidden"] .agents-head { height: auto; padding: var(--titlebar) 12px 8px 16px; }
-.app[data-layout="focus"] .header { padding-left: var(--lead, 116px); }
+.app[data-layout="focus"] .topbar { padding-left: var(--lead, 116px); }
 .app:not([data-layout="normal"]) .dashboard { left: 0; }
 .app[data-layout="focus"] .dashboard { box-shadow: none; }
 .app:not([data-layout="normal"]) .dash-head,
@@ -662,21 +662,15 @@ kbd {
 .agent-tile-bare svg { width: 100%; height: 100%; display: block; }
 .agent-mono { font-weight: 700; font-size: 12px; color: var(--fg); }
 
-/* ---------- Header ---------- */
-.header {
-  flex: none; display: flex; align-items: center; gap: 12px;
-  height: var(--titlebar); padding: 0 12px 0 18px; box-sizing: border-box;
+/* ---------- Top bar: the open tabs and the Lens switch, one row as tall as the columns' heads ---------- */
+.topbar {
+  flex: none; display: flex; align-items: stretch; height: var(--titlebar); box-sizing: border-box;
   border-bottom: 1px solid var(--line); background: var(--surface-chrome);
 }
-.crumbs { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--fg-3); pointer-events: none; }
-.crumb.current { color: var(--fg); font-weight: 600; }
-.crumbs .sep { color: var(--fg-3); opacity: 0.6; padding: 0 2px; }
-.agent-status {
-  flex: none; display: inline-flex; align-items: center; gap: 7px; height: 24px; padding: 0 10px;
-  border-radius: 999px; background: var(--hover); border: 1px solid var(--line); color: var(--fg-2); font-size: 12px;
-}
-.agent-status.status-blocked { color: var(--amber-text); background: color-mix(in srgb, var(--amber) 10%, transparent); border-color: color-mix(in srgb, var(--amber) 25%, transparent); }
-.agent-status.status-working { color: var(--blue-text); }
+.topbar .files-tabs { flex: 1; min-width: 0; background: none; border-bottom: 0; }
+.topbar .files-tab-item { height: 100%; }
+.topbar .seg { align-self: center; margin: 0 10px 0 12px; }
+.files-tab-where { color: var(--fg-3); font-weight: 400; }
 
 .seg {
   position: relative; flex: none; display: inline-grid; grid-template-columns: 1fr 1fr;
@@ -698,6 +692,7 @@ kbd {
 .seg button[aria-pressed="true"] { color: var(--fg); }
 .seg button:disabled { opacity: 0.4; cursor: default; }
 .seg button:disabled:hover { color: var(--fg-3); }
+.seg-icons button { padding: 0 9px; }
 /* N options: set --n (count) and --i (selected index) inline. */
 .seg-n { grid-template-columns: repeat(var(--n), 1fr); }
 .seg-n .seg-thumb { width: calc((100% - 4px) / var(--n)); transform: translateX(calc(var(--i) * 100%)); }

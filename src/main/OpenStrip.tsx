@@ -13,6 +13,8 @@ interface Entry {
   label: string;
   /** Hover text: where the item lives, then what it is. */
   title: string;
+  /** Said after the label when another tab has the same one: an agent's workspace, a file's folder. */
+  where: string;
   /** Set for an agent item; a file item shows an icon instead. */
   pane?: PaneView;
 }
@@ -22,14 +24,16 @@ function entries(machines: Record<string, MachineView>, items: OpenItem[]): Entr
     const key = itemKey(item);
     if (item.kind === "file") {
       const place = placeOf(machines, item.ws.machine_id, item.ws.session, item.ws.workspace_id);
-      return place ? [{ key, label: item.rel.split("/").pop() ?? item.rel, title: `${place} · ${item.rel}` }] : [];
+      const parts = item.rel.split("/");
+      const where = parts.length > 1 ? parts[parts.length - 2] : place?.split(" · ")[1] ?? "";
+      return place ? [{ key, label: parts[parts.length - 1], title: `${place} · ${item.rel}`, where }] : [];
     }
     const { machine_id, session, pane_id } = item.ref;
     const machine = machines[machine_id];
     for (const w of machine?.sessions.find((s) => s.name === session)?.workspaces ?? [])
       for (const t of w.tabs)
         for (const pane of t.panes)
-          if (pane.pane_id === pane_id) return [{ key, label: pane.title, title: `${machine.label}/${session} · ${w.label} · ${pane.title}`, pane }];
+          if (pane.pane_id === pane_id) return [{ key, label: pane.title, title: `${machine.label}/${session} · ${w.label} · ${pane.title}`, where: w.label, pane }];
     return [];
   });
 }
@@ -64,6 +68,7 @@ export const OpenStrip = memo(function OpenStrip() {
   const [over, setOver] = useState<{ key: string; side: Side } | null>(null);
   const tabs = entries(machines, items);
   if (tabs.length === 0) return null;
+  const twice = (label: string) => tabs.filter((t) => t.label === label).length > 1;
 
   const close = (key: string) => closeItems(key, "one");
   // Commands that would close nothing are left out.
@@ -77,8 +82,9 @@ export const OpenStrip = memo(function OpenStrip() {
   };
 
   return (
-    <div className="files-tabs agent-tabs" role="tablist" aria-label="Open items">
-      {tabs.map(({ key, label, title, pane }) => {
+    // the strip's empty end is the top bar's, and drags the window
+    <div className="files-tabs agent-tabs" role="tablist" aria-label="Open items" data-tauri-drag-region>
+      {tabs.map(({ key, label, title, where, pane }) => {
         const isActive = key === active;
         const state = `${isActive ? " active" : ""}${key === preview ? " preview" : ""}`;
         const drop = over?.key === key ? ` drop-${over.side}` : "";
@@ -149,7 +155,10 @@ export const OpenStrip = memo(function OpenStrip() {
                 }
               }}
             >
-              <span className="files-tab-name">{label}</span>
+              <span className="files-tab-name">
+                {label}
+                {twice(label) && where && <span className="files-tab-where"> · {where}</span>}
+              </span>
             </span>
             <button
               type="button"
