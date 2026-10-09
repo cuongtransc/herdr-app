@@ -130,11 +130,9 @@ user sees, then where it lives. A numbered picture of all of them, light and dar
 | **Agent Board** | The ⇧⌘D overlay, with the Quota column | `src/dashboard/AgentDashboard.tsx`, `QuotaColumn` |
 | **Files panel** | Under the Pane rows in the Agents column; ⌘E focuses it, Browse files on a Workspace header | `src/files/FilesPanel.tsx`, `src-tauri/src/files/` |
 | **Go to file** / **Files tree** | ⌘P's box and the folders under the Files panel's root | `src/files/GoToFile.tsx`, `src/files/FileTree.tsx` |
-| **Header** | The bar over the selected Pane: Breadcrumb, Status pill, Lens switch | `src/main/Header.tsx` |
-| **Breadcrumb** | Machine › Session › Workspace › Pane in the Header | `.crumbs` |
-| **Status pill** | The selected Pane's agent and status in the Header | `.agent-status` |
-| **Lens switch** | Terminal \| Chat in the Header | `.seg` in `Header.tsx` |
-| **Open strip** | The tabs of open Agents and files above the main area | `src/main/OpenStrip.tsx`, `src/store/openItems.ts` |
+| **Top bar** | The main area's one bar, as tall as the columns' heads: the Open strip, then the Lens switch while a Pane fills the main area. It replaced the Header (Breadcrumb, Status pill) on 2026-10-10 | `src/main/TopBar.tsx` |
+| **Open strip** | The tabs of open Agents and files; two tabs of one name say where they live (`zsh · herdr-app`), the tooltip the whole path | `src/main/OpenStrip.tsx`, `src/store/openItems.ts` |
+| **Lens switch** | Terminal \| Chat as two icons at the Top bar's end | `src/main/LensSwitch.tsx` |
 | **File viewer** | The main area while a file tab is active | `src/files/FileViewer.tsx` |
 | **CHANGED group** | Git's changes under the root, above the Files tree | `ChangedList`, `useChanged`, `files_changed` |
 | **Chat lens** / **Terminal lens** | The main area, as a conversation or the raw terminal | `src/chat/ChatLens.tsx`, `src/terminal/TerminalLens.tsx` |

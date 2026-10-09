@@ -367,7 +367,10 @@ describe("App shell", () => {
       expect(useApp.getState().openItems.active).toBeNull();
       // The selected agent with no active item: its lens, not a blank main area.
       await waitFor(() => expect(document.querySelector(".main .chat-lens, .main .term-lens")).toBeTruthy());
-      expect(document.querySelector(".main .header")).toBeTruthy();
+      // one bar over the main area: the tabs and the Lens switch, no breadcrumb or status pill
+      expect(document.querySelectorAll(".main .topbar")).toHaveLength(1);
+      expect(document.querySelector(".main .topbar .seg")).toBeTruthy();
+      expect(screen.queryByLabelText("Breadcrumb")).toBeNull();
     });
 
     it("keeps the strip above the empty state when no pane is selected", async () => {
