@@ -25,7 +25,7 @@ export function BookmarkRow({ bookmark: b, nextKey }: { bookmark: RBookmark; nex
     () => (b.node ? sessionProjects(b.node.machine, b.node.session, doneSeen, true, since, now, keptMs).find((r) => r.label === b.label) ?? null : null),
     [b, doneSeen, since, now, keptMs],
   );
-  const select = useApp((s) => s.select);
+  const openProject = useApp((s) => s.openProject);
   const setOrigin = useViewOrigin((s) => s.set);
   const clickedHere = useViewOrigin((s) => s.from === "bookmarks");
   // Lit when the selected pane is in this project and the user got there from Bookmarks.
@@ -41,9 +41,9 @@ export function BookmarkRow({ bookmark: b, nextKey }: { bookmark: RBookmark; nex
   const word = row ? WORD[row.state] : undefined;
   const lanes = row && row.state === "working" && row.lanes > 0 ? `${row.lanes} ${row.lanes === 1 ? "lane" : "lanes"}` : null;
   const open = () => {
-    if (!row?.target) return;
+    if (!row?.target || !b.node) return;
     setOrigin("bookmarks");
-    select(row.target);
+    openProject({ machine_id: b.node.machine.id, session: b.node.session.name }, row);
   };
   const unbookmark = { label: "Unbookmark", icon: StarOffIcon, onSelect: () => useLayout.getState().update((l) => setBookmarked(l, b.key, false)) };
   return (

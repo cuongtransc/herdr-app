@@ -46,7 +46,7 @@ export function ProjectRows({ machineId, session, rows, current, folded = false,
   folded?: boolean;
   onUnfold?: () => void;
 }) {
-  const select = useApp((s) => s.select);
+  const openProject = useApp((s) => s.openProject);
   const setOrigin = useViewOrigin((s) => s.set);
   const bookmarks = useLayout((s) => s.layout.bookmarks);
   const a = useActions();
@@ -64,7 +64,7 @@ export function ProjectRows({ machineId, session, rows, current, folded = false,
         const open = () => {
           if (!r.target) return;
           setOrigin("sessions");
-          select(r.target);
+          openProject({ machine_id: machineId, session }, r);
         };
         // A project is what Bookmarks hold (ADR 0006): its row's menu bookmarks it, a star says it is.
         const key = projectKey(machineId, session, r.label);
