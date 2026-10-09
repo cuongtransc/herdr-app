@@ -1,0 +1,749 @@
+{
+ "captured": "2026-10-10",
+ "width": 1440,
+ "height": 900,
+ "parts": [
+  {
+   "group": "Sidebar",
+   "name": "Sidebar",
+   "selector": "nav.sidebar",
+   "at": [
+    0.5,
+    0.55
+   ],
+   "what": "The left column: Bookmarks, Sessions, Machines.",
+   "code": "src/sidebar/Sidebar.tsx",
+   "rect": {
+    "x": 0,
+    "y": 0,
+    "w": 249,
+    "h": 900
+   },
+   "badge": {
+    "x": 124.5,
+    "y": 495.00000000000006
+   }
+  },
+  {
+   "group": "Sidebar",
+   "name": "Layout controls",
+   "selector": ".layout-controls",
+   "at": [
+    0,
+    0.5
+   ],
+   "d": [
+    -10,
+    0
+   ],
+   "what": "Beside the traffic lights: ⌘B hides the Sidebar, ⇧⌘B the Agents column too.",
+   "code": "src/main/LayoutControls.tsx",
+   "rect": {
+    "x": 78,
+    "y": 9,
+    "w": 131.078125,
+    "h": 28
+   },
+   "badge": {
+    "x": 68,
+    "y": 23
+   }
+  },
+  {
+   "group": "Sidebar",
+   "name": "Board button",
+   "selector": ".board-btn",
+   "at": [
+    1,
+    0.5
+   ],
+   "d": [
+    11,
+    0
+   ],
+   "what": "Opens the Agent Board (⇧⌘D); the count is the agents that need you.",
+   "code": ".board-btn in LayoutControls",
+   "rect": {
+    "x": 112,
+    "y": 9,
+    "w": 97.078125,
+    "h": 28
+   },
+   "badge": {
+    "x": 220.078125,
+    "y": 23
+   }
+  },
+  {
+   "group": "Sidebar",
+   "name": "Bookmarks",
+   "selector": "[aria-label='Bookmarks']",
+   "at": [
+    0,
+    0
+   ],
+   "d": [
+    142,
+    39
+   ],
+   "what": "Workspaces pinned to the top; a closed one waits under the same name.",
+   "code": "useLayout().bookmarks",
+   "rect": {
+    "x": 8,
+    "y": 46,
+    "w": 232,
+    "h": 54
+   },
+   "badge": {
+    "x": 150,
+    "y": 85
+   }
+  },
+  {
+   "group": "Sidebar",
+   "name": "Sessions filter",
+   "selector": ".sidebar .active-toggle",
+   "at": [
+    0,
+    0.5
+   ],
+   "d": [
+    -13,
+    0
+   ],
+   "what": "All | Active on the Sessions header.",
+   "code": "useSessionFilter (src/sidebar/activeFilter.ts)",
+   "rect": {
+    "x": 170.46875,
+    "y": 121,
+    "w": 61.53125,
+    "h": 20
+   },
+   "badge": {
+    "x": 157.46875,
+    "y": 131
+   }
+  },
+  {
+   "group": "Sidebar",
+   "name": "Session row",
+   "selector": "li.session > .row",
+   "at": [
+    0,
+    0.5
+   ],
+   "d": [
+    122,
+    0
+   ],
+   "what": "A Session in the Sidebar.",
+   "code": "SessionRow",
+   "rect": {
+    "x": 8,
+    "y": 144,
+    "w": 232,
+    "h": 28
+   },
+   "badge": {
+    "x": 130,
+    "y": 158
+   }
+  },
+  {
+   "group": "Sidebar",
+   "name": "Project row",
+   "selector": ".project-row",
+   "at": [
+    0,
+    0.5
+   ],
+   "d": [
+    120,
+    0
+   ],
+   "what": "A Workspace with agent work, under its Session row.",
+   "code": "ProjectRows",
+   "rect": {
+    "x": 32,
+    "y": 173,
+    "w": 208,
+    "h": 24
+   },
+   "badge": {
+    "x": 152,
+    "y": 185
+   }
+  },
+  {
+   "group": "Sidebar",
+   "name": "Fold line",
+   "selector": ".filter-hidden",
+   "at": [
+    0,
+    0.5
+   ],
+   "d": [
+    172,
+    0
+   ],
+   "what": "“N hidden · idle or stopped”: what the Active filter hides, with Show.",
+   "code": ".filter-hidden in GroupTree",
+   "rect": {
+    "x": 8,
+    "y": 232,
+    "w": 232,
+    "h": 32.796875
+   },
+   "badge": {
+    "x": 180,
+    "y": 248.3984375
+   }
+  },
+  {
+   "group": "Sidebar",
+   "name": "Machines",
+   "selector": "li.machine",
+   "at": [
+    0,
+    0.5
+   ],
+   "d": [
+    142,
+    0
+   ],
+   "what": "The machines herdr runs on, local and over SSH.",
+   "code": "li.machine in Sidebar",
+   "rect": {
+    "x": 8,
+    "y": 789,
+    "w": 232,
+    "h": 28
+   },
+   "badge": {
+    "x": 150,
+    "y": 803
+   }
+  },
+  {
+   "group": "Agents column",
+   "name": "Agents column",
+   "selector": "aside.agents",
+   "at": [
+    0.5,
+    0.39
+   ],
+   "what": "The middle column, headed by the Session name and PANES.",
+   "code": "src/agents/AgentList.tsx",
+   "rect": {
+    "x": 249,
+    "y": 0,
+    "w": 289,
+    "h": 900
+   },
+   "badge": {
+    "x": 393.5,
+    "y": 351
+   }
+  },
+  {
+   "group": "Agents column",
+   "name": "Queue chip",
+   "selector": ".need-chip",
+   "at": [
+    1,
+    0.5
+   ],
+   "d": [
+    13,
+    0
+   ],
+   "what": "“1 blocked · 1 review”: steps to the next pane that needs you.",
+   "code": "SessionQueueChip",
+   "rect": {
+    "x": 285.609375,
+    "y": 12.5,
+    "w": 126.1875,
+    "h": 20
+   },
+   "badge": {
+    "x": 424.796875,
+    "y": 22.5
+   }
+  },
+  {
+   "group": "Agents column",
+   "name": "Panes filter",
+   "selector": ".panes-head .active-toggle",
+   "at": [
+    0,
+    0.5
+   ],
+   "d": [
+    -17,
+    0
+   ],
+   "what": "All | Active on the PANES header.",
+   "code": "usePaneFilter, PanesHeader",
+   "rect": {
+    "x": 459.46875,
+    "y": 52,
+    "w": 61.53125,
+    "h": 20
+   },
+   "badge": {
+    "x": 442.46875,
+    "y": 62
+   }
+  },
+  {
+   "group": "Agents column",
+   "name": "Workspace header",
+   "selector": ".ws-head",
+   "at": [
+    0,
+    0.5
+   ],
+   "d": [
+    91,
+    0
+   ],
+   "what": "A Workspace's name over its Pane rows; + starts an agent in it.",
+   "code": ".ws-head in AgentList",
+   "rect": {
+    "x": 249,
+    "y": 82,
+    "w": 288,
+    "h": 24
+   },
+   "badge": {
+    "x": 340,
+    "y": 94
+   }
+  },
+  {
+   "group": "Agents column",
+   "name": "Pane row",
+   "selector": ".agent-card",
+   "at": [
+    0,
+    0.5
+   ],
+   "d": [
+    159,
+    0
+   ],
+   "what": "A Pane: agent mark, title, lock, status.",
+   "code": "AgentCard",
+   "rect": {
+    "x": 255,
+    "y": 106,
+    "w": 276,
+    "h": 28
+   },
+   "badge": {
+    "x": 414,
+    "y": 120
+   }
+  },
+  {
+   "group": "Agents column",
+   "name": "Lane toggle",
+   "selector": ".lane-toggle",
+   "at": [
+    0.5,
+    0
+   ],
+   "d": [
+    3,
+    -11
+   ],
+   "what": "“N lanes ›” on an orchestrator's Pane row.",
+   "code": ".lane-toggle in AgentList",
+   "rect": {
+    "x": 449.03125,
+    "y": 110,
+    "w": 55.96875,
+    "h": 20
+   },
+   "badge": {
+    "x": 480.015625,
+    "y": 99
+   }
+  },
+  {
+   "group": "Agents column",
+   "name": "Files panel",
+   "selector": ".files-panel",
+   "at": [
+    0,
+    0
+   ],
+   "d": [
+    157,
+    17
+   ],
+   "what": "Under the Pane rows; ⌘E focuses it.",
+   "code": "src/files/FilesPanel.tsx",
+   "rect": {
+    "x": 249,
+    "y": 449,
+    "w": 288,
+    "h": 451
+   },
+   "badge": {
+    "x": 406,
+    "y": 466
+   }
+  },
+  {
+   "group": "Agents column",
+   "name": "Go to file",
+   "selector": ".files-goto",
+   "at": [
+    0,
+    0.5
+   ],
+   "d": [
+    223,
+    0
+   ],
+   "what": "⌘P: find a file by name in the panel's root.",
+   "code": "src/files/GoToFile.tsx",
+   "rect": {
+    "x": 249,
+    "y": 510,
+    "w": 288,
+    "h": 44
+   },
+   "badge": {
+    "x": 472,
+    "y": 532
+   }
+  },
+  {
+   "group": "Agents column",
+   "name": "Files tree",
+   "selector": ".files-tree",
+   "at": [
+    0.5,
+    0
+   ],
+   "d": [
+    0,
+    56
+   ],
+   "what": "The folders and files under the root.",
+   "code": "src/files/FileTree.tsx",
+   "rect": {
+    "x": 249,
+    "y": 554,
+    "w": 288,
+    "h": 338
+   },
+   "badge": {
+    "x": 393,
+    "y": 610
+   }
+  },
+  {
+   "group": "Main area",
+   "name": "Top bar",
+   "selector": ".topbar",
+   "at": [
+    0,
+    0.5
+   ],
+   "d": [
+    562,
+    0
+   ],
+   "what": "The main area's one bar, as tall as the columns' heads: the Open strip, then the Lens switch.",
+   "code": "src/main/TopBar.tsx",
+   "rect": {
+    "x": 538,
+    "y": 0,
+    "w": 902,
+    "h": 46
+   },
+   "badge": {
+    "x": 1100,
+    "y": 23
+   }
+  },
+  {
+   "group": "Main area",
+   "name": "Open strip",
+   "selector": ".agent-tabs",
+   "at": [
+    0,
+    0.5
+   ],
+   "d": [
+    298,
+    0
+   ],
+   "what": "The tabs of open Agents and files. Two tabs of one name say where they live; the tooltip has the whole path.",
+   "code": "src/main/OpenStrip.tsx",
+   "rect": {
+    "x": 538,
+    "y": 0,
+    "w": 810,
+    "h": 45
+   },
+   "badge": {
+    "x": 836,
+    "y": 22.5
+   }
+  },
+  {
+   "group": "Main area",
+   "name": "Lens switch",
+   "selector": ".topbar .seg",
+   "at": [
+    0,
+    0
+   ],
+   "d": [
+    2,
+    1
+   ],
+   "what": "Terminal | Chat for the selected Pane, as two icons.",
+   "code": "src/main/LensSwitch.tsx",
+   "rect": {
+    "x": 1360,
+    "y": 7.5,
+    "w": 70,
+    "h": 30
+   },
+   "badge": {
+    "x": 1362,
+    "y": 8.5
+   }
+  },
+  {
+   "group": "Main area",
+   "name": "Chat lens",
+   "selector": ".chat-lens",
+   "at": [
+    0,
+    0.5
+   ],
+   "d": [
+    15,
+    27
+   ],
+   "what": "The Pane's Transcript as a conversation. Its twin is the Terminal lens.",
+   "code": "src/chat/ChatLens.tsx",
+   "rect": {
+    "x": 538,
+    "y": 46,
+    "w": 902,
+    "h": 854
+   },
+   "badge": {
+    "x": 553,
+    "y": 500
+   }
+  },
+  {
+   "group": "Main area",
+   "name": "Work block",
+   "selector": ".chat-work",
+   "at": [
+    0,
+    0.5
+   ],
+   "d": [
+    221,
+    0
+   ],
+   "what": "One turn's work folded under “Worked for …”.",
+   "code": "src/chat/WorkBlockView.tsx",
+   "rect": {
+    "x": 569,
+    "y": 110,
+    "w": 840,
+    "h": 36.796875
+   },
+   "badge": {
+    "x": 790,
+    "y": 128.3984375
+   }
+  },
+  {
+   "group": "Main area",
+   "name": "Queued messages",
+   "selector": ".chat-queued .chat-bubble",
+   "at": [
+    0,
+    0.5
+   ],
+   "d": [
+    -66,
+    0
+   ],
+   "what": "Sent mid-turn, not read by the agent yet.",
+   "code": "src/chat/QueuedMessages.tsx",
+   "rect": {
+    "x": 1185.875,
+    "y": 681.953125,
+    "w": 195.125,
+    "h": 40.25
+   },
+   "badge": {
+    "x": 1119.875,
+    "y": 702.078125
+   }
+  },
+  {
+   "group": "Main area",
+   "name": "Working line",
+   "selector": ".chat-working",
+   "at": [
+    0,
+    0.5
+   ],
+   "d": [
+    121,
+    2
+   ],
+   "what": "The spinner and “Working 1m 23s”, counted from the prompt, while the agent works.",
+   "code": "src/chat/WorkingIndicator.tsx",
+   "rect": {
+    "x": 569,
+    "y": 730.203125,
+    "w": 840,
+    "h": 22.796875
+   },
+   "badge": {
+    "x": 690,
+    "y": 743.6015625
+   }
+  },
+  {
+   "group": "Main area",
+   "name": "Composer chips",
+   "selector": ".composer-quick",
+   "at": [
+    1,
+    0.5
+   ],
+   "d": [
+    19,
+    0
+   ],
+   "what": "Quick replies above the message box.",
+   "code": ".composer-quick in Composer",
+   "rect": {
+    "x": 589,
+    "y": 761,
+    "w": 390.46875,
+    "h": 24
+   },
+   "badge": {
+    "x": 998.46875,
+    "y": 773
+   }
+  },
+  {
+   "group": "Main area",
+   "name": "Composer keys",
+   "selector": ".composer-keys",
+   "at": [
+    0,
+    0.5
+   ],
+   "d": [
+    -16,
+    0
+   ],
+   "what": "Esc, Ctrl+C, ⇧Tab sent to the agent as keys.",
+   "code": ".composer-keys in Composer",
+   "rect": {
+    "x": 1231.375,
+    "y": 761,
+    "w": 157.625,
+    "h": 24
+   },
+   "badge": {
+    "x": 1215.375,
+    "y": 773
+   }
+  },
+  {
+   "group": "Main area",
+   "name": "Composer",
+   "selector": ".composer-box",
+   "at": [
+    0,
+    0
+   ],
+   "d": [
+    511,
+    21
+   ],
+   "what": "The message box.",
+   "code": "src/chat/Composer.tsx",
+   "rect": {
+    "x": 589,
+    "y": 791,
+    "w": 800,
+    "h": 93
+   },
+   "badge": {
+    "x": 1100,
+    "y": 812
+   }
+  },
+  {
+   "group": "Main area",
+   "name": "Git status line",
+   "selector": ".composer-git",
+   "at": [
+    1,
+    0.5
+   ],
+   "d": [
+    20,
+    0
+   ],
+   "what": "Folder, branch and changed files of the Pane's directory.",
+   "code": "GitStatusLine (src/chat/GitStatus.tsx)",
+   "rect": {
+    "x": 604,
+    "y": 852.953125,
+    "w": 202.40625,
+    "h": 16.09375
+   },
+   "badge": {
+    "x": 826.40625,
+    "y": 861
+   }
+  },
+  {
+   "group": "Main area",
+   "name": "Model label",
+   "selector": ".composer-model",
+   "at": [
+    0,
+    0.5
+   ],
+   "d": [
+    -18,
+    0
+   ],
+   "what": "Model · reasoning effort · context used.",
+   "code": ".composer-model, src/chat/modelLabel.ts",
+   "rect": {
+    "x": 1147.84375,
+    "y": 850.953125,
+    "w": 164.15625,
+    "h": 20.09375
+   },
+   "badge": {
+    "x": 1129.84375,
+    "y": 861
+   }
+  }
+ ]
+}
