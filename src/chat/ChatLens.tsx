@@ -19,8 +19,9 @@ import { QueuedMessages } from "./QueuedMessages";
 import { WorkingIndicator } from "./WorkingIndicator";
 import { usePiModelPicker } from "./usePiModelPicker";
 import { usePendingTranscript } from "./pendingTranscript";
-import { ArrowDownIcon } from "../ui/icons";
+import { ArrowDownIcon, GitBranchIcon } from "../ui/icons";
 import { useLensSettings } from "../settings/lens";
+import { useForks } from "../agents/forkSession";
 import { forgetTranscript, rememberedTranscript, rememberTranscript, TranscriptPicker } from "./TranscriptPicker";
 
 /** How long an open that has not answered yet may go without saying the transcript is loading. */
@@ -34,6 +35,7 @@ export function ChatLens({ pane, view }: { pane: PaneRef; view: PaneView }) {
   const setLensOverride = useApp((s) => s.setLensOverride);
   const machineState = useApp((s) => s.machines[pane.machine_id]?.state);
   const chatWidth = useLensSettings((s) => s.chatWidth);
+  const forkOf = useForks((s) => s.forks[key]);
   const sawDown = useRef(false);
   const [state, dispatch] = useReducer(reducer, emptyChat);
   const latest = useRef(state);
@@ -275,6 +277,16 @@ export function ChatLens({ pane, view }: { pane: PaneRef; view: PaneView }) {
     <div className="chat-main">
       {located && <TranscriptPicker located={located} onChoose={choose} />}
       {err && <div className="chat-notice chat-error">{err.code}: {err.message}</div>}
+      {forkOf && (
+        <div className="chat-notice neutral chat-fork" role="status" aria-label="Fork">
+          <GitBranchIcon className="icon" />
+          <span>
+            Forked from <b>{forkOf.from}</b> at {new Date(forkOf.at).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", hour12: false })}
+            {forkOf.worktree && <> · worktree {forkOf.worktree}</>} · knows nothing the original did after that
+          </span>
+          <button className="btn btn-xs" onClick={() => useApp.getState().select(forkOf.of)}>Back to original</button>
+        </div>
+      )}
       {pending && !err && <div className="chat-notice neutral">New conversation: send the first message to start it.</div>}
       {!loaded && loadingShown && !pending && !err && <div className="chat-notice neutral">Loading transcript…</div>}
       <div className="chat-scroll" ref={scrollRef} onScroll={onScroll} onWheel={unpick} onPointerDown={unpick} onKeyDown={unpick}>

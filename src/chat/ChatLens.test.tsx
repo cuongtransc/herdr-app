@@ -46,6 +46,9 @@ import { chatLocate, herdrCall } from "../lib/ipc";
 import type { PaneView } from "../lib/types";
 import { ChatLens } from "./ChatLens";
 import { useLensSettings } from "../settings/lens";
+import { useForks } from "../agents/forkSession";
+import { paneKey } from "../lib/types";
+import { useApp } from "../store/app";
 
 const pane = { machine_id: "devtuf", session: "default", pane_id: "w1:p1" };
 const idlePi = { status: "idle", agent: "pi", title: "pi" } as PaneView;
@@ -195,6 +198,19 @@ describe("ChatLens", () => {
     expect(list.textContent).toContain("Queued");
     send([]);
     expect(screen.queryByRole("list", { name: "Queued messages" })).toBeNull();
+  });
+
+  it("says a forked pane is a fork, of what and since when, and goes back to the original", () => {
+    const of = { machine_id: "m1", session: "s", pane_id: "w1:p1" };
+    useForks.setState({ forks: { [paneKey(pane)]: { of, from: "Port Files panel", at: new Date(2026, 9, 9, 16, 5).getTime(), worktree: "fork-20261009-1605" } } });
+    render(<ChatLens pane={pane} view={idlePi} />);
+    const banner = screen.getByRole("status", { name: "Fork" });
+    expect(banner.textContent).toContain("Forked from Port Files panel at 16:05");
+    expect(banner.textContent).toContain("worktree fork-20261009-1605");
+    expect(banner.textContent).toContain("knows nothing the original did after that");
+    fireEvent.click(screen.getByRole("button", { name: "Back to original" }));
+    expect(useApp.getState().selected).toEqual(of);
+    useForks.setState({ forks: {} });
   });
 
   it("runs at the chat width chosen in Settings, and follows a change", () => {
