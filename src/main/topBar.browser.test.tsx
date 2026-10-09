@@ -47,6 +47,23 @@ it.each([902, 262])("is one 46px bar with the tabs and a whole Lens switch in a 
   expect(seg.width).toBeLessThan(80);
 });
 
+it("draws each tab as a 28px pill with an edge, the open one filled and semibold", async () => {
+  const main = mount(902);
+  await act(async () => createRoot(main).render(<TopBar lens />));
+  const [open, other] = [".files-tab-item.active", ".files-tab-item:not(.active)"].map((sel) => main.querySelector<HTMLElement>(sel)!);
+  for (const tab of [open, other]) {
+    expect(tab.getBoundingClientRect().height).toBe(28);
+    expect(getComputedStyle(tab).borderTopWidth).toBe("1px");
+    expect(getComputedStyle(tab).borderTopLeftRadius).toBe("6px");
+  }
+  expect(getComputedStyle(open).fontWeight).toBe("600");
+  expect(getComputedStyle(other).fontWeight).toBe("400");
+  expect(getComputedStyle(open).backgroundColor).not.toBe(getComputedStyle(other).backgroundColor);
+  // a tab dragged over the open one still shows the side it would land on
+  open.classList.add("drop-before");
+  expect(getComputedStyle(open).boxShadow).toContain("inset");
+});
+
 it("keeps its height with no tab open, for the window to be dragged by", async () => {
   useApp.setState({ openItems: NO_ITEMS, selected: null });
   const main = mount(600);

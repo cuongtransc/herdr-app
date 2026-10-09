@@ -667,8 +667,15 @@ kbd {
   flex: none; display: flex; align-items: stretch; height: var(--titlebar); box-sizing: border-box;
   border-bottom: 1px solid var(--line); background: var(--surface-chrome);
 }
-.topbar .files-tabs { flex: 1; min-width: 0; background: none; border-bottom: 0; }
-.topbar .files-tab-item { height: 100%; }
+.topbar .files-tabs { flex: 1; min-width: 0; align-items: center; gap: 4px; padding: 0 6px; background: none; border-bottom: 0; }
+/* A tab is a pill as tall as a row, with an edge, so the tabs stand apart; the open one is filled
+   and semibold, not only coloured. */
+.topbar .files-tab-item {
+  height: var(--row-s); padding: 0 4px 0 10px; border: 1px solid var(--line); border-radius: var(--r-sm); color: var(--fg-2);
+}
+.topbar .files-tab-item.active { color: var(--fg); background: var(--active); border-color: var(--line-2); box-shadow: none; font-weight: 600; }
+.topbar .files-tab-item.drop-before { box-shadow: inset 2px 0 0 var(--accent); }
+.topbar .files-tab-item.drop-after { box-shadow: inset -2px 0 0 var(--accent); }
 .topbar .seg { align-self: center; margin: 0 10px 0 12px; }
 .files-tab-where { color: var(--fg-3); font-weight: 400; }
 
