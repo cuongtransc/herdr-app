@@ -1,7 +1,8 @@
 import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-vi.mock("../lib/ipc", () => ({ sessionStart: vi.fn().mockResolvedValue(undefined) }));
-import { sessionStart } from "../lib/ipc";
+vi.mock("../lib/ipc", () => ({ sessionStart: vi.fn().mockResolvedValue(undefined), sessionStop: vi.fn().mockResolvedValue(undefined) }));
+import { sessionStart, sessionStop } from "../lib/ipc";
+import { useProtect } from "../agents/protect";
 import { useApp } from "../store/app";
 import { EMPTY_LAYOUT, projectKey, sessionKey, useLayout } from "./groups";
 import { Sidebar } from "./Sidebar";
@@ -177,6 +178,17 @@ describe("Sidebar", () => {
     fireEvent.click(screen.getByText("ai-radar"));
     expect(sessionStart).toHaveBeenCalledWith("box", "ai-radar");
     await waitFor(() => expect(useApp.getState().viewed).toEqual({ machine_id: "box", session: "ai-radar" }));
+  });
+  it("names the protected panes before stopping their session, and unprotects them on Stop", () => {
+    useProtect.setState({ marks: { "box/default/w1:p1": true } });
+    render(<Sidebar />);
+    fireEvent.contextMenu(screen.getByText("default"));
+    fireEvent.click(screen.getByRole("menuitem", { name: "Stop session" }));
+    const dialog = screen.getByRole("dialog", { name: "Stop session" });
+    expect(within(dialog).getByText("Rewrite")).toBeTruthy();
+    fireEvent.click(within(dialog).getByRole("button", { name: "Unprotect and close" }));
+    expect(sessionStop).toHaveBeenCalledWith("box", "default");
+    expect(useProtect.getState().marks["box/default/w1:p1"]).toBe(false);
   });
   it("ignores clicks on sessions of a machine that is not connected", () => {
     useApp.setState({ machines: { box: { ...m, state: "disconnected" } } });

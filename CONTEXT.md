@@ -119,6 +119,7 @@ user sees, then where it lives.
 | **Pane row** | A Pane in the Agents column | `AgentCard` |
 | **Panes filter** | All \| Active on the PANES header | `usePaneFilter` (`src/agents/paneFilter.ts`), `PanesHeader` |
 | **Queue chip** | "1 blocked · 1 review" atop the Agents column | `SessionQueueChip` |
+| **Protected pane** | A lock on a Pane row: Close pane is off, and closing its tab, workspace or session names it first; orchestrators start protected | `src/agents/protect.ts` |
 | **Lane toggle** | "N lanes ›" on an orchestrator's Pane row | `.lane-toggle` in `AgentList.tsx` |
 | **Triage HUD** | The queue shown by ⌘J | `src/main/TriageHud.tsx`, `src/main/triage.ts` |
 | **Agent Board** | The ⇧⌘D overlay, with the Quota column | `src/dashboard/AgentDashboard.tsx`, `QuotaColumn` |

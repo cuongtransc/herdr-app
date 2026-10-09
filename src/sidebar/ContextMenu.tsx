@@ -1,11 +1,18 @@
 import { useEffect, useRef, useState } from "react";
 import type { ComponentType, SVGProps } from "react";
 import { PathInput } from "../ui/PathInput";
+import { CheckIcon, LockIcon } from "../ui/icons";
+import type { ProtectedPane } from "../agents/protect";
 
 export interface MenuItem {
   label: string;
   icon: ComponentType<SVGProps<SVGSVGElement>>;
   onSelect: () => void;
+  /** A toggle: shown with a check while on. */
+  checked?: boolean;
+  disabled?: boolean;
+  /** Says why the item is disabled, under it. */
+  note?: string;
 }
 
 export function ContextMenu({ x, y, items, onClose }: { x: number; y: number; items: MenuItem[]; onClose: () => void }) {
@@ -20,7 +27,9 @@ export function ContextMenu({ x, y, items, onClose }: { x: number; y: number; it
         {items.map((it) => (
           <li key={it.label} role="none">
             <button
-              role="menuitem"
+              role={it.checked === undefined ? "menuitem" : "menuitemcheckbox"}
+              aria-checked={it.checked}
+              disabled={it.disabled}
               onClick={() => {
                 onClose();
                 it.onSelect();
@@ -28,7 +37,9 @@ export function ContextMenu({ x, y, items, onClose }: { x: number; y: number; it
             >
               <it.icon />
               {it.label}
+              {it.checked && <CheckIcon className="icon ctx-check" />}
             </button>
+            {it.note && <div className="ctx-note">{it.note}</div>}
           </li>
         ))}
       </ul>
@@ -58,27 +69,44 @@ export function ConfirmDialog({
   confirmLabel,
   onConfirm,
   onClose,
+  protectedPanes = [],
 }: {
   title: string;
   message: string;
   confirmLabel: string;
   onConfirm: () => void;
   onClose: () => void;
+  /** Protected panes the action would close: listed, and Cancel takes the focus. */
+  protectedPanes?: ProtectedPane[];
 }) {
+  const guarded = protectedPanes.length > 0;
   return (
     <Modal title={title} onClose={onClose}>
       <p>{message}</p>
+      {guarded && (
+        <>
+          <p>{protectedPanes.length === 1 ? "It holds a protected pane, which closes too:" : `It holds ${protectedPanes.length} protected panes, which close too:`}</p>
+          <ul className="protected-list">
+            {protectedPanes.map((p) => (
+              <li key={p.key}>
+                <LockIcon className="icon" />
+                {p.title}
+              </li>
+            ))}
+          </ul>
+        </>
+      )}
       <div className="actions">
-        <button className="btn" onClick={onClose}>Cancel</button>
+        <button className="btn" autoFocus={guarded} onClick={onClose}>Cancel</button>
         <button
           className="btn btn-danger"
-          autoFocus
+          autoFocus={!guarded}
           onClick={() => {
             onClose();
             onConfirm();
           }}
         >
-          {confirmLabel}
+          {guarded ? "Unprotect and close" : confirmLabel}
         </button>
       </div>
     </Modal>
