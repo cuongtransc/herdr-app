@@ -1236,6 +1236,19 @@ kbd {
 .composer-git-branch { color: var(--fg-2); }
 .composer-git-folder + .icon { margin-left: 6px; }
 .composer-git-mark { flex: none; font-variant-numeric: tabular-nums; }
+/* A narrow Chat lens (the smallest window): the quick replies wrap instead of hiding past the
+   edge, the keys follow them; the git line drops the folder while it has a branch and takes its
+   own line, and the model shares the last one with Stop and Send. */
+@container (max-width: 520px) {
+  .composer-top { flex-wrap: wrap; row-gap: 6px; }
+  .composer-quick { flex-wrap: wrap; row-gap: 6px; overflow: visible; }
+  .composer-git:has(.composer-git-branch) > .icon:first-child,
+  .composer-git:has(.composer-git-branch) > .composer-git-folder { display: none; }
+  .composer-git:has(.composer-git-branch) > .composer-git-folder + .icon { margin-left: 0; }
+  .composer-bar { flex-wrap: wrap; row-gap: 6px; }
+  .composer-bar .composer-git { flex: 1 0 100%; }
+  .composer-bar .composer-model { flex: 1 1 0; text-align: right; }
+}
 .composer-git-branch + .composer-git-mark { margin-left: 2px; }
 .composer-git-mark.clean { font-size: 10px; color: var(--green-text); }
 .composer-git-mark.ahead, .composer-git-mark.behind { color: var(--fg-2); }
