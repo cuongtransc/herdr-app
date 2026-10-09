@@ -186,6 +186,20 @@ describe("ChatLens", () => {
     expect(screen.queryByText("Loading transcript…")).toBeNull();
   });
 
+  it("shows a message sent mid-turn as queued until the agent reads it", () => {
+    render(<ChatLens pane={pane} view={{ status: "working", agent: "claude", title: "claude" } as PaneView} />);
+    const send = (queued: string[]) =>
+      act(() => channels[channels.length - 1].onmessage({ type: "meta", model: null, effort: null, context_tokens: null, queued }));
+    act(() => channels[channels.length - 1].onmessage({ type: "reset", items: [], total: 0 }));
+    expect(screen.queryByRole("list", { name: "Queued messages" })).toBeNull();
+    send(["sao không commit đi?"]);
+    const list = screen.getByRole("list", { name: "Queued messages" });
+    expect(list.textContent).toContain("sao không commit đi?");
+    expect(list.textContent).toContain("Queued");
+    send([]);
+    expect(screen.queryByRole("list", { name: "Queued messages" })).toBeNull();
+  });
+
   it("says a forked pane is a fork, of what and since when, and goes back to the original", () => {
     const of = { machine_id: "m1", session: "s", pane_id: "w1:p1" };
     useForks.setState({ forks: { [paneKey(pane)]: { of, from: "Port Files panel", at: new Date(2026, 9, 9, 16, 5).getTime(), worktree: "fork-20261009-1605" } } });

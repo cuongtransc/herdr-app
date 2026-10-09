@@ -6,10 +6,14 @@ use super::{
     ParserOutput,
 };
 use serde_json::Value;
+use std::collections::VecDeque;
 
 #[derive(Default)]
 pub struct ClaudeParser {
     meta: ChatMeta,
+    /// The CLI's prompt queue as its `queue-operation` records leave it: what was sent
+    /// mid-turn and not read yet. `None` is an entry recorded without its text.
+    queue: VecDeque<Option<String>>,
 }
 
 fn flag(v: &Value, key: &str) -> bool {
@@ -134,9 +138,38 @@ impl ClaudeParser {
     }
 }
 
-impl Parser for ClaudeParser {
-    fn push_line(&mut self, line: &str, images: &mut dyn ImageSink) -> ParserOutput {
-        let v: Value = match serde_json::from_str(line) {
+impl ClaudeParser {
+    /// Replays one `queue-operation` record: `enqueue` adds, `dequeue` takes the oldest
+    /// (it names no text), `remove` takes the named one, `popAll` empties the queue.
+    fn replay_queue(&mut self, v: &Value) {
+        let content = v.get("content").and_then(Value::as_str);
+        match v.get("operation").and_then(Value::as_str) {
+            Some("enqueue") => self.queue.push_back(content.map(str::to_string)),
+            Some("dequeue") => {
+                self.queue.pop_front();
+            }
+            Some("remove") => {
+                if let Some(text) = content {
+                    self.leave_queue(text);
+                }
+            }
+            Some("popAll") => self.queue.clear(),
+            _ => {}
+        }
+    }
+
+    fn leave_queue(&mut self, text: &str) {
+        if let Some(i) = self.queue.iter().position(|q| q.as_deref() == Some(text)) {
+            self.queue.remove(i);
+        }
+    }
+
+    fn parse_line(&mut self, line: &str, images: &mut dyn ImageSink) -> ParserOutput {
+        let v: Value = match serde_json::from_str::<Value>(line) {
+            Ok(v) if v.get("type").and_then(Value::as_str) == Some("queue-operation") => {
+                self.replay_queue(&v);
+                return ParserOutput::None;
+            }
             Ok(v) => queued_prompt(&v).unwrap_or(v),
             Err(e) => {
                 tracing::debug!("skipping non-JSON transcript line: {e}");
@@ -311,9 +344,36 @@ impl Parser for ClaudeParser {
             ParserOutput::Append(items)
         }
     }
+}
+
+impl Parser for ClaudeParser {
+    fn push_line(&mut self, line: &str, images: &mut dyn ImageSink) -> ParserOutput {
+        let out = self.parse_line(line, images);
+        // A queued message shown as the user's words has been read, whatever the queue
+        // records said: it must not also wait in the queue.
+        if let ParserOutput::Append(items) = &out {
+            for item in items {
+                if let ChatItem::User { text, .. } = item {
+                    self.leave_queue(text);
+                }
+            }
+        }
+        out
+    }
 
     fn meta(&self) -> ChatMeta {
-        self.meta.clone()
+        ChatMeta {
+            // The CLI's own entries (a task finishing, a subagent's hand-back) are tagged
+            // `<…>`; they are not the user's words.
+            queued: self
+                .queue
+                .iter()
+                .flatten()
+                .filter(|text| !text.starts_with('<'))
+                .cloned()
+                .collect(),
+            ..self.meta.clone()
+        }
     }
 }
 
@@ -621,6 +681,78 @@ mod tests {
             vec![]
         );
     }
+    fn queue_op(op: &str, content: Option<&str>) -> String {
+        let mut v = serde_json::json!({"type":"queue-operation","operation":op,"timestamp":"2026-10-09T09:07:59.214Z","sessionId":"s"});
+        if let Some(c) = content {
+            v["content"] = c.into();
+        }
+        v.to_string()
+    }
+    fn queued_now(lines: &[String]) -> Vec<String> {
+        run_with(&lines.join("\n")).2.meta().queued
+    }
+    #[test]
+    fn a_message_sent_mid_turn_waits_in_the_queue_until_claude_reads_it() {
+        let sent = queue_op("enqueue", Some("vụ skill sao không commit đi?"));
+        let (items, _, p) = run_with(&sent);
+        assert_eq!(items, vec![]);
+        assert_eq!(
+            p.meta().queued,
+            vec!["vụ skill sao không commit đi?".to_string()]
+        );
+        // Read mid-turn: removed from the queue, shown as the user's message.
+        let read = [
+            sent.clone(),
+            queue_op("remove", Some("vụ skill sao không commit đi?")),
+            queued("vụ skill sao không commit đi?".into(), "human"),
+        ];
+        let (items, _, p) = run_with(&read.join("\n"));
+        assert_eq!(p.meta().queued, Vec::<String>::new());
+        assert!(
+            matches!(&items[..], [User { text, .. }] if text == "vụ skill sao không commit đi?")
+        );
+    }
+    #[test]
+    fn the_queue_follows_dequeue_pop_all_and_the_cli_s_own_entries() {
+        // Dequeue carries no content: it takes the oldest entry, the CLI's own included.
+        let task = "<task-notification>\n<task-id>b1</task-id>\n</task-notification>";
+        assert_eq!(
+            queued_now(&[
+                queue_op("enqueue", Some(task)),
+                queue_op("enqueue", Some("hi")),
+                queue_op("dequeue", None)
+            ]),
+            vec!["hi".to_string()]
+        );
+        assert_eq!(
+            queued_now(&[queue_op("enqueue", Some("hi")), queue_op("dequeue", None)]),
+            Vec::<String>::new()
+        );
+        assert_eq!(
+            queued_now(&[
+                queue_op("enqueue", Some("a")),
+                queue_op("enqueue", Some("b")),
+                queue_op("popAll", Some("a\nb"))
+            ]),
+            Vec::<String>::new()
+        );
+        // The CLI's own entries are not the user's words.
+        assert_eq!(
+            queued_now(&[queue_op("enqueue", Some(task))]),
+            Vec::<String>::new()
+        );
+    }
+    #[test]
+    fn a_queued_message_that_shows_up_as_a_prompt_leaves_the_queue() {
+        // Should the queue records miss a step, the message must not wait forever.
+        let typed =
+            serde_json::json!({"type":"user","origin":{"kind":"human"},"message":{"content":"hi"}})
+                .to_string();
+        assert_eq!(
+            queued_now(&[queue_op("enqueue", Some("hi")), typed]),
+            Vec::<String>::new()
+        );
+    }
     #[test]
     fn image_beside_text_attaches_to_the_user_item() {
         let line = serde_json::json!({"type":"user","uuid":"u1","message":{"content":[png("AQID"),{"type":"text","text":"look"}]}}).to_string();
@@ -712,6 +844,7 @@ mod tests {
                 model: Some("claude-opus-5-5".into()),
                 effort: Some("high".into()),
                 context_tokens: None,
+                queued: vec![],
             }
         );
     }
@@ -756,6 +889,7 @@ mod tests {
                 model: Some("claude-sonnet-5-5".into()),
                 effort: Some("xhigh".into()),
                 context_tokens: None,
+                queued: vec![],
             }
         );
     }

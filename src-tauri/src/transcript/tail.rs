@@ -208,6 +208,7 @@ impl State {
                     model: meta.model,
                     effort: meta.effort,
                     context_tokens: meta.context_tokens,
+                    queued: meta.queued,
                 },
             );
         }

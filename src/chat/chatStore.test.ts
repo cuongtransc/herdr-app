@@ -13,8 +13,17 @@ describe("chat store", () => {
     expect(s.error?.code).toBe("io");
     expect(reduce(s, { type: "reset", items: [], total: 0 }).items).toEqual([]);
   });
+  it("keeps the messages waiting in the queue, across resets, until a meta says otherwise", () => {
+    let s = reduce(emptyChat, { type: "meta", model: null, effort: null, context_tokens: null, queued: ["hi"] });
+    expect(s.queued).toEqual(["hi"]);
+    s = reduce(s, { type: "reset", items: [], total: 0 });
+    expect(s.queued).toEqual(["hi"]);
+    s = reduce(s, { type: "meta", model: null, effort: null, context_tokens: null, queued: [] });
+    expect(s.queued).toEqual([]);
+  });
+
   it("keeps the latest meta across resets", () => {
-    let s = reduce(emptyChat, { type: "meta", model: "m", effort: "high", context_tokens: 5 });
+    let s = reduce(emptyChat, { type: "meta", model: "m", effort: "high", context_tokens: 5, queued: [] });
     expect(s.meta).toEqual({ model: "m", effort: "high", context_tokens: 5 });
     s = reduce(s, { type: "reset", items: [], total: 0 });
     expect(s.meta).toEqual({ model: "m", effort: "high", context_tokens: 5 });

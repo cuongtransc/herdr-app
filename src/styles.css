@@ -1155,6 +1155,10 @@ kbd {
   animation: fade-up var(--t) var(--ease);
 }
 .chat-new .icon { width: 14px; height: 14px; }
+/* Sent mid-turn, not read yet: the user's bubble, faded and dashed, above the working line. */
+.chat-queued { flex: none; margin: 0; padding: 0; list-style: none; max-height: 30vh; overflow-y: auto; }
+.chat-queued .chat-bubble { background: transparent; border-style: dashed; color: var(--fg-2); }
+.chat-queued-label { flex: none; color: var(--fg-3); font-size: 11px; font-weight: 600; letter-spacing: .04em; }
 .chat-working {
   flex: none; display: flex; align-items: center; gap: 8px; width: 100%; max-width: var(--chat-max); margin: 0 auto;
   padding: 6px 28px 0; box-sizing: border-box; color: var(--fg-3); font-size: 12px;
