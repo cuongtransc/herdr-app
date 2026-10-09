@@ -86,6 +86,11 @@ export function protectedIn(machineId: string, session: string, workspaces: Work
  * is offline, or a stopped session, keeps its marks: its panes are unknown, not gone.
  */
 export function pruneMarks(marks: Marks, machine: MachineView): Marks {
+  return prunePaneKeys(marks, machine);
+}
+
+/** `rec` (by paneKey) without the panes a connected machine's running sessions no longer have; `rec` itself when nothing goes. */
+export function prunePaneKeys<T>(marks: Record<string, T>, machine: MachineView): Record<string, T> {
   if (machine.state !== "connected") return marks;
   const live = new Set<string>();
   const running = new Set<string>();
