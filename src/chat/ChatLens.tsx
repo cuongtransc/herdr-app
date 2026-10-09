@@ -15,6 +15,7 @@ import { buildRows } from "./workBlocks";
 import { ChatOutline } from "./ChatOutline";
 import { currentEntry, outline } from "./outline";
 import { Composer } from "./Composer";
+import { QueuedMessages } from "./QueuedMessages";
 import { WorkingIndicator } from "./WorkingIndicator";
 import { usePiModelPicker } from "./usePiModelPicker";
 import { usePendingTranscript } from "./pendingTranscript";
@@ -313,6 +314,7 @@ export function ChatLens({ pane, view }: { pane: PaneRef; view: PaneView }) {
           <ArrowDownIcon /> New messages
         </button>
       )}
+      <QueuedMessages texts={state.queued} />
       <WorkingIndicator status={view.status} />
       {view.status === "blocked" || picker.open ? (
         <PromptPanel pane={pane} view={view} fallback={view.status === "blocked"} asked={asked} />

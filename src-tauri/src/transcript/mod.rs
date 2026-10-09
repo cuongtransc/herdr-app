@@ -33,13 +33,16 @@ pub struct SkillUse {
     pub path: String,
 }
 
-/// The Model, Reasoning effort and context size an Agent reports in its Transcript.
+/// The Model, Reasoning effort and context size an Agent reports in its Transcript, and the
+/// messages sent mid-turn that it has not read yet.
 #[derive(Clone, Debug, Default, PartialEq, Serialize)]
 pub struct ChatMeta {
     pub model: Option<String>,
     pub effort: Option<String>,
     /// Tokens the last main-thread reply took in and gave out: how full the context is.
     pub context_tokens: Option<u64>,
+    /// The user's messages waiting in the agent's queue, oldest first.
+    pub queued: Vec<String>,
 }
 
 #[derive(Clone, Debug, PartialEq, Serialize)]
@@ -133,6 +136,7 @@ pub enum ChatEvent {
         model: Option<String>,
         effort: Option<String>,
         context_tokens: Option<u64>,
+        queued: Vec<String>,
     },
 }
 
@@ -897,11 +901,12 @@ mod tests {
             model: Some("m".into()),
             effort: None,
             context_tokens: Some(42),
+            queued: vec!["hi".into()],
         })
         .unwrap();
         assert_eq!(
             v,
-            serde_json::json!({ "type": "meta", "model": "m", "effort": null, "context_tokens": 42 })
+            serde_json::json!({ "type": "meta", "model": "m", "effort": null, "context_tokens": 42, "queued": ["hi"] })
         );
     }
 

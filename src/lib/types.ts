@@ -111,7 +111,7 @@ export type ChatItem = (
 export type ChatEvent =
   | { type: "reset"; items: ChatItem[]; total: number }
   | { type: "append"; items: ChatItem[] }
-  | ({ type: "meta" } & ChatMeta)
+  | ({ type: "meta"; queued: string[] } & ChatMeta)
   | { type: "error"; error: AppError };
 
 /** The folder and git branch a Pane works in (`branch` is null outside a repository). */

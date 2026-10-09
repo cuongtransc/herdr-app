@@ -5,9 +5,11 @@ export interface ChatState {
   total: number;
   error: AppError | null;
   meta: ChatMeta;
+  /** The user's messages sent mid-turn that the agent has not read yet, oldest first. */
+  queued: string[];
 }
 
-export const emptyChat: ChatState = { items: [], total: 0, error: null, meta: { model: null, effort: null, context_tokens: null } };
+export const emptyChat: ChatState = { items: [], total: 0, error: null, meta: { model: null, effort: null, context_tokens: null }, queued: [] };
 
 export const TRIM_AT = 2000;
 export const TRIM_TO = 1000;
@@ -15,7 +17,7 @@ export const TRIM_TO = 1000;
 export function reduce(state: ChatState, ev: ChatEvent, atBottom = false): ChatState {
   switch (ev.type) {
     case "reset":
-      return { items: ev.items, total: ev.total, error: null, meta: state.meta };
+      return { items: ev.items, total: ev.total, error: null, meta: state.meta, queued: state.queued };
     case "append":
     {
       let items = [...state.items, ...ev.items];
@@ -24,7 +26,7 @@ export function reduce(state: ChatState, ev: ChatEvent, atBottom = false): ChatS
       return { ...state, items, total: state.total + ev.items.length };
     }
     case "meta":
-      return { ...state, meta: { model: ev.model, effort: ev.effort, context_tokens: ev.context_tokens } };
+      return { ...state, meta: { model: ev.model, effort: ev.effort, context_tokens: ev.context_tokens }, queued: ev.queued };
     case "error":
       return { ...state, error: ev.error };
   }

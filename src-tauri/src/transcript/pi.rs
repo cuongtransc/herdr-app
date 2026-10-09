@@ -616,6 +616,7 @@ mod tests {
                 model: Some("gpt-5".into()),
                 effort: Some("off".into()),
                 context_tokens: Some(82920),
+                queued: vec![],
             }
         );
     }
