@@ -115,12 +115,19 @@ function PromptCard({
     if (custom.trim()) onAnswer({ custom_text: custom.trim() });
   };
 
+  const head = (
+    <div className="blocked-head">
+      <span className="dot dot-blocked" aria-hidden="true" />
+      <span className="prompt-title">{prompt.title}</span>
+    </div>
+  );
+  // A fallback card's lines are a guess cut from the screen the mirror under it shows whole,
+  // and its keys join the mirror's: only the title stays here.
+  if (prompt.fallback) return head;
+
   return (
     <>
-      <div className="blocked-head">
-        <span className="dot dot-blocked" aria-hidden="true" />
-        <span className="prompt-title">{prompt.title}</span>
-      </div>
+      {head}
       {prompt.question !== prompt.title && <p className="prompt-question">{prompt.question}</p>}
       {prompt.body && <pre className="prompt-body">{prompt.body}</pre>}
       <div className={hasPreview ? "prompt-split" : "prompt-unsplit"}>
@@ -425,8 +432,14 @@ export function PromptPanel({
       {error && <div className="chat-error" role="alert">{error}</div>}
       {screenOpen && <ScreenMirror text={screenText} />}
       <div className="blocked-keys">
+        {prompt?.fallback &&
+          prompt.options.map((option, i) => (
+            <button key={`card-${i}`} className="keycap" disabled={pending} onClick={() => void answer({ option_index: i })}>
+              {option.label}
+            </button>
+          ))}
         {screenOpen &&
-          QUICK.map((k) => (
+          QUICK.filter((k) => !prompt?.fallback || !prompt.options.some((o) => o.label === k.label)).map((k) => (
             <button key={k.key} className="keycap" onClick={() => sendKey(k.key)}>
               {k.label}
             </button>
