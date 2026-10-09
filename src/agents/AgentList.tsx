@@ -1,6 +1,6 @@
 import { memo } from "react";
 import type { ReactNode } from "react";
-import { herdrCall, sessionStart } from "../lib/ipc";
+import { chatLocate, herdrCall, sessionStart } from "../lib/ipc";
 import { paneKey } from "../lib/types";
 import type { AgentStatus, PaneView, SessionView, TabView, WorkspaceView } from "../lib/types";
 import { useFilesPanel } from "../files/panelStore";
@@ -10,10 +10,11 @@ import { stepTriage, triageQueue } from "../dashboard/triage";
 import type { MenuItem } from "../sidebar/ContextMenu";
 import { ActionsProvider, useActions } from "../sidebar/actions";
 import { ActiveToggle } from "../sidebar/ActiveToggle";
-import { BotIcon, CheckIcon, LockIcon, ChevronIcon, CloseIcon, FolderOpenIcon, PencilIcon, PlusIcon, SplitDownIcon, SplitRightIcon, TabPlusIcon, TerminalIcon } from "../ui/icons";
+import { BotIcon, CheckIcon, GitBranchIcon, LockIcon, ChevronIcon, CloseIcon, FolderOpenIcon, PencilIcon, PlusIcon, SplitDownIcon, SplitRightIcon, TabPlusIcon, TerminalIcon } from "../ui/icons";
 import { folderName, suggestFolder, useFolder } from "../workspaces/folder";
 import { AgentIcon } from "./AgentIcon";
 import { isProtected, protectedIn, useProtect } from "./protect";
+import { forkBlocked, forkSession } from "./forkSession";
 import { idleLabel, paneState, useActiveKeptMs, useMinuteClock, usePaneFilter } from "./paneFilter";
 import { laneTitle, paneRoles, tabRole } from "./roles";
 import { AGENTS, openAgentTab } from "./openAgentTab";
@@ -163,6 +164,17 @@ function AgentCard({
         { label: "Rename…", icon: PencilIcon, onSelect: () => a.rename("Rename pane", pane.title, (label) => call("pane.rename", { pane_id: pane.pane_id, label })()) },
         { label: "Split right", icon: SplitRightIcon, onSelect: () => a.guard(call("pane.split", { target_pane_id: pane.pane_id, direction: "right" })) },
         { label: "Split down", icon: SplitDownIcon, onSelect: () => a.guard(call("pane.split", { target_pane_id: pane.pane_id, direction: "down" })) },
+        ...(pane.agent === "claude"
+          ? (() => {
+              const why = forkBlocked(pane);
+              const fork = (worktree: boolean) => () =>
+                a.guard(() => forkSession(ref, ws, pane, { worktree }, { call: (m, p) => herdrCall(machineId, session, m, p), locate: chatLocate }));
+              return [
+                { label: "Fork session", icon: GitBranchIcon, disabled: !!why, onSelect: fork(false) },
+                { label: "Fork into a new worktree", icon: GitBranchIcon, disabled: !!why, note: why ?? undefined, onSelect: fork(true) },
+              ];
+            })()
+          : []),
         isProt
           ? { label: "Close pane", icon: CloseIcon, disabled: true, note: "Protected: unprotect it to close", onSelect: () => {} }
           : { label: "Close pane", icon: CloseIcon, onSelect: () => a.guard(close) },

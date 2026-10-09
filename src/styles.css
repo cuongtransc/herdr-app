@@ -723,6 +723,11 @@ kbd {
 }
 .term-banner::before, .chat-notice::before { content: ""; width: 6px; height: 6px; border-radius: 50%; background: var(--amber); flex: none; }
 .term-banner.neutral, .chat-notice.neutral { background: var(--surface-1); border-bottom-color: var(--line); }
+/* A forked session (agents/forkSession.ts): where it came from, and the way back. */
+.chat-notice.chat-fork::before { display: none; }
+.chat-fork .icon { flex: none; width: 14px; height: 14px; color: var(--accent); }
+.chat-fork > span { flex: 1; min-width: 0; }
+.chat-fork .btn { flex: none; }
 .term-banner.neutral::before, .chat-notice.neutral::before { background: var(--grey); }
 
 /* ---------- Settings ---------- */

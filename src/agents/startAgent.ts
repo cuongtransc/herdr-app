@@ -2,6 +2,8 @@ export interface AgentStartParams {
   name: string;
   kind: string;
   pane_id: string;
+  /** Extra arguments for the agent's command line (herdr's `agent.start` `args`). */
+  args?: string[];
 }
 
 type Call = (method: string, params: unknown) => Promise<unknown>;

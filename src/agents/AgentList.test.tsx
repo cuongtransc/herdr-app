@@ -1,6 +1,6 @@
 import { fireEvent, render, screen, within } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-vi.mock("../lib/ipc", () => ({ herdrCall: vi.fn().mockResolvedValue(undefined) }));
+vi.mock("../lib/ipc", () => ({ herdrCall: vi.fn().mockResolvedValue(undefined), chatLocate: vi.fn() }));
 import { herdrCall } from "../lib/ipc";
 import { useFilesPanel } from "../files/panelStore";
 import { panelWorkspace } from "../files/root";
@@ -347,6 +347,8 @@ describe("AgentList", () => {
     fireEvent.contextMenu(screen.getByText("Tag v1.4.0"));
     const names = screen.getAllByRole("menuitem").map((b) => b.textContent);
     expect(names).toEqual(["Rename…", "Split right", "Split down", "Close pane", "New tab", "Rename tab…", "Close tab"]);
+    // A shell pane offers no fork.
+    expect(screen.queryByRole("menuitem", { name: "Fork session" })).toBeNull();
     expect(screen.getByRole("menuitemcheckbox", { name: "Protect" }).getAttribute("aria-checked")).toBe("false");
     fireEvent.click(screen.getByRole("menuitem", { name: "Split right" }));
     expect(herdrCall).toHaveBeenCalledWith("local", "default", "pane.split", { target_pane_id: "p3", direction: "right" });
@@ -357,6 +359,36 @@ describe("AgentList", () => {
     fireEvent.click(screen.getByRole("button", { name: "Close Tag v1.4.0" }));
     expect(screen.queryByRole("dialog")).toBeNull();
     expect(herdrCall).toHaveBeenCalledWith("local", "default", "pane.close", { pane_id: "p3" });
+  });
+
+  describe("fork", () => {
+    it("offers Fork session and Fork into a new worktree on a done Claude pane", () => {
+      render(<AgentList />);
+      fireEvent.contextMenu(screen.getByText("Idempotent payments"));
+      expect((screen.getByRole("menuitem", { name: "Fork session" }) as HTMLButtonElement).disabled).toBe(false);
+      expect((screen.getByRole("menuitem", { name: "Fork into a new worktree" }) as HTMLButtonElement).disabled).toBe(false);
+    });
+
+    it("turns both off on a busy Claude pane, saying why", () => {
+      const busy: MachineView = { ...m, sessions: [{ ...m.sessions[0], workspaces: m.sessions[0].workspaces.map((w) =>
+        w.workspace_id !== "w1" ? w : { ...w, tabs: w.tabs.map((t) => ({ ...t, panes: t.panes.map((p) => ({ ...p, status: "working" as const })) })) }) }, m.sessions[1]] };
+      useApp.setState({ machines: { local: busy } });
+      render(<AgentList />);
+      fireEvent.contextMenu(screen.getByText("Idempotent payments"));
+      const menu = screen.getByRole("menu");
+      expect((within(menu).getByRole("menuitem", { name: "Fork session" }) as HTMLButtonElement).disabled).toBe(true);
+      expect((within(menu).getByRole("menuitem", { name: "Fork into a new worktree" }) as HTMLButtonElement).disabled).toBe(true);
+      expect(within(menu).getByText("Busy: a fork now would run its unfinished command again. Fork once it finishes.")).toBeTruthy();
+    });
+
+    it("shows why a fork was refused", async () => {
+      vi.mocked(herdrCall).mockImplementation(async (_m, _s, method) => (method === "agent.get" ? { agent: { agent_session: null } } : undefined));
+      render(<AgentList />);
+      fireEvent.contextMenu(screen.getByText("Idempotent payments"));
+      fireEvent.click(screen.getByRole("menuitem", { name: "Fork session" }));
+      expect(await screen.findByText("Herdr has not reported this pane's session yet")).toBeTruthy();
+      expect(herdrCall).not.toHaveBeenCalledWith("local", "default", "tab.create", expect.anything());
+    });
   });
 
   describe("protect", () => {
