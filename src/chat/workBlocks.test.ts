@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { ChatItem } from "../lib/types";
-import { buildRows, formatWorkDuration, workSummary, type ChatRow } from "./workBlocks";
+import { buildRows, formatWorkDuration, liveStart, workSummary, type ChatRow } from "./workBlocks";
 
 const user = (text: string, ts?: string): ChatItem => ({ kind: "user", text, ts });
 const say = (markdown: string, ts?: string): ChatItem => ({ kind: "assistant_text", markdown, ts });
@@ -132,5 +132,23 @@ describe("formatWorkDuration", () => {
     expect(formatWorkDuration(null, "2026-10-03T00:00:07Z")).toBeNull();
     expect(formatWorkDuration("2026-10-03T00:00:07Z", "2026-10-03T00:00:00Z")).toBeNull();
     expect(formatWorkDuration("garbage", "2026-10-03T00:00:00Z")).toBeNull();
+  });
+});
+
+describe("liveStart", () => {
+  const user = (ts: string): ChatItem => ({ kind: "user", text: "go", ts });
+  const call = (id: string, ts: string): ChatItem => ({ kind: "tool_call", id, name: "Bash", input_summary: "ls", input: {}, ts });
+  it("is the newest turn's prompt, before any call lands", () => {
+    expect(liveStart(buildRows([user("2026-10-03T00:00:00Z"), call("a", "2026-10-03T00:00:01Z"), user("2026-10-03T00:05:00Z")]).rows)).toBe("2026-10-03T00:05:00Z");
+  });
+  it("is the live block's start once the turn has one, also with narration after it", () => {
+    const items: ChatItem[] = [user("2026-10-03T00:00:00Z"), call("a", "2026-10-03T00:00:01Z"), { kind: "assistant_text", markdown: "ok", ts: "2026-10-03T00:00:02Z" }];
+    expect(liveStart(buildRows(items).rows)).toBe("2026-10-03T00:00:00Z");
+  });
+  it("is the first timed call when the prompt is not loaded", () => {
+    expect(liveStart(buildRows([call("a", "2026-10-03T00:00:01Z")]).rows)).toBe("2026-10-03T00:00:01Z");
+  });
+  it("is unknown with nothing loaded", () => {
+    expect(liveStart([])).toBeNull();
   });
 });

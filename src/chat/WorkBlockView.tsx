@@ -1,5 +1,4 @@
 import { memo } from "react";
-import { useSecondClock } from "../dashboard/QuotaColumn";
 import { ChevronIcon } from "../ui/icons";
 import { ChatItemView } from "./ChatItemView";
 import { SkillChips, turnSkills } from "./skills";
@@ -15,6 +14,7 @@ export const WorkBlockView = memo(function WorkBlockView({
   open,
   onToggle,
   live,
+  working = live,
 }: {
   block: WorkBlock;
   results: Map<string, ToolResult>;
@@ -22,6 +22,8 @@ export const WorkBlockView = memo(function WorkBlockView({
   /** Called with this block's id and its open state, so a stable callback keeps memo working. */
   onToggle: (id: string, open: boolean) => void;
   live: boolean;
+  /** Running, not waiting on the user: a call without its result yet spins. Defaults to `live`. */
+  working?: boolean;
 }) {
   const duration = formatWorkDuration(block.start, block.end);
   const title = duration ? `Worked for ${duration}` : "Worked";
@@ -30,11 +32,11 @@ export const WorkBlockView = memo(function WorkBlockView({
     <div className="chat-row chat-work">
       <button className="chat-work-head" aria-expanded={open} onClick={() => onToggle(block.id, open)}>
         <ChevronIcon className={"icon chev" + (open ? " open" : "")} />
-        {live && <span className="spin" aria-hidden="true" />}
-        <span className="chat-work-title">{live ? <LiveTitle start={block.start} /> : title}</span>
+        {/* While live the working line below has the spinner and clock; this shows what was done. */}
+        {!live && <span className="chat-work-title">{title}</span>}
         {summary && (
           <>
-            {" · "}
+            {!live && " · "}
             <span className="chat-work-summary">{summary}</span>
           </>
         )}
@@ -44,7 +46,11 @@ export const WorkBlockView = memo(function WorkBlockView({
         <div className="chat-work-rows">
           {block.items.map((it, i) => (
             <div key={i} className={it.kind === "assistant_text" ? "chat-narration" : undefined}>
-              <ChatItemView item={it} result={it.kind === "tool_call" ? results.get(it.id) : undefined} />
+              <ChatItemView
+                item={it}
+                result={it.kind === "tool_call" ? results.get(it.id) : undefined}
+                running={working && it.kind === "tool_call" && !results.has(it.id)}
+              />
             </div>
           ))}
         </div>
@@ -52,9 +58,3 @@ export const WorkBlockView = memo(function WorkBlockView({
     </div>
   );
 });
-
-/** "Working 1m 23s", counted from the prompt each second; mounted only while live, so only it re-renders. */
-function LiveTitle({ start }: { start: string | null }) {
-  const elapsed = formatWorkDuration(start, new Date(useSecondClock()).toISOString());
-  return elapsed ? `Working ${elapsed}` : "Working…";
-}

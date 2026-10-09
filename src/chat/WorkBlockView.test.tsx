@@ -1,4 +1,4 @@
-import { act, fireEvent, render, screen } from "@testing-library/react";
+import { fireEvent, render, screen } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 import type { ChatItem } from "../lib/types";
 import { WorkBlockView } from "./WorkBlockView";
@@ -36,28 +36,24 @@ describe("WorkBlockView", () => {
     expect(screen.getByText("a.txt")).toBeTruthy();
   });
 
-  it("counts the time since the prompt while the agent runs, every second", () => {
-    vi.useFakeTimers({ now: Date.parse("2026-10-03T00:01:23Z") });
-    try {
-      render(<WorkBlockView block={{ ...block, end: null }} results={results} open={false} onToggle={() => {}} live />);
-      expect(screen.getByRole("button", { name: /^Working 1m 23s · 1 command$/ })).toBeTruthy();
-      act(() => vi.advanceTimersByTime(1_000));
-      expect(screen.getByRole("button", { name: /^Working 1m 24s · 1 command$/ })).toBeTruthy();
-    } finally {
-      vi.useRealTimers();
-    }
+  it("shows only its summary while the agent runs: the working line below carries the spinner and clock", () => {
+    render(<WorkBlockView block={{ ...block, end: null }} results={results} open={false} onToggle={() => {}} live />);
+    const head = screen.getByRole("button", { name: /^1 command$/ });
+    expect(head.querySelector(".spin")).toBeNull();
+    expect(head.textContent).not.toContain("Working");
   });
 
-  it("reads Working… while the agent runs and its start is unknown", () => {
-    render(<WorkBlockView block={{ ...block, start: null }} results={results} open onToggle={() => {}} live />);
-    expect(screen.getByRole("button", { name: /^Working… · 1 command$/ })).toBeTruthy();
-  });
-
-  it("spins in the header only while the agent runs", () => {
-    const { rerender } = render(<WorkBlockView block={block} results={results} open={false} onToggle={() => {}} live />);
-    expect(screen.getByRole("button", { name: /Working/ }).querySelector(".spin")).toBeTruthy();
-    rerender(<WorkBlockView block={block} results={results} open={false} onToggle={() => {}} live={false} />);
-    expect(screen.getByRole("button", { name: /Worked for 7s/ }).querySelector(".spin")).toBeNull();
+  it("spins on the call still waiting for its result while the agent runs", () => {
+    const running: WorkBlock = { ...block, items: [...block.items, { kind: "tool_call", id: "b", name: "Bash", input_summary: "pnpm build", input: { command: "pnpm build" } }], end: null };
+    const { rerender } = render(<WorkBlockView block={running} results={results} open onToggle={() => {}} live />);
+    expect(screen.getByRole("button", { name: /pnpm build/ }).querySelector(".spin")).toBeTruthy();
+    expect(screen.getByRole("button", { name: /Bash\s*·\s*ls/ }).querySelector(".spin")).toBeNull();
+    // A turn that ended with a call unanswered (interrupted) is not running.
+    rerender(<WorkBlockView block={running} results={results} open onToggle={() => {}} live={false} />);
+    expect(screen.getByRole("button", { name: /pnpm build/ }).querySelector(".spin")).toBeNull();
+    // Blocked on the user (a permission prompt): live, but the call is not running.
+    rerender(<WorkBlockView block={running} results={results} open onToggle={() => {}} live working={false} />);
+    expect(screen.getByRole("button", { name: /pnpm build/ }).querySelector(".spin")).toBeNull();
   });
 
   it("reads Worked when the span is unknown", () => {
