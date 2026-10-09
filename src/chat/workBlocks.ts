@@ -87,6 +87,16 @@ export function buildRows(items: ChatItem[], offset = 0): { rows: ChatRow[]; res
   return { rows, results };
 }
 
+/** When the newest turn began: its work block's start, else its opener's ts (no call has landed yet). */
+export function liveStart(rows: ChatRow[]): string | null {
+  for (let i = rows.length - 1; i >= 0; i--) {
+    const row = rows[i];
+    if (row.kind === "work") return row.last ? row.block.start : null;
+    if (opensTurn(row.item)) return row.item.ts ?? null;
+  }
+  return null;
+}
+
 type Category = "edit" | "read" | "command" | "other";
 const LABELS: Record<Category, [string, string]> = {
   edit: ["edit", "edits"],

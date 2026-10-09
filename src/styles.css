@@ -1111,6 +1111,8 @@ kbd {
 }
 .chat-tool-row:hover { background: var(--hover); }
 .chat-tool-row .chev { width: 12px; height: 12px; }
+/* The call the live turn is waiting on: its spinner at the row's end. */
+.chat-tool-row .spin { margin-left: auto; }
 .chat-tool-icon { flex: none; width: 14px; height: 14px; color: var(--fg-3); }
 .chat-tool-name { font-weight: 700; color: var(--link); flex: none; }
 .chat-tool-sep { color: var(--fg-3); flex: none; }

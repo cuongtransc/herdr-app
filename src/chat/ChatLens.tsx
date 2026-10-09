@@ -11,7 +11,7 @@ import { emptyChat, prepend, reduce, type ChatState } from "./chatStore";
 import { ChatItemView } from "./ChatItemView";
 import { ChatOpenContext, ChatPaneContext, revokeChatImages } from "./images";
 import { WorkBlockView } from "./WorkBlockView";
-import { buildRows } from "./workBlocks";
+import { buildRows, liveStart } from "./workBlocks";
 import { ChatOutline } from "./ChatOutline";
 import { currentEntry, outline } from "./outline";
 import { Composer } from "./Composer";
@@ -176,6 +176,7 @@ export function ChatLens({ pane, view }: { pane: PaneRef; view: PaneView }) {
     setChosenOpen((m) => new Map(m).set(id, !wasOpen));
   }, []);
   const live = view.status === "working" || view.status === "blocked";
+  const start = useMemo(() => liveStart(rows), [rows]);
 
   const virt = useVirtualizer({
     count: rows.length,
@@ -308,6 +309,7 @@ export function ChatLens({ pane, view }: { pane: PaneRef; view: PaneView }) {
                     open={chosenOpen.get(row.block.id) ?? false}
                     onToggle={toggle}
                     live={live && row.last}
+                    working={view.status === "working" && row.last}
                   />
                 ) : (
                   <ChatItemView
@@ -327,7 +329,7 @@ export function ChatLens({ pane, view }: { pane: PaneRef; view: PaneView }) {
         </button>
       )}
       <QueuedMessages texts={state.queued} />
-      <WorkingIndicator status={view.status} />
+      <WorkingIndicator status={view.status} start={start} />
       {view.status === "blocked" || picker.open ? (
         <PromptPanel pane={pane} view={view} fallback={view.status === "blocked"} asked={asked} />
       ) : (

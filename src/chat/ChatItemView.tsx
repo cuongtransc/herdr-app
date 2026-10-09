@@ -58,7 +58,7 @@ function Checklist({ rows }: { rows: ChecklistRow[] }) {
   );
 }
 
-function ToolCallView({ item, result }: { item: Extract<ChatItem, { kind: "tool_call" }>; result?: ToolResult }) {
+function ToolCallView({ item, result, running = false }: { item: Extract<ChatItem, { kind: "tool_call" }>; result?: ToolResult; running?: boolean }) {
   const [open, setOpen] = useState(false);
   const input = (item.input ?? {}) as Record<string, unknown>;
   const ToolIcon = toolIcon(item.name);
@@ -72,6 +72,7 @@ function ToolCallView({ item, result }: { item: Extract<ChatItem, { kind: "tool_
           <span className="chat-tool-name">{item.name}</span>
           <span className="chat-tool-sep"> · </span>
           <span className="chat-tool-summary">{checklistSummary(todos)}</span>
+          {running && <span className="spin" aria-label="Running" />}
         </button>
         {open && (
           <div className="chat-tool-body">
@@ -92,6 +93,7 @@ function ToolCallView({ item, result }: { item: Extract<ChatItem, { kind: "tool_
         <span className="chat-tool-name">{item.name}</span>
         <span className="chat-tool-sep"> · </span>
         <span className="chat-tool-summary">{item.input_summary}</span>
+        {running && <span className="spin" aria-label="Running" />}
       </button>
       {open && (
         <div className="chat-tool-body">
@@ -130,7 +132,18 @@ function ShellText({ text, error }: { text: string; error?: boolean }) {
 }
 
 /** `copy`: offer a copy button on a user message or an answer (not on narration inside a work block). */
-export const ChatItemView = memo(function ChatItemView({ item, result, copy = false }: { item: ChatItem; result?: ToolResult; copy?: boolean }) {
+export const ChatItemView = memo(function ChatItemView({
+  item,
+  result,
+  copy = false,
+  running = false,
+}: {
+  item: ChatItem;
+  result?: ToolResult;
+  copy?: boolean;
+  /** A tool call the live turn is still waiting on: spins at the end of its row. */
+  running?: boolean;
+}) {
   switch (item.kind) {
     case "user":
       return (
@@ -162,7 +175,7 @@ export const ChatItemView = memo(function ChatItemView({ item, result, copy = fa
     case "tool_call":
       return (
         <div className="chat-row">
-          <ToolCallView item={item} result={result} />
+          <ToolCallView item={item} result={result} running={running} />
         </div>
       );
     case "tool_result":
