@@ -8,6 +8,7 @@ import { useApp } from "../store/app";
 import { itemKey, NO_ITEMS } from "../store/openItems";
 import { setFolder } from "../workspaces/folder";
 import { AgentList, workspaceGroups } from "./AgentList";
+import { useProtect } from "./protect";
 import { useActiveWindow, usePaneFilter } from "./paneFilter";
 import type { MachineView, PaneView } from "../lib/types";
 
@@ -46,6 +47,7 @@ describe("AgentList", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     localStorage.clear();
+    useProtect.setState({ marks: {} });
     useApp.setState({ machines: { local: m }, order: ["local"], selected: null, viewed: { machine_id: "local", session: "default" }, expanded: {}, doneSeen: {}, statusSince: {} });
     usePaneFilter.setState({ filter: "active" });
   });
@@ -345,6 +347,7 @@ describe("AgentList", () => {
     fireEvent.contextMenu(screen.getByText("Tag v1.4.0"));
     const names = screen.getAllByRole("menuitem").map((b) => b.textContent);
     expect(names).toEqual(["Rename…", "Split right", "Split down", "Close pane", "New tab", "Rename tab…", "Close tab"]);
+    expect(screen.getByRole("menuitemcheckbox", { name: "Protect" }).getAttribute("aria-checked")).toBe("false");
     fireEvent.click(screen.getByRole("menuitem", { name: "Split right" }));
     expect(herdrCall).toHaveBeenCalledWith("local", "default", "pane.split", { target_pane_id: "p3", direction: "right" });
   });
@@ -354,6 +357,82 @@ describe("AgentList", () => {
     fireEvent.click(screen.getByRole("button", { name: "Close Tag v1.4.0" }));
     expect(screen.queryByRole("dialog")).toBeNull();
     expect(herdrCall).toHaveBeenCalledWith("local", "default", "pane.close", { pane_id: "p3" });
+  });
+
+  describe("protect", () => {
+    // w2's "release" tab renamed orch-release: its agent (Ship flag) is the orchestrator.
+    const withOrch: MachineView = { ...m, sessions: [{ ...m.sessions[0], workspaces: m.sessions[0].workspaces.map((w) =>
+      w.workspace_id !== "w2" ? w : { ...w, tabs: w.tabs.map((t) => (t.tab_id === "w2:t2" ? { ...t, label: "orch-release" } : t)) }) }, m.sessions[1]] };
+    const menuOf = (title: string) => {
+      fireEvent.contextMenu(screen.getByText(title));
+      return screen.getByRole("menu");
+    };
+
+    it("protects an orchestrator by default: a lock instead of the close button, Close pane turned off with the reason", () => {
+      useApp.setState({ machines: { local: withOrch } });
+      usePaneFilter.setState({ filter: "all" });
+      render(<AgentList />);
+      expect(screen.getByLabelText("Protected: Ship flag")).toBeTruthy();
+      expect(screen.queryByRole("button", { name: "Close Ship flag" })).toBeNull();
+      const menu = menuOf("Ship flag");
+      const close = within(menu).getByRole("menuitem", { name: "Close pane" }) as HTMLButtonElement;
+      expect(close.disabled).toBe(true);
+      expect(within(menu).getByText("Protected: unprotect it to close")).toBeTruthy();
+      expect(within(menu).getByRole("menuitemcheckbox", { name: "Protected" }).getAttribute("aria-checked")).toBe("true");
+    });
+
+    it("unprotects from the menu, and the close button comes back", () => {
+      useApp.setState({ machines: { local: withOrch } });
+      usePaneFilter.setState({ filter: "all" });
+      render(<AgentList />);
+      fireEvent.click(within(menuOf("Ship flag")).getByRole("menuitemcheckbox", { name: "Protected" }));
+      expect(screen.queryByLabelText("Protected: Ship flag")).toBeNull();
+      expect(screen.getByRole("button", { name: "Close Ship flag" })).toBeTruthy();
+      expect(useProtect.getState().marks["local/default/p4"]).toBe(false);
+    });
+
+    it("protects any pane from its menu, and remembers it", () => {
+      render(<AgentList />);
+      fireEvent.click(within(menuOf("Tag v1.4.0")).getByRole("menuitemcheckbox", { name: "Protect" }));
+      expect(screen.getByLabelText("Protected: Tag v1.4.0")).toBeTruthy();
+      expect(JSON.parse(localStorage.getItem("herdr-app:protected")!)).toEqual({ "local/default/p3": true });
+    });
+
+    it("refuses to close a tab holding a protected pane until the user unprotects it in the dialog", () => {
+      useProtect.getState().set("local/default/p3", true);
+      render(<AgentList />);
+      fireEvent.click(within(menuOf("Tag v1.4.0")).getByRole("menuitem", { name: "Close tab" }));
+      const dialog = screen.getByRole("dialog", { name: "Close tab" });
+      expect(within(dialog).getByText("Tag v1.4.0")).toBeTruthy();
+      expect(document.activeElement?.textContent).toBe("Cancel");
+      // Cancel is the default action: filled; closing stays a plain button in red text.
+      expect(within(dialog).getByRole("button", { name: "Cancel" }).className).toBe("btn btn-primary");
+      expect(within(dialog).getByRole("button", { name: "Unprotect and close" }).className).toBe("btn btn-danger-text");
+      fireEvent.click(within(dialog).getByRole("button", { name: "Cancel" }));
+      expect(herdrCall).not.toHaveBeenCalled();
+      fireEvent.click(within(menuOf("Tag v1.4.0")).getByRole("menuitem", { name: "Close tab" }));
+      fireEvent.click(screen.getByRole("button", { name: "Unprotect and close" }));
+      expect(herdrCall).toHaveBeenCalledWith("local", "default", "tab.close", { tab_id: "w2:t2" });
+      expect(useProtect.getState().marks["local/default/p3"]).toBe(false);
+    });
+
+    it("names the protected panes when closing their workspace", () => {
+      useProtect.getState().set("local/default/p2", true);
+      render(<AgentList />);
+      fireEvent.contextMenu(screen.getByText("web", { selector: ".ws-label" }));
+      fireEvent.click(screen.getByRole("menuitem", { name: "Close workspace" }));
+      const dialog = screen.getByRole("dialog", { name: "Close workspace" });
+      expect(within(dialog).getByText("Guard export")).toBeTruthy();
+      expect(within(dialog).getByRole("button", { name: "Unprotect and close" })).toBeTruthy();
+    });
+
+    it("keeps the plain confirmation when nothing in the tab is protected", () => {
+      render(<AgentList />);
+      fireEvent.click(within(menuOf("Guard export")).getByRole("menuitem", { name: "Close tab" }));
+      const dialog = screen.getByRole("dialog", { name: "Close tab" });
+      expect(within(dialog).getByRole("button", { name: "Close" })).toBeTruthy();
+      expect(within(dialog).queryByRole("button", { name: "Unprotect and close" })).toBeNull();
+    });
   });
 
   it("asks for a session when none is viewed", () => {

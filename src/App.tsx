@@ -18,6 +18,7 @@ import { Sidebar } from "./sidebar/Sidebar";
 import { QuotaStrip } from "./sidebar/QuotaStrip";
 import { guardFileDrops } from "./sidebar/dnd";
 import { AgentList } from "./agents/AgentList";
+import { watchProtectPrune } from "./agents/protect";
 import { AgentDashboard } from "./dashboard/AgentDashboard";
 import { FilesPanel } from "./files/FilesPanel";
 import { useFilesPanel } from "./files/panelStore";
@@ -128,6 +129,7 @@ export default function App() {
     return () => window.removeEventListener("focus", onFocus);
   }, []);
   useEffect(() => guardFileDrops(), []);
+  useEffect(() => watchProtectPrune(), []);
 
   useEffect(() => {
     let cancelled = false;

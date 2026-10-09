@@ -10,9 +10,10 @@ import { stepTriage, triageQueue } from "../dashboard/triage";
 import type { MenuItem } from "../sidebar/ContextMenu";
 import { ActionsProvider, useActions } from "../sidebar/actions";
 import { ActiveToggle } from "../sidebar/ActiveToggle";
-import { BotIcon, CheckIcon, ChevronIcon, CloseIcon, FolderOpenIcon, PencilIcon, PlusIcon, SplitDownIcon, SplitRightIcon, TabPlusIcon, TerminalIcon } from "../ui/icons";
+import { BotIcon, CheckIcon, LockIcon, ChevronIcon, CloseIcon, FolderOpenIcon, PencilIcon, PlusIcon, SplitDownIcon, SplitRightIcon, TabPlusIcon, TerminalIcon } from "../ui/icons";
 import { folderName, suggestFolder, useFolder } from "../workspaces/folder";
 import { AgentIcon } from "./AgentIcon";
+import { isProtected, protectedIn, useProtect } from "./protect";
 import { idleLabel, paneState, useActiveKeptMs, useMinuteClock, usePaneFilter } from "./paneFilter";
 import { laneTitle, paneRoles, tabRole } from "./roles";
 import { AGENTS, openAgentTab } from "./openAgentTab";
@@ -154,15 +155,28 @@ function AgentCard({
   const a = useActions();
   const call = (method: string, params: unknown) => () => herdrCall(machineId, session, method, params);
   const close = call("pane.close", { pane_id: pane.pane_id });
+  const key = paneKey(ref);
+  const isProt = useProtect((s) => isProtected(s.marks, key, row.role === "orch" || (tabRole(tab.label) === "orch" && !!pane.agent)));
   const items: MenuItem[] = a
     ? [
+        { label: isProt ? "Protected" : "Protect", icon: LockIcon, checked: isProt, onSelect: () => useProtect.getState().set(key, !isProt) },
         { label: "Rename…", icon: PencilIcon, onSelect: () => a.rename("Rename pane", pane.title, (label) => call("pane.rename", { pane_id: pane.pane_id, label })()) },
         { label: "Split right", icon: SplitRightIcon, onSelect: () => a.guard(call("pane.split", { target_pane_id: pane.pane_id, direction: "right" })) },
         { label: "Split down", icon: SplitDownIcon, onSelect: () => a.guard(call("pane.split", { target_pane_id: pane.pane_id, direction: "down" })) },
-        { label: "Close pane", icon: CloseIcon, onSelect: () => a.guard(close) },
+        isProt
+          ? { label: "Close pane", icon: CloseIcon, disabled: true, note: "Protected: unprotect it to close", onSelect: () => {} }
+          : { label: "Close pane", icon: CloseIcon, onSelect: () => a.guard(close) },
         { label: "New tab", icon: TabPlusIcon, onSelect: () => a.guard(call("tab.create", { workspace_id: ws.workspace_id })) },
         { label: "Rename tab…", icon: PencilIcon, onSelect: () => a.rename("Rename tab", tab.label, (label) => call("tab.rename", { tab_id: tab.tab_id, label })()) },
-        { label: "Close tab", icon: CloseIcon, onSelect: () => a.confirm("Close tab", `Close tab "${tab.label}" and all its panes?`, "Close", call("tab.close", { tab_id: tab.tab_id })) },
+        {
+          label: "Close tab",
+          icon: CloseIcon,
+          onSelect: () => {
+            const inTab = new Set(tab.panes.map((p) => paneKey({ machine_id: machineId, session, pane_id: p.pane_id })));
+            const prot = protectedIn(machineId, session, [ws], useProtect.getState().marks).filter((p) => inTab.has(p.key));
+            a.confirm("Close tab", `Close tab "${tab.label}" and all its panes?`, "Close", call("tab.close", { tab_id: tab.tab_id }), prot);
+          },
+        },
       ]
     : [];
   const laneToggleText = lanes && (
@@ -189,6 +203,11 @@ function AgentCard({
       >
         <AgentIcon agent={pane.agent} />
         <span className={"agent-card-title" + (activity ? " has-activity" : "")}>{title}</span>
+        {isProt && (
+          <span className="agent-card-lock" role="img" aria-label={`Protected: ${title}`} title="Protected: close is turned off (right-click to unprotect)">
+            <LockIcon />
+          </span>
+        )}
         {activity && <span className="agent-card-activity">{activity}</span>}
         {!quiet && idleFor !== null && (
           <span className="row-age" title={`Idle for ${idleLabel(idleFor)}`}>
@@ -209,9 +228,11 @@ function AgentCard({
           {laneToggleText}
         </button>
       )}
-      <button className="agent-card-close" aria-label={`Close ${title}`} title="Close pane" onClick={() => a?.guard(close)}>
-        <CloseIcon />
-      </button>
+      {!isProt && (
+        <button className="agent-card-close" aria-label={`Close ${title}`} title="Close pane" onClick={() => a?.guard(close)}>
+          <CloseIcon />
+        </button>
+      )}
     </li>
   );
 }
@@ -270,7 +291,13 @@ function WorkspaceGroup({ machineId, session, workspace: ws, rows: all, active }
         { label: "Browse files", icon: FolderOpenIcon, onSelect: browse },
         { label: "Change folder…", icon: FolderOpenIcon, onSelect: () => a.changeFolder(ref, folder ?? suggestFolder(ws)) },
         { label: "Rename workspace…", icon: PencilIcon, onSelect: () => a.rename("Rename workspace", ws.label, (label) => call("workspace.rename", { workspace_id: ws.workspace_id, label })()) },
-        { label: "Close workspace", icon: CloseIcon, onSelect: () => a.confirm("Close workspace", `Close workspace "${ws.label}" and all its panes?`, "Close", call("workspace.close", { workspace_id: ws.workspace_id })) },
+        {
+          label: "Close workspace",
+          icon: CloseIcon,
+          onSelect: () =>
+            a.confirm("Close workspace", `Close workspace "${ws.label}" and all its panes?`, "Close", call("workspace.close", { workspace_id: ws.workspace_id }),
+              protectedIn(machineId, session, [ws], useProtect.getState().marks)),
+        },
       ]
     : [];
   return (

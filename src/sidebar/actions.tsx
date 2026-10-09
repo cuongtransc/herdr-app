@@ -13,11 +13,12 @@ import { NewAgentDialog } from "../agents/NewAgentDialog";
 import { setFolder } from "../workspaces/folder";
 import type { WorkspaceRef } from "../workspaces/folder";
 import { AddMachineDialog } from "../machines/AddMachineDialog";
+import { useProtect, type ProtectedPane } from "../agents/protect";
 const ConnectDialog = lazy(() => import("../machines/ConnectDialog").then((m) => ({ default: m.ConnectDialog })));
 
 type Dialog =
   | { kind: "rename"; title: string; initial: string; submitLabel: string; run: (label: string) => Promise<unknown> }
-  | { kind: "confirm"; title: string; message: string; confirmLabel: string; run: () => Promise<unknown> }
+  | { kind: "confirm"; title: string; message: string; confirmLabel: string; run: () => Promise<unknown>; protectedPanes: ProtectedPane[] }
   | { kind: "session"; machineId?: string; groupId?: string }
   | { kind: "workspace"; machineId: string; session: string; defaultCwd: string }
   | { kind: "agent"; machineId: string; session: string; workspace: WorkspaceView }
@@ -31,7 +32,8 @@ export interface Actions {
   /** The menu at a point, e.g. under the button that opened it. */
   menuAt: (x: number, y: number, items: MenuItem[]) => void;
   rename: (title: string, initial: string, run: (label: string) => Promise<unknown>, submitLabel?: string) => void;
-  confirm: (title: string, message: string, confirmLabel: string, run: () => Promise<unknown>) => void;
+  /** `protectedPanes`: the protected panes `run` closes; confirming unprotects them first. */
+  confirm: (title: string, message: string, confirmLabel: string, run: () => Promise<unknown>, protectedPanes?: ProtectedPane[]) => void;
   /** No `machineId`: the dialog offers a machine picker. `groupId`: place the new session there. */
   newSession: (machineId?: string, groupId?: string) => void;
   newWorkspace: (machineId: string, session: string) => void;
@@ -81,7 +83,8 @@ export function ActionsProvider({ children }: { children: ReactNode }) {
       },
       menuAt: (x, y, items) => setMenu({ x, y, items }),
       rename: (title, initial, run, submitLabel = "Rename") => setDialog({ kind: "rename", title, initial, submitLabel, run }),
-      confirm: (title, message, confirmLabel, run) => setDialog({ kind: "confirm", title, message, confirmLabel, run }),
+      confirm: (title, message, confirmLabel, run, protectedPanes = []) =>
+        setDialog({ kind: "confirm", title, message, confirmLabel, run, protectedPanes }),
       newAgent: (machineId, session, workspace) => setDialog({ kind: "agent", machineId, session, workspace }),
       changeFolder: (ref, initial) => setDialog({ kind: "folder", ref, initial }),
       moveToGroup: (key) => setDialog({ kind: "move", key }),
@@ -115,8 +118,12 @@ export function ActionsProvider({ children }: { children: ReactNode }) {
     );
   } else if (dialog?.kind === "confirm") {
     modal = (
-      <ConfirmDialog title={dialog.title} message={dialog.message} confirmLabel={dialog.confirmLabel}
-        onClose={closeDialog} onConfirm={() => guard(dialog.run)} />
+      <ConfirmDialog title={dialog.title} message={dialog.message} confirmLabel={dialog.confirmLabel} protectedPanes={dialog.protectedPanes}
+        onClose={closeDialog}
+        onConfirm={() => {
+          useProtect.getState().release(dialog.protectedPanes.map((p) => p.key));
+          guard(dialog.run);
+        }} />
     );
   } else if (dialog?.kind === "session") {
     modal = <NewSessionDialog machineId={dialog.machineId} groupId={dialog.groupId} onClose={closeDialog} onError={setError} />;

@@ -15,6 +15,7 @@ import {
 } from "../lib/ipc";
 import type { MachineView } from "../lib/types";
 import { useApp } from "../store/app";
+import { protectedIn, useProtect } from "../agents/protect";
 import { StatusDot } from "./StatusDot";
 import type { MenuItem } from "./ContextMenu";
 import { ActionsProvider, useActions } from "./actions";
@@ -75,7 +76,13 @@ export function SessionRow({ node }: { node: RSession }) {
         : session.running
         ? [
             { label: "New workspace…", icon: PlusIcon, onSelect: () => a.newWorkspace(machineId, session.name) },
-            { label: "Stop session", icon: StopIcon, onSelect: () => a.confirm("Stop session", `Stop session "${session.name}"? Running agents will end.`, "Stop", () => sessionStop(machineId, session.name)) },
+            {
+              label: "Stop session",
+              icon: StopIcon,
+              onSelect: () =>
+                a.confirm("Stop session", `Stop session "${session.name}"? Running agents will end.`, "Stop", () => sessionStop(machineId, session.name),
+                  protectedIn(machineId, session.name, session.workspaces, useProtect.getState().marks)),
+            },
             moveItem,
           ]
         : [
