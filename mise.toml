@@ -102,6 +102,13 @@ run = "pnpm test"
 description = "Frontend tests that need a real browser (*.browser.test.tsx)"
 run = "pnpm vitest run --config vitest.browser.config.ts"
 
+[tasks."docs:ui-map"]
+description = "Redraw docs/design/ui-map.html from the real App (after a UI change)"
+run = [
+  "pnpm vitest run --config vitest.uimap.config.ts",
+  "node scripts/ui-map.mjs",
+]
+
 [tasks."test:backend"]
 description = "Backend unit tests"
 dir = "src-tauri"

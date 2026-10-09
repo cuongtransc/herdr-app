@@ -108,7 +108,8 @@ The moment a Window's used percent goes back to zero.
 
 The names to use when talking about the screen, in issues, specs and prompts: each is what the
 user sees, then where it lives. A numbered picture of all of them, light and dark:
-[docs/design/ui-map.html](docs/design/ui-map.html).
+[docs/design/ui-map.html](docs/design/ui-map.html). After a UI change, `mise run docs:ui-map` redraws it from
+the real App; a surface added or renamed here goes into `src/docs/uiMap.surfaces.ts` too.
 
 | Surface | What it is | Code |
 |---|---|---|
