@@ -72,6 +72,8 @@ export interface AppState {
   viewed: SessionRef | null;
   /** The pane last selected in each session (by sessionKey), opened again when the session is viewed. Not persisted. */
   lastPane: Record<string, PaneRef>;
+  /** The pane last selected in each Workspace (by sessionKey/workspace_id), opened again when its project row is clicked. Not persisted. */
+  lastInProject: Record<string, PaneRef>;
   lens: Record<string, Lens>;
   expanded: Record<string, boolean>;
   /** Automatic lens choices (the Chat lens falling back to Terminal). Not persisted; they win
@@ -109,6 +111,9 @@ export interface AppState {
   select: (ref: PaneRef | null) => void;
   acknowledgeSelectedDone: () => void;
   view: (ref: SessionRef | null) => void;
+  /** Opens a project (a Workspace row): the pane that asks when it is Blocked or in Review, else the
+   *  pane last selected in it, else its lead (`project.target`). */
+  openProject: (at: SessionRef, project: { id: string; state: string; target: PaneRef | null }) => void;
   setLens: (key: string, lens: Lens) => void;
   toggle: (nodeKey: string, current?: boolean) => void;
 }
@@ -119,6 +124,7 @@ export const useApp = create<AppState>((set, get) => ({
   selected: null,
   viewed: null,
   lastPane: {},
+  lastInProject: {},
   lensOverride: {},
   starting: {},
   dashboardOpen: false,
@@ -181,6 +187,7 @@ export const useApp = create<AppState>((set, get) => ({
       dashboardOpen: ref ? false : s.dashboardOpen,
       viewed: ref ? { machine_id: ref.machine_id, session: ref.session } : s.viewed,
       lastPane: ref ? { ...s.lastPane, [sessionKey(ref.machine_id, ref.session)]: ref } : s.lastPane,
+      lastInProject: rememberInProject(s.lastInProject, s.machines, ref),
       doneSeen: ref && findPane(s.machines, ref)?.status === "done" ? { ...s.doneSeen, [paneKey(ref)]: true } : s.doneSeen,
       openItems: !ref
         ? s.openItems
@@ -233,6 +240,14 @@ export const useApp = create<AppState>((set, get) => ({
     const pane = last && findPane(s.machines, last) ? last : firstPane(s.machines, ref);
     if (pane) s.select(pane);
     else set({ viewed: ref });
+  },
+  openProject: (at, project) => {
+    const s = get();
+    const asks = project.state === "blocked" || project.state === "review";
+    const last = s.lastInProject[projectPaneKey(at, project.id)];
+    // Still in this Workspace: a closed pane, or one moved to another, falls back to the lead.
+    const pane = !asks && last && workspaceOf(s.machines, last) === project.id ? last : project.target;
+    if (pane) s.select(pane);
   },
   setLensOverride: (key, lens) =>
     set((s) => {
@@ -298,6 +313,18 @@ function claudeStarted(s: Pick<AppState, "machines" | "selected" | "lens" | "len
   if (!sel || sel.machine_id !== v.id || chosenLens(s, paneKey(sel)) || !newAgentOnTerminal()) return false;
   const before = findPane(s.machines, sel);
   return !!before && before.agent !== "claude" && findPane({ [v.id]: v }, sel)?.agent === "claude";
+}
+
+const projectPaneKey = (at: SessionRef, workspaceId: string) => `${sessionKey(at.machine_id, at.session)}/${workspaceId}`;
+
+function workspaceOf(machines: Record<string, MachineView>, ref: PaneRef): string | undefined {
+  const session = machines[ref.machine_id]?.sessions.find((s) => s.name === ref.session);
+  return session?.workspaces.find((w) => w.tabs.some((t) => t.panes.some((p) => p.pane_id === ref.pane_id)))?.workspace_id;
+}
+
+function rememberInProject(last: Record<string, PaneRef>, machines: Record<string, MachineView>, ref: PaneRef | null): Record<string, PaneRef> {
+  const ws = ref && workspaceOf(machines, ref);
+  return ref && ws ? { ...last, [projectPaneKey(ref, ws)]: ref } : last;
 }
 
 function firstPane(machines: Record<string, MachineView>, ref: SessionRef): PaneRef | null {

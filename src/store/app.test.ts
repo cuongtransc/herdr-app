@@ -315,6 +315,55 @@ describe("switching session", () => {
   });
 });
 
+describe("opening a project", () => {
+  const s = machine.sessions[0];
+  const other = { ...s, name: "other", workspaces: [{ ...s.workspaces[0], workspace_id: "w2", tabs: [
+    { ...s.workspaces[0].tabs[0], tab_id: "w2:t1", panes: [{ ...s.workspaces[0].tabs[0].panes[0], pane_id: "w2:p1" }] },
+  ] }] };
+  const pane = (session: string, pane_id: string) => ({ machine_id: "local", session, pane_id });
+  const at = { machine_id: "local", session: "default" };
+  const project = (state: "blocked" | "review" | "working" | "recent" | "quiet") => ({ id: "w1", state, target: pane("default", "w1:p1") });
+  beforeEach(() => useApp.setState({ machines: { local: { ...machine, sessions: [s, other] } }, order: ["local"], selected: null, viewed: null, lastPane: {}, lastInProject: {} }));
+
+  it("goes back to the pane last selected in it", () => {
+    useApp.getState().select(pane("default", "w1:p2"));
+    useApp.getState().select(pane("other", "w2:p1"));
+    useApp.getState().openProject(at, project("working"));
+    expect(useApp.getState().selected).toEqual(pane("default", "w1:p2"));
+  });
+
+  it("stays put when it is the project already open and nothing asks", () => {
+    useApp.getState().select(pane("default", "w1:p2"));
+    useApp.getState().openProject(at, project("recent"));
+    expect(useApp.getState().selected).toEqual(pane("default", "w1:p2"));
+  });
+
+  it.each(["blocked", "review"] as const)("opens the pane that asks when %s, wherever the user was", (state) => {
+    useApp.getState().select(pane("default", "w1:p2"));
+    useApp.getState().openProject(at, project(state));
+    expect(useApp.getState().selected).toEqual(pane("default", "w1:p1"));
+  });
+
+  it("opens its lead pane when none was selected in it", () => {
+    useApp.getState().select(pane("other", "w2:p1"));
+    useApp.getState().openProject(at, project("working"));
+    expect(useApp.getState().selected).toEqual(pane("default", "w1:p1"));
+  });
+
+  it("opens its lead pane when the remembered one moved to another workspace", () => {
+    useApp.setState({ lastInProject: { [`${sessionKey("local", "default")}/w1`]: pane("default", "w2:p1") } });
+    useApp.setState({ machines: { local: { ...machine, sessions: [{ ...s, workspaces: [...s.workspaces, other.workspaces[0]] }] } } });
+    useApp.getState().openProject(at, project("working"));
+    expect(useApp.getState().selected).toEqual(pane("default", "w1:p1"));
+  });
+
+  it("opens its lead pane when the remembered one is gone", () => {
+    useApp.setState({ lastInProject: { [`${sessionKey("local", "default")}/w1`]: pane("default", "w1:p9") } });
+    useApp.getState().openProject(at, project("working"));
+    expect(useApp.getState().selected).toEqual(pane("default", "w1:p1"));
+  });
+});
+
 describe("an agent showing up in the selected pane", () => {
   const s = machine.sessions[0];
   const withAgent = (agent: string | null): MachineView => ({

@@ -14,7 +14,8 @@ export interface ProjectRow {
   state: ProjectState;
   /** Panes in its `lane-*` tabs, when an orchestrator leads them. */
   lanes: number;
-  /** The pane a click opens: the one asking, else the orchestrator, else the first agent or pane. */
+  /** The pane that asks, else the lead: the orchestrator, else the first agent or pane. A click opens the
+   *  one asking, else the pane last selected in the project, else this (`openProject`). */
   target: PaneRef | null;
   /** A `recent` project: how long since its agent last changed. */
   idleFor?: number;
