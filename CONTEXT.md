@@ -107,15 +107,19 @@ The moment a Window's used percent goes back to zero.
 ## UI surfaces
 
 The names to use when talking about the screen, in issues, specs and prompts: each is what the
-user sees, then where it lives.
+user sees, then where it lives. A numbered picture of all of them, light and dark:
+[docs/design/ui-map.html](docs/design/ui-map.html).
 
 | Surface | What it is | Code |
 |---|---|---|
 | **Sidebar** | The left column: Bookmarks, Sessions, Machines | `src/sidebar/Sidebar.tsx` |
+| **Layout controls** / **Board button** | Beside the traffic lights: ⌘B / ⇧⌘B, and the Agent Board with its count | `src/main/LayoutControls.tsx`, `.board-btn` |
 | **Session row** | A Session in the Sidebar | `SessionRow` |
 | **Project row** | A Workspace with agent work, under its Session row | `ProjectRows` (`src/sidebar/ProjectRows.tsx`), `sessionProjects` |
 | **Sessions filter** | All \| Active on the Sessions header | `useSessionFilter` (`src/sidebar/activeFilter.ts`) |
+| **Fold line** | "N hidden · idle or stopped" with Show, under what the Active filter keeps | `.filter-hidden` in `GroupTree` |
 | **Agents column** | The middle column, headed by the Session name and PANES | `src/agents/AgentList.tsx` |
+| **Workspace header** | A Workspace's name over its Pane rows; + starts an agent in it | `.ws-head` in `AgentList.tsx` |
 | **Pane row** | A Pane in the Agents column | `AgentCard` |
 | **Panes filter** | All \| Active on the PANES header | `usePaneFilter` (`src/agents/paneFilter.ts`), `PanesHeader` |
 | **Queue chip** | "1 blocked · 1 review" atop the Agents column | `SessionQueueChip` |
@@ -125,11 +129,21 @@ user sees, then where it lives.
 | **Triage HUD** | The queue shown by ⌘J | `src/main/TriageHud.tsx`, `src/main/triage.ts` |
 | **Agent Board** | The ⇧⌘D overlay, with the Quota column | `src/dashboard/AgentDashboard.tsx`, `QuotaColumn` |
 | **Files panel** | Under the Pane rows in the Agents column; ⌘E focuses it, Browse files on a Workspace header | `src/files/FilesPanel.tsx`, `src-tauri/src/files/` |
+| **Go to file** / **Files tree** | ⌘P's box and the folders under the Files panel's root | `src/files/GoToFile.tsx`, `src/files/FileTree.tsx` |
+| **Header** | The bar over the selected Pane: Breadcrumb, Status pill, Lens switch | `src/main/Header.tsx` |
+| **Breadcrumb** | Machine › Session › Workspace › Pane in the Header | `.crumbs` |
+| **Status pill** | The selected Pane's agent and status in the Header | `.agent-status` |
+| **Lens switch** | Terminal \| Chat in the Header | `.seg` in `Header.tsx` |
 | **Open strip** | The tabs of open Agents and files above the main area | `src/main/OpenStrip.tsx`, `src/store/openItems.ts` |
 | **File viewer** | The main area while a file tab is active | `src/files/FileViewer.tsx` |
 | **CHANGED group** | Git's changes under the root, above the Files tree | `ChangedList`, `useChanged`, `files_changed` |
 | **Chat lens** / **Terminal lens** | The main area, as a conversation or the raw terminal | `src/chat/ChatLens.tsx`, `src/terminal/TerminalLens.tsx` |
+| **Work block** | One turn's work folded under "Worked for …" | `src/chat/WorkBlockView.tsx` |
+| **Queued messages** | Messages sent mid-turn that the agent has not read yet | `src/chat/QueuedMessages.tsx` |
+| **Working line** | The spinner and "Working 1m 23s" (counted from the prompt) over the Composer while the agent works | `src/chat/WorkingIndicator.tsx` |
 | **Composer** / **Composer chips** | The message box and the reply buttons above it | `src/chat/Composer.tsx` |
+| **Composer keys** | Esc, Ctrl+C, ⇧Tab sent as keys, right of the Composer chips | `.composer-keys` |
+| **Git status line** / **Model label** | Under the message box: folder, branch, changes; model · effort · context | `GitStatusLine`, `.composer-model` |
 
 Status words, everywhere a status is put in words (ui-ux-guidelines §3.1): **Blocked** = `blocked`,
 **In progress** = `working`, **Review** = `done` not yet seen, **Done** = `done` seen or `idle`.
