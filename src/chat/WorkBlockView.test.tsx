@@ -1,4 +1,4 @@
-import { fireEvent, render, screen } from "@testing-library/react";
+import { act, fireEvent, render, screen } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 import type { ChatItem } from "../lib/types";
 import { WorkBlockView } from "./WorkBlockView";
@@ -36,9 +36,28 @@ describe("WorkBlockView", () => {
     expect(screen.getByText("a.txt")).toBeTruthy();
   });
 
-  it("reads Working… while the agent runs", () => {
-    render(<WorkBlockView block={block} results={results} open onToggle={() => {}} live />);
-    expect(screen.getByRole("button", { name: /Working…/ })).toBeTruthy();
+  it("counts the time since the prompt while the agent runs, every second", () => {
+    vi.useFakeTimers({ now: Date.parse("2026-10-03T00:01:23Z") });
+    try {
+      render(<WorkBlockView block={{ ...block, end: null }} results={results} open={false} onToggle={() => {}} live />);
+      expect(screen.getByRole("button", { name: /^Working 1m 23s · 1 command$/ })).toBeTruthy();
+      act(() => vi.advanceTimersByTime(1_000));
+      expect(screen.getByRole("button", { name: /^Working 1m 24s · 1 command$/ })).toBeTruthy();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("reads Working… while the agent runs and its start is unknown", () => {
+    render(<WorkBlockView block={{ ...block, start: null }} results={results} open onToggle={() => {}} live />);
+    expect(screen.getByRole("button", { name: /^Working… · 1 command$/ })).toBeTruthy();
+  });
+
+  it("spins in the header only while the agent runs", () => {
+    const { rerender } = render(<WorkBlockView block={block} results={results} open={false} onToggle={() => {}} live />);
+    expect(screen.getByRole("button", { name: /Working/ }).querySelector(".spin")).toBeTruthy();
+    rerender(<WorkBlockView block={block} results={results} open={false} onToggle={() => {}} live={false} />);
+    expect(screen.getByRole("button", { name: /Worked for 7s/ }).querySelector(".spin")).toBeNull();
   });
 
   it("reads Worked when the span is unknown", () => {
