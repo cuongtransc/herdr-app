@@ -4,9 +4,9 @@ A macOS desktop client for the [herdr](https://herdr.dev) terminal multiplexer. 
 
 ![Chat lens](docs/screenshots/chat.png)
 
-| Agent Dashboard | Terminal lens |
+| Agent Board | Terminal lens |
 |---|---|
-| ![Agent Dashboard](docs/screenshots/dashboard.png) | ![Terminal lens](docs/screenshots/terminal.png) |
+| ![Agent Board](docs/screenshots/dashboard.png) | ![Terminal lens](docs/screenshots/terminal.png) |
 
 ## Install
 

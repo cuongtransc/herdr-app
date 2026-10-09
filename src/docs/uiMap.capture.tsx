@@ -1,6 +1,7 @@
 // `mise run docs:ui-map`: the real App, rendered from its components with sample data, screenshotted
 // in light and dark with each named surface measured. scripts/ui-map.mjs turns the result into
-// docs/design/ui-map.html. Not a test: it writes the map's files.
+// docs/design/ui-map.html. It also takes the README's three screenshots (docs/screenshots/). Not a
+// test: it writes those files.
 import "../styles.css";
 import { act } from "react";
 import { createRoot } from "react-dom/client";
@@ -56,7 +57,48 @@ vi.mock("@tauri-apps/api/core", async (orig) => ({
   }),
 }));
 vi.mock("@tauri-apps/api/event", async (orig) => ({ ...(await orig<object>()), listen: vi.fn(async () => () => {}) }));
-vi.mock("../terminal/TerminalLens", () => ({ TerminalLens: () => null }));
+// A shell's sample output in a real xterm with the app's terminal theme and font, for the README's
+// Terminal lens; the lens itself attaches to a live herdr terminal, which a capture has none of.
+const SHELL = [
+  "\x1b[1;32m~/herdr-app\x1b[0m \x1b[2mfeat/compact-tabs\x1b[0m $ git log --oneline -4",
+  "\x1b[33m6e6815c\x1b[0m Merge pull request #75 from cuongtransc/fix/composer-narrow",
+  "\x1b[33m80ff029\x1b[0m fix(chat): the Composer fits the smallest window",
+  "\x1b[33m5028def\x1b[0m fix(ui): Top bar tabs as 28px outlined pills, not 45px blocks",
+  "\x1b[33mabfbef7\x1b[0m feat(ui): one Top bar over the main area, 33px more for the content",
+  "\x1b[1;32m~/herdr-app\x1b[0m \x1b[2mfeat/compact-tabs\x1b[0m $ mise run ci",
+  "[typecheck] $ tsc --noEmit",
+  "[test:frontend]  \x1b[32m✓\x1b[0m src/main/topBar.browser.test.tsx (4 tests) 412ms",
+  "[test:frontend]  Test Files  \x1b[1;32m139 passed\x1b[0m (139)",
+  "[test:frontend]       Tests  \x1b[1;32m1265 passed\x1b[0m (1265)",
+  "[test:backend] test result: \x1b[32mok\x1b[0m. 416 passed; 0 failed",
+  "[ci] Finished in 102.4s",
+  "\x1b[1;32m~/herdr-app\x1b[0m \x1b[2mfeat/compact-tabs\x1b[0m $ ",
+].join("\r\n");
+vi.mock("../terminal/TerminalLens", async () => {
+  const { useEffect, useRef } = await import("react");
+  const { Terminal } = await import("@xterm/xterm");
+  await import("@xterm/xterm/css/xterm.css");
+  const { FitAddon } = await import("@xterm/addon-fit");
+  const { watchTermFont } = await import("../settings/store");
+  const { watchTermTheme } = await import("../settings/theme");
+  const { TERM_MIN_CONTRAST } = await import("../terminal/theme");
+  function TerminalLens() {
+    const host = useRef<HTMLDivElement>(null);
+    useEffect(() => {
+      const term = new Terminal({ allowProposedApi: true, minimumContrastRatio: TERM_MIN_CONTRAST });
+      const fit = new FitAddon();
+      term.loadAddon(fit);
+      const unwatchFont = watchTermFont(term, fit);
+      const unwatchTheme = watchTermTheme(term);
+      term.open(host.current!);
+      fit.fit();
+      term.write(SHELL);
+      return () => { unwatchFont(); unwatchTheme(); term.dispose(); };
+    }, []);
+    return <div className="term-lens"><div className="term-host" ref={host} /></div>;
+  }
+  return { TerminalLens };
+});
 vi.mock("../chat/chatSession", async (orig) => ({
   ...(await orig<typeof import("../chat/chatSession")>()),
   openChat: (_p: unknown, _path: unknown, ch: { onmessage: (e: unknown) => void }) => {
@@ -111,5 +153,18 @@ it("captures the UI map", async () => {
     await settle(200);
     await page.screenshot({ path: `../../docs/design/assets/ui-map-${theme}.png`, element: root });
   }
+  // The README's screenshots, in dark as they always were: the Chat lens as mapped, a shell in the
+  // Terminal lens, and the Agent Board.
+  const shot = async (name: string) => { await settle(400); await page.screenshot({ path: `../../docs/screenshots/${name}.png`, element: root }); };
+  delete document.documentElement.dataset.theme;
+  await shot("chat");
+  await act(async () => useApp.getState().select({ machine_id: "local", session: "ct", pane_id: "p3" }));
+  await shot("terminal");
+  await act(async () => {
+    useApp.getState().select({ machine_id: "local", session: "ct", pane_id: "p1" });
+    useApp.getState().setDashboardOpen(true);
+  });
+  await shot("dashboard");
+  await act(async () => useApp.getState().setDashboardOpen(false));
   await commands.writeFile("docs/design/assets/ui-map.json", JSON.stringify({ captured: new Date().toLocaleDateString("sv"), width: W, height: H, parts }, null, 1) + "\n");
 });
