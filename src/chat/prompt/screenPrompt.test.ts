@@ -502,6 +502,42 @@ ${after}`;
   });
 });
 
+// Claude Code 2.1, captured 2026-10-09: the reply above the question panel has a numbered list of its own
+test("reads Claude's question under a reply that has a numbered list of its own", () => {
+  const prompt = parseInteractivePrompt("claude", `
+  Hai việc cần anh làm trước khi import:
+  1. 2023-04 và 2026-02 sẽ bị lệnh từ chối. Anh sửa 2 dòng này trong saving-snapshot.md, hoặc nói cho mình biết giá trị
+     nào là của ngày nào.
+  2. Ngày ghi tiền thực nhận tính theo giờ VN (UTC+7) phải không?
+
+⏺ Chưa có code nào được viết.
+  - Chờ anh: 2 câu dưới đây.
+────────────────────────────────────────
+Planning: /Users/connor/.claude/plans/ti-n-th-n-o-cheeky-thunder.md
+────────────────────────────────────────
+←  ☐ Tháng lệch  ☐ Múi giờ  ✔ Submit  →
+
+│ 2023-04 có 29 giá trị cho 30 ngày, 2026-02 có 29 giá trị cho 28 ngày. Xử lý thế
+│ nào?
+
+❯ 1. Tôi sửa file md (Recommended)
+     Anh tự sửa 2 dòng này trong saving-snapshot.md, rồi mới chạy import.
+  2. Gộp 2 tháng theo tổng
+     Hai tháng này lưu theo tổng tháng, ghép vào ngày cuối tháng kèm ghi chú.
+  3. Tôi chỉ ra ngày
+     Anh cho biết giá trị nào thuộc ngày nào.
+  4. Type something.
+────────────────────────────────────────
+  5. Chat about this
+
+Enter to select · Tab/Arrow keys to navigate · Esc to cancel
+`);
+  expect(prompt).toMatchObject({ kind: "question", title: "Tháng lệch · 1 of 2", custom_option_index: 3 });
+  expect(prompt?.question).toBe("2023-04 có 29 giá trị cho 30 ngày, 2026-02 có 29 giá trị cho 28 ngày. Xử lý thế nào?");
+  expect(labels(prompt)).toEqual(["Tôi sửa file md (Recommended)", "Gộp 2 tháng theo tổng", "Tôi chỉ ra ngày"]);
+  expect(answerKeys(prompt!, { option_index: 1 })).toEqual([{ keys: ["down"] }, { keys: ["enter"] }]);
+});
+
 describe("the fallback card for a blocked pane no reader knows", () => {
   test("offers a numbered menu at the screen's end as options answered by their number", () => {
     const prompt = parseFallbackPrompt("gjc", `

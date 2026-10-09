@@ -231,6 +231,24 @@ describe("PromptPanel", () => {
   });
 });
 
+describe("the fallback card", () => {
+  it("shows the screen once, in the mirror, with one row of keys", async () => {
+    window.matchMedia ??= ((query: string) =>
+      ({ matches: false, media: query, addEventListener() {}, removeEventListener() {}, addListener() {}, removeListener() {} }) as unknown as MediaQueryList);
+    shown = "Deploy to which stage?\nstaging is the default\n\nUse arrows to pick\n";
+    const { container } = render(<PromptPanel pane={pane} view={view} />);
+    expect(await screen.findByText("Waiting for input")).toBeTruthy();
+    // the screen's lines are in the mirror, not also as text on the card
+    expect(screen.queryByText("Deploy to which stage?")).toBeNull();
+    expect(container.querySelector(".prompt-body")).toBeNull();
+    expect(container.querySelector(".blocked-screen")).toBeTruthy();
+    for (const key of ["Enter", "Esc", "↑", "↓"]) expect(screen.getAllByRole("button", { name: key })).toHaveLength(1);
+    expect(screen.getByRole("button", { name: "1" })).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: "↓" }));
+    await waitFor(() => expect(sent()).toContainEqual(["agent.send_keys", { target: "w1:p1", keys: ["down"] }]));
+  });
+});
+
 describe("PromptPanel without the fallback card", () => {
   const idlePi = { status: "idle", agent: "pi", title: "pi" } as PaneView;
   const picker = (cursor: 0 | 1) => `
