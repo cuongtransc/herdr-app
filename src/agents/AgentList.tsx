@@ -2,7 +2,7 @@ import { memo } from "react";
 import type { ReactNode } from "react";
 import { chatLocate, herdrCall, sessionStart } from "../lib/ipc";
 import { paneKey } from "../lib/types";
-import type { AgentStatus, PaneView, SessionView, TabView, WorkspaceView } from "../lib/types";
+import type { AgentStatus, PaneRef, PaneView, SessionView, TabView, WorkspaceView } from "../lib/types";
 import { useFilesPanel } from "../files/panelStore";
 import { useApp } from "../store/app";
 import { itemKey } from "../store/openItems";
@@ -122,6 +122,17 @@ function StatusMark({ status, seen, agent, lane, slot }: { status: AgentStatus; 
 
 type Reorder = ReturnType<typeof useTabReorder>;
 
+/** Fork session and Fork into a new worktree, both off with the reason under them while the pane cannot fork. */
+function forkItems(a: NonNullable<ReturnType<typeof useActions>>, ref: PaneRef, ws: WorkspaceView, pane: PaneView): MenuItem[] {
+  const why = forkBlocked(pane) ?? undefined;
+  const fork = (worktree: boolean) => () =>
+    a.guard(() => forkSession(ref, ws, pane, { worktree }, { call: (m, p) => herdrCall(ref.machine_id, ref.session, m, p), locate: chatLocate }));
+  return [
+    { label: "Fork session", icon: GitBranchIcon, disabled: !!why, onSelect: fork(false) },
+    { label: "Fork into a new worktree", icon: GitBranchIcon, disabled: !!why, note: why, onSelect: fork(true) },
+  ];
+}
+
 /** `tabRow` when this card is its Tab's whole row (a single-pane Tab), so it is also the drop target. */
 function AgentCard({
   machineId,
@@ -164,17 +175,7 @@ function AgentCard({
         { label: "Rename…", icon: PencilIcon, onSelect: () => a.rename("Rename pane", pane.title, (label) => call("pane.rename", { pane_id: pane.pane_id, label })()) },
         { label: "Split right", icon: SplitRightIcon, onSelect: () => a.guard(call("pane.split", { target_pane_id: pane.pane_id, direction: "right" })) },
         { label: "Split down", icon: SplitDownIcon, onSelect: () => a.guard(call("pane.split", { target_pane_id: pane.pane_id, direction: "down" })) },
-        ...(pane.agent === "claude"
-          ? (() => {
-              const why = forkBlocked(pane);
-              const fork = (worktree: boolean) => () =>
-                a.guard(() => forkSession(ref, ws, pane, { worktree }, { call: (m, p) => herdrCall(machineId, session, m, p), locate: chatLocate }));
-              return [
-                { label: "Fork session", icon: GitBranchIcon, disabled: !!why, onSelect: fork(false) },
-                { label: "Fork into a new worktree", icon: GitBranchIcon, disabled: !!why, note: why ?? undefined, onSelect: fork(true) },
-              ];
-            })()
-          : []),
+        ...(pane.agent === "claude" ? forkItems(a, ref, ws, pane) : []),
         isProt
           ? { label: "Close pane", icon: CloseIcon, disabled: true, note: "Protected: unprotect it to close", onSelect: () => {} }
           : { label: "Close pane", icon: CloseIcon, onSelect: () => a.guard(close) },

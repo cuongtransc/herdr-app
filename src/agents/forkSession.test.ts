@@ -1,7 +1,8 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { paneKey, type Located, type MachineView, type PaneView } from "../lib/types";
 import { useApp } from "../store/app";
-import { forkBlocked, forkSession, useForks } from "./forkSession";
+import { useLensSettings } from "../settings/lens";
+import { forkBlocked, forkSession, useForks, watchForkPrune } from "./forkSession";
 
 const orig = { machine_id: "local", session: "default", pane_id: "w1:p1" };
 const claude = (status: PaneView["status"], extra: Partial<PaneView> = {}): PaneView =>
@@ -47,7 +48,7 @@ describe("forkSession", () => {
   afterEach(() => vi.useRealTimers());
 
   const deps = (over: { session?: unknown; located?: Located } = {}) => {
-    const call = vi.fn(async (method: string) => {
+    const call = vi.fn(async (method: string, _params?: unknown) => {
       if (method === "agent.get") return { agent: { agent: "claude", agent_session: "session" in over ? over.session : { agent: "claude", kind: "id", value: "sid-1" } } };
       if (method === "tab.create") return { root_pane: { pane_id: "w1:p9" } };
       if (method === "agent.start") {
@@ -79,9 +80,9 @@ describe("forkSession", () => {
     const d = deps();
     await forkSession(orig, ws, claude("done"), { worktree: true }, d);
     expect(d.call).toHaveBeenCalledWith("agent.start", expect.objectContaining({
-      args: ["--resume", "sid-1", "--fork-session", "--name", "Fork · Port Files panel", "--worktree", "fork-20261009-1605"],
+      args: ["--resume", "sid-1", "--fork-session", "--name", "Fork · Port Files panel", "--worktree", "fork-20261009-160500"],
     }));
-    expect(useForks.getState().forks["local/default/w1:p9"].worktree).toBe("fork-20261009-1605");
+    expect(useForks.getState().forks["local/default/w1:p9"].worktree).toBe("fork-20261009-160500");
   });
 
   it("refuses before opening anything when the session has no transcript yet, is a guess, or herdr reports no id", async () => {
@@ -96,9 +97,66 @@ describe("forkSession", () => {
     }
   });
 
+  it("opens the fork on Chat, where its banner is, even when new agents open on the Terminal", async () => {
+    useLensSettings.setState({ newAgentLens: "terminal" });
+    await forkSession(orig, ws, claude("idle"), { worktree: false }, deps());
+    expect(useApp.getState().lensOverride["local/default/w1:p9"]).toBe("chat");
+    useLensSettings.setState({ newAgentLens: "terminal" });
+  });
+
+  it("names a fork of an untitled pane plainly", async () => {
+    const d = deps();
+    await forkSession(orig, ws, claude("idle", { title: "  " }), { worktree: false }, d);
+    expect(d.call).toHaveBeenCalledWith("agent.start", expect.objectContaining({ args: ["--resume", "sid-1", "--fork-session", "--name", "Fork"] }));
+  });
+
+  it("forgets the fork record when claude does not start, leaving the tab to show why", async () => {
+    const d = deps();
+    d.call.mockImplementation(async (method: string) => {
+      if (method === "agent.get") return { agent: { agent: "claude", agent_session: { kind: "id", value: "sid-1" } } };
+      if (method === "tab.create") return { root_pane: { pane_id: "w1:p9" } };
+      if (method === "agent.start") throw { code: "herdr_error", message: "timed out waiting for agent startup" };
+      return {};
+    });
+    await expect(forkSession(orig, ws, claude("idle"), { worktree: false }, d)).rejects.toBeTruthy();
+    expect(useForks.getState().forks).toEqual({});
+    expect(JSON.parse(localStorage.getItem("herdr-app:forks") ?? "{}")).toEqual({});
+  });
+
+  it("checks the pane again after asking herdr: one that started working meanwhile is not forked", async () => {
+    const d = deps();
+    const base = d.call.getMockImplementation()!;
+    d.call.mockImplementation(async (method: string, params: unknown) => {
+      if (method === "agent.get") {
+        const m = machine(null);
+        m.sessions[0].workspaces[0].tabs[0].panes[0].status = "working";
+        useApp.getState().upsertMachine(m);
+      }
+      return base(method, params);
+    });
+    await expect(forkSession(orig, ws, claude("idle"), { worktree: false }, d)).rejects.toThrow(/^Busy/);
+    expect(d.call).not.toHaveBeenCalledWith("tab.create", expect.anything());
+  });
+
   it("refuses a busy pane even when asked directly", async () => {
     const d = deps();
     await expect(forkSession(orig, ws, claude("working"), { worktree: false }, d)).rejects.toThrow(/^Busy/);
     expect(d.call).not.toHaveBeenCalled();
+  });
+});
+
+describe("watchForkPrune", () => {
+  it("forgets the fork record of a pane gone from its running session", () => {
+    useApp.setState({ machines: {} });
+    const stale = { of: orig, from: "x", at: 1, worktree: null };
+    useForks.setState({ forks: { "local/default/w1:p9": stale, "local/default/w1:p1": stale } });
+    const stop = watchForkPrune();
+    useApp.getState().upsertMachine(machine(null));
+    expect(Object.keys(useForks.getState().forks)).toEqual(["local/default/w1:p9", "local/default/w1:p1"]);
+    const gone = machine(null);
+    gone.sessions[0].workspaces[0].tabs.pop();
+    useApp.getState().upsertMachine(gone);
+    expect(Object.keys(useForks.getState().forks)).toEqual(["local/default/w1:p1"]);
+    stop();
   });
 });

@@ -1,8 +1,8 @@
 import { create } from "zustand";
 import { paneKey } from "../lib/types";
 import type { Located, PaneRef, PaneView, WorkspaceView } from "../lib/types";
-import { newAgentOnTerminal } from "../settings/lens";
-import { useApp } from "../store/app";
+import { findPane, useApp } from "../store/app";
+import { prunePaneKeys } from "./protect";
 import { launchAgent } from "./launchAgent";
 
 type Call = (method: string, params: unknown) => Promise<unknown>;
@@ -46,22 +46,47 @@ function load(): Record<string, ForkOrigin> {
 }
 
 /** By the fork's paneKey: where it came from, for the Chat lens banner. */
-export const useForks = create<{ forks: Record<string, ForkOrigin>; add: (key: string, o: ForkOrigin) => void }>((set, get) => ({
+function save(forks: Record<string, ForkOrigin>): void {
+  try {
+    localStorage.setItem(KEY, JSON.stringify(forks));
+  } catch {
+    /* ignore */
+  }
+}
+
+interface ForksStore {
+  forks: Record<string, ForkOrigin>;
+  add: (key: string, o: ForkOrigin) => void;
+  remove: (key: string) => void;
+  replace: (forks: Record<string, ForkOrigin>) => void;
+}
+
+export const useForks = create<ForksStore>((set, get) => ({
   forks: load(),
-  add: (key, o) => {
-    const forks = { ...get().forks, [key]: o };
-    try {
-      localStorage.setItem(KEY, JSON.stringify(forks));
-    } catch {
-      /* ignore */
-    }
+  add: (key, o) => get().replace({ ...get().forks, [key]: o }),
+  remove: (key) => {
+    const { [key]: _, ...rest } = get().forks;
+    get().replace(rest);
+  },
+  replace: (forks) => {
+    save(forks);
     set({ forks });
   },
 }));
 
+/** Forgets the records of panes gone from their machine (herdr reuses pane ids); returns the unsubscribe. */
+export function watchForkPrune(): () => void {
+  return useApp.subscribe((s, prev) => {
+    if (s.machines === prev.machines) return;
+    let forks = useForks.getState().forks;
+    for (const [id, m] of Object.entries(s.machines)) if (m !== prev.machines[id]) forks = prunePaneKeys(forks, m);
+    if (forks !== useForks.getState().forks) useForks.getState().replace(forks);
+  });
+}
+
 const pad = (n: number) => String(n).padStart(2, "0");
 function stamp(d: Date): string {
-  return `${d.getFullYear()}${pad(d.getMonth() + 1)}${pad(d.getDate())}-${pad(d.getHours())}${pad(d.getMinutes())}`;
+  return `${d.getFullYear()}${pad(d.getMonth() + 1)}${pad(d.getDate())}-${pad(d.getHours())}${pad(d.getMinutes())}${pad(d.getSeconds())}`;
 }
 
 /**
@@ -84,6 +109,10 @@ export async function forkSession(
   const where = await locate(ref);
   if (where.pending) throw new Error("Nothing to fork yet: send it a first message");
   if (where.ambiguous) throw new Error("Herdr is not sure which session this pane runs, so it cannot fork it");
+  // The menu's pane may be stale by now: a turn that started meanwhile must not be forked.
+  const live = findPane(useApp.getState().machines, ref);
+  const stillBlocked = live && forkBlocked(live);
+  if (stillBlocked) throw new Error(stillBlocked);
 
   const now = new Date();
   const tree = worktree ? `fork-${stamp(now)}` : null;
@@ -91,9 +120,18 @@ export async function forkSession(
     root_pane: { pane_id: string };
   };
   const fork = { machine_id: ref.machine_id, session: ref.session, pane_id: res.root_pane.pane_id };
-  useForks.getState().add(paneKey(fork), { of: ref, from: pane.title, at: now.getTime(), worktree: tree });
-  if (newAgentOnTerminal()) useApp.getState().setLensOverride(paneKey(fork), "terminal");
+  const key = paneKey(fork);
+  const title = pane.title.trim();
+  // Opens on Chat whatever new agents open on: its banner says what it is and leads back.
+  useForks.getState().add(key, { of: ref, from: title || "a Claude session", at: now.getTime(), worktree: tree });
+  useApp.getState().setLensOverride(key, "chat");
   useApp.getState().select(fork);
-  const args = ["--resume", session.value, "--fork-session", "--name", `Fork · ${pane.title}`, ...(tree ? ["--worktree", tree] : [])];
-  await launchAgent(call, fork, "claude", { name: "fork", args, timeoutMs: FORK_START_MS });
+  const args = ["--resume", session.value, "--fork-session", "--name", title ? `Fork · ${title}` : "Fork", ...(tree ? ["--worktree", tree] : [])];
+  try {
+    await launchAgent(call, fork, "claude", { name: "fork", args, timeoutMs: FORK_START_MS });
+  } catch (e) {
+    // The tab stays, showing what the shell did; it is no fork.
+    useForks.getState().remove(key);
+    throw e;
+  }
 }
