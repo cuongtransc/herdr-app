@@ -15,7 +15,21 @@ export interface MenuItem {
   note?: string;
 }
 
-export function ContextMenu({ x, y, items, onClose }: { x: number; y: number; items: MenuItem[]; onClose: () => void }) {
+/** A menu row, or "sep": a line between groups. */
+export type MenuEntry = MenuItem | "sep";
+
+/** Lines only between items: none at either end, none twice in a row (a group may be empty). */
+function grouped(items: MenuEntry[]): MenuEntry[] {
+  const out: MenuEntry[] = [];
+  for (const it of items) {
+    if (it === "sep" && (out.length === 0 || out[out.length - 1] === "sep")) continue;
+    out.push(it);
+  }
+  if (out[out.length - 1] === "sep") out.pop();
+  return out;
+}
+
+export function ContextMenu({ x, y, items, onClose }: { x: number; y: number; items: MenuEntry[]; onClose: () => void }) {
   useEffect(() => {
     const key = (e: KeyboardEvent) => e.key === "Escape" && onClose();
     window.addEventListener("keydown", key);
@@ -24,7 +38,10 @@ export function ContextMenu({ x, y, items, onClose }: { x: number; y: number; it
   return (
     <div className="overlay clear" onMouseDown={onClose} onContextMenu={(e) => { e.preventDefault(); onClose(); }}>
       <ul className="ctx-menu" role="menu" style={{ left: x, top: y }} onMouseDown={(e) => e.stopPropagation()}>
-        {items.map((it) => (
+        {grouped(items).map((it, i) =>
+          it === "sep" ? (
+            <li key={`sep-${i}`} role="separator" className="ctx-sep" />
+          ) : (
           <li key={it.label} role="none">
             <button
               role={it.checked === undefined ? "menuitem" : "menuitemcheckbox"}
@@ -41,7 +58,8 @@ export function ContextMenu({ x, y, items, onClose }: { x: number; y: number; it
             </button>
             {it.note && <div className="ctx-note">{it.note}</div>}
           </li>
-        ))}
+          ),
+        )}
       </ul>
     </div>
   );

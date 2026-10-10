@@ -4,7 +4,7 @@ import { machineConnect } from "../lib/ipc";
 import type { MachineView, WorkspaceView } from "../lib/types";
 import { useApp } from "../store/app";
 import { ConfirmDialog, ContextMenu, TextDialog } from "./ContextMenu";
-import type { MenuItem } from "./ContextMenu";
+import type { MenuEntry } from "./ContextMenu";
 import { MoveToGroupDialog } from "./MoveToGroupDialog";
 import type { SessionKey } from "./groups";
 import { NewWorkspaceDialog } from "./NewWorkspaceDialog";
@@ -28,9 +28,9 @@ type Dialog =
   | { kind: "connect"; machine: MachineView };
 
 export interface Actions {
-  menu: (e: MouseEvent, items: MenuItem[]) => void;
+  menu: (e: MouseEvent, items: MenuEntry[]) => void;
   /** The menu at a point, e.g. under the button that opened it. */
-  menuAt: (x: number, y: number, items: MenuItem[]) => void;
+  menuAt: (x: number, y: number, items: MenuEntry[]) => void;
   rename: (title: string, initial: string, run: (label: string) => Promise<unknown>, submitLabel?: string) => void;
   /** `protectedPanes`: the protected panes `run` closes; confirming unprotects them first. */
   confirm: (title: string, message: string, confirmLabel: string, run: () => Promise<unknown>, protectedPanes?: ProtectedPane[]) => void;
@@ -66,7 +66,7 @@ function errorMessage(e: unknown): string {
 
 /** Context menu, dialogs and the action error line shared by the Sidebar and the Agents column. */
 export function ActionsProvider({ children }: { children: ReactNode }) {
-  const [menu, setMenu] = useState<{ x: number; y: number; items: MenuItem[] } | null>(null);
+  const [menu, setMenu] = useState<{ x: number; y: number; items: MenuEntry[] } | null>(null);
   const [dialog, setDialog] = useState<Dialog | null>(null);
   const [error, setError] = useState<string | null>(null);
 

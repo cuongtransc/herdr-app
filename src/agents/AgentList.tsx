@@ -7,14 +7,15 @@ import { useFilesPanel } from "../files/panelStore";
 import { useApp } from "../store/app";
 import { itemKey } from "../store/openItems";
 import { stepTriage, triageQueue } from "../dashboard/triage";
-import type { MenuItem } from "../sidebar/ContextMenu";
+import type { MenuEntry, MenuItem } from "../sidebar/ContextMenu";
 import { ActionsProvider, useActions } from "../sidebar/actions";
 import { ActiveToggle } from "../sidebar/ActiveToggle";
-import { BookIcon, BotIcon, CheckIcon, GitBranchIcon, LayersIcon, LockIcon, UnplugIcon, ChevronIcon, CloseIcon, FolderOpenIcon, PencilIcon, PlusIcon, SplitDownIcon, SplitRightIcon, TabPlusIcon, TerminalIcon } from "../ui/icons";
+import { BookIcon, BotIcon, CheckIcon, CopyIcon, GitBranchIcon, LayersIcon, LockIcon, UnplugIcon, ChevronIcon, CloseIcon, FolderOpenIcon, PencilIcon, PlusIcon, SplitDownIcon, SplitRightIcon, TerminalIcon } from "../ui/icons";
 import { folderName, suggestFolder, useFolder } from "../workspaces/folder";
 import { AgentIcon } from "./AgentIcon";
 import { isProtected, protectedIn, useProtect } from "./protect";
 import { forkBlocked, forkSession } from "./forkSession";
+import { copyTranscriptPath } from "./transcriptPath";
 import { idleLabel, paneState, useActiveKeptMs, useMinuteClock, usePaneFilter } from "./paneFilter";
 import { useLaneRecords } from "./laneOwners";
 import { laneTitle, sessionRoles, tabRole } from "./roles";
@@ -179,27 +180,37 @@ function AgentCard({
   const close = call("pane.close", { pane_id: pane.pane_id });
   const key = paneKey(ref);
   const isProt = useProtect((s) => isProtected(s.marks, key, row.role === "orch" || (tabRole(tab.label) === "orch" && !!pane.agent)));
-  const items: MenuItem[] = a
+  // A one-pane Tab closes with its pane: one Close tab, which acts as Close pane (no question, off while protected).
+  const onlyPane = tab.panes.length === 1;
+  const closeLabel = onlyPane ? "Close tab" : "Close pane";
+  const closePane: MenuItem = isProt
+    ? { label: closeLabel, icon: CloseIcon, disabled: true, note: "Protected: unprotect it to close", onSelect: () => {} }
+    : { label: closeLabel, icon: CloseIcon, onSelect: () => a?.guard(close) };
+  const items: MenuEntry[] = a
     ? [
-        { label: isProt ? "Protected" : "Protect", icon: LockIcon, checked: isProt, onSelect: () => useProtect.getState().set(key, !isProt) },
-        { label: "Rename…", icon: PencilIcon, onSelect: () => a.rename("Rename pane", pane.title, (label) => call("pane.rename", { pane_id: pane.pane_id, label })()) },
+        { label: "Rename pane…", icon: PencilIcon, onSelect: () => a.rename("Rename pane", pane.title, (label) => call("pane.rename", { pane_id: pane.pane_id, label })()) },
         { label: "Split right", icon: SplitRightIcon, onSelect: () => a.guard(call("pane.split", { target_pane_id: pane.pane_id, direction: "right" })) },
         { label: "Split down", icon: SplitDownIcon, onSelect: () => a.guard(call("pane.split", { target_pane_id: pane.pane_id, direction: "down" })) },
+        { label: isProt ? "Protected" : "Protect", icon: LockIcon, checked: isProt, onSelect: () => useProtect.getState().set(key, !isProt) },
+        ...(onlyPane ? [] : [closePane]),
+        "sep",
         ...(pane.agent === "claude" ? forkItems(a, ref, ws, pane) : []),
-        isProt
-          ? { label: "Close pane", icon: CloseIcon, disabled: true, note: "Protected: unprotect it to close", onSelect: () => {} }
-          : { label: "Close pane", icon: CloseIcon, onSelect: () => a.guard(close) },
-        { label: "New tab", icon: TabPlusIcon, onSelect: () => a.guard(call("tab.create", { workspace_id: ws.workspace_id })) },
+        ...(pane.agent === "claude" || pane.agent === "pi"
+          ? [{ label: "Copy transcript path", icon: CopyIcon, onSelect: () => void copyTranscriptPath(ref) }]
+          : []),
+        "sep",
         { label: "Rename tab…", icon: PencilIcon, onSelect: () => a.rename("Rename tab", tab.label, (label) => call("tab.rename", { tab_id: tab.tab_id, label })()) },
-        {
-          label: "Close tab",
-          icon: CloseIcon,
-          onSelect: () => {
-            const inTab = new Set(tab.panes.map((p) => paneKey({ machine_id: machineId, session, pane_id: p.pane_id })));
-            const prot = protectedIn(machineId, session, [ws], useProtect.getState().marks).filter((p) => inTab.has(p.key));
-            a.confirm("Close tab", `Close tab "${tab.label}" and all its panes?`, "Close", call("tab.close", { tab_id: tab.tab_id }), prot);
-          },
-        },
+        onlyPane
+          ? closePane
+          : {
+              label: "Close tab",
+              icon: CloseIcon,
+              onSelect: () => {
+                const inTab = new Set(tab.panes.map((p) => paneKey({ machine_id: machineId, session, pane_id: p.pane_id })));
+                const prot = protectedIn(machineId, session, [ws], useProtect.getState().marks).filter((p) => inTab.has(p.key));
+                a.confirm("Close tab", `Close tab "${tab.label}" and all its panes?`, "Close", call("tab.close", { tab_id: tab.tab_id }), prot);
+              },
+            },
       ]
     : [];
   const laneToggleText = lanes && (
