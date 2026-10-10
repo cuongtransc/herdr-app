@@ -1,7 +1,9 @@
 import { fireEvent, render, screen, within } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-vi.mock("../lib/ipc", () => ({ herdrCall: vi.fn().mockResolvedValue(undefined), chatLocate: vi.fn() }));
-import { herdrCall } from "../lib/ipc";
+// No ctc by default: lanes fold by workspace, as before the lane store reported owners.
+vi.mock("../lib/ipc", () => ({ herdrCall: vi.fn().mockResolvedValue(undefined), chatLocate: vi.fn(), lanesList: vi.fn().mockRejectedValue(new Error("no ctc")) }));
+import { herdrCall, lanesList } from "../lib/ipc";
+import { useLaneOwners } from "./laneOwners";
 import { useFilesPanel } from "../files/panelStore";
 import { panelWorkspace } from "../files/root";
 import { useApp } from "../store/app";
@@ -548,7 +550,8 @@ describe("AgentList lanes", () => {
     useApp.setState({ machines: { local: only } });
     usePaneFilter.setState({ filter: "all" });
     render(<AgentList />);
-    const row = screen.getByRole("button", { name: "π - lane: search — Wave 2, pi, done" });
+    // Its LANE badge says what the title's prefix did.
+    const row = screen.getByRole("button", { name: "search — Wave 2, pi, done" });
     expect(within(row).queryByText("Review")).toBeNull();
     expect(row.querySelector(".agent-review")).toBeNull();
     expect(screen.queryByRole("button", { name: /pi, review/ })).toBeNull();
@@ -654,5 +657,76 @@ describe("AgentList tab reordering", () => {
     drag(card("Idempotent payments"), card("Guard export"));
     expect(herdrCall).not.toHaveBeenCalled();
     expect(document.querySelector(".drop-before, .drop-after")).toBeNull();
+  });
+});
+
+describe("AgentList lanes by owner (ctc lane list)", () => {
+  const tab = (id: string, label: string, panes: PaneView[]) => ({ tab_id: id, label, number: 1, status: "idle" as const, panes });
+  // The reported bug: lanes owned by the plain "claude" tab folded under the orch- tab of the same workspace.
+  const machine: MachineView = {
+    ...m,
+    sessions: [
+      { name: "default", running: true, status: "working", error: null, workspaces: [
+        { workspace_id: "w1", label: "vault", number: 1, status: "working", tabs: [
+          tab("t1", "orch-xbit-vault-engine", [pane("w1:tP", "Vault rollout", "claude", "working")]),
+          tab("t2", "claude", [pane("w1:p8", "Rate limits", "claude", "working")]),
+          tab("t3", "lane-a", [pane("w1:pA", "lane: a", "pi", "working")]),
+          tab("t4", "lane-b", [pane("w1:pB", "lane: b", "pi", "working")]),
+          tab("t5", "lane-c", [pane("w1:pC", "lane: c", "pi", "working")]),
+          tab("t6", "brief-1010-fees", [pane("w1:pF", "brief: fees", "claude", "working")]),
+        ] } ] },
+    ],
+  };
+  const owned = (pane_id: string, owner: string | null) => ({ lane_id: "lane-" + pane_id, herdr_session: "default", pane_id, owner });
+  beforeEach(() => {
+    vi.clearAllMocks();
+    localStorage.clear();
+    useLaneOwners.setState({ byMachine: {} });
+    useApp.setState({ machines: { local: machine }, order: ["local"], selected: null, viewed: { machine_id: "local", session: "default" }, expanded: {}, doneSeen: {}, statusSince: {} });
+    usePaneFilter.setState({ filter: "all" });
+  });
+  const card = (name: RegExp) => screen.getByRole("button", { name });
+
+  it("folds each lane under the pane that owns it, not the workspace's orch- tab; an orphan stays on top", async () => {
+    vi.mocked(lanesList).mockResolvedValue([owned("w1:pA", "default/w1:p8"), owned("w1:pB", "default/w1:p8"), owned("w1:pC", null)]);
+    render(<AgentList />);
+    const toggle = await screen.findByRole("button", { name: "2 lanes" });
+    expect(toggle.closest("li")).toBe(card(/^Rate limits/).closest("li"));
+    expect(card(/^Vault rollout/).closest("li")?.className).not.toContain("has-lanes");
+    // Folded: a and b are hidden; c, an orphan, shows on its own with its marker.
+    expect(screen.queryByRole("button", { name: /^a, pi/ })).toBeNull();
+    const orphan = card(/^c, pi/).closest("li")!;
+    expect(orphan.className).not.toContain("lane-row");
+    expect(within(orphan).getByText("orphan")).toBeTruthy();
+    fireEvent.click(toggle);
+    expect([...document.querySelectorAll(".agent-card")].map((b) => b.getAttribute("aria-label")?.split(",")[0])).toEqual([
+      "Vault rollout", "Rate limits", "a", "b", "c", "fees",
+    ]);
+  });
+
+  it("marks a lane orphan when its owner pane is gone", async () => {
+    vi.mocked(lanesList).mockResolvedValue([owned("w1:pA", "default/w1:gone"), owned("w1:pB", "default/w1:p8"), owned("w1:pC", "default/w1:p8")]);
+    render(<AgentList />);
+    await screen.findByRole("button", { name: "2 lanes" });
+    expect(within(card(/^a, pi/).closest("li")!).getByText("orphan")).toBeTruthy();
+  });
+
+  it("badges each row's role from its tab label, the session title staying the main text", async () => {
+    vi.mocked(lanesList).mockResolvedValue([owned("w1:pA", "default/w1:p8"), owned("w1:pB", "default/w1:p8"), owned("w1:pC", "default/w1:p8")]);
+    render(<AgentList />);
+    // Before the store answers, the lanes fold by workspace under the orch- tab: wait for the move.
+    await vi.waitFor(() => expect(card(/^Rate limits/).closest("li")?.className).toContain("has-lanes"));
+    fireEvent.click(screen.getByRole("button", { name: "3 lanes" }));
+    const badge = (name: RegExp) => card(name).querySelector(".role-badge")?.textContent ?? null;
+    expect([badge(/^Vault rollout/), badge(/^Rate limits/), badge(/^a, pi/), badge(/^fees/)]).toEqual(["ORCH", null, "LANE", "BRIEF"]);
+    expect(card(/^Vault rollout/).querySelector(".agent-card-title")?.textContent).toBe("Vault rollout");
+  });
+
+  it("falls back to folding by workspace when ctc fails, with nothing marked orphan", async () => {
+    render(<AgentList />);
+    await vi.waitFor(() => expect(lanesList).toHaveBeenCalledWith("local"));
+    expect(card(/^Vault rollout/).closest("li")?.className).toContain("has-lanes");
+    expect(screen.getByRole("button", { name: "3 lanes" })).toBeTruthy();
+    expect(screen.queryByText("orphan")).toBeNull();
   });
 });

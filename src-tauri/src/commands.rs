@@ -15,6 +15,7 @@ use crate::{
     },
     git::{self, GitStatus},
     herdr::rpc,
+    lanes::{self, LaneRecord},
     layout::LayoutStore,
     machines::{self, MachineManager},
     sshconfig,
@@ -818,6 +819,16 @@ pub async fn files_read(
     let root = files_root(&mgr, &machine_id, &root)?;
     let t = mgr.transport(&machine_id)?;
     read::read_file(&*t, &root, &rel).await
+}
+
+/// Who owns each lane, from `ctc lane list --json` on the Machine; `None` when its ctc reports no owner.
+#[tauri::command]
+pub async fn lanes_list(
+    mgr: Mgr<'_>,
+    machine_id: String,
+) -> Result<Option<Vec<LaneRecord>>, AppError> {
+    let t = mgr.transport(&machine_id)?;
+    lanes::list(&*t).await
 }
 
 /// The git changes under a Workspace root, for the Files overlay's CHANGED group.
