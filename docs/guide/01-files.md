@@ -5,7 +5,7 @@ whichever Machine it lives.
 
 | To | Do |
 |---|---|
-| Open the panel on a Workspace | **Browse files** on its Workspace header, or ⌘E to focus the panel |
+| Open the panel on a Workspace | **Browse files** on its Workspace header, or ⌘E (**Toggle Files panel**: shows it with the tree focused, or hides it; change the key in Settings → Shortcuts) |
 | Find a file by name | ⌘P (**Go to file**) |
 | See what changed | The **CHANGED** group above the tree lists git's changes under the root |
 | Read a file | Click it: it opens as an item in the **Open strip**, next to the open agents. The **File viewer** has Copy path, Copy contents, an Outline for Markdown, and find |

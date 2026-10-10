@@ -821,6 +821,21 @@ kbd {
 .hidden-folder-add input:focus { border-color: var(--accent); box-shadow: var(--ring); }
 .hidden-folder-add input::placeholder { color: var(--fg-3); }
 .settings-body .hidden-folder-error { color: var(--err-fg); }
+.shortcut-group { display: flex; flex-direction: column; gap: 6px; }
+.shortcut-group-title { margin: 4px 0 0; font-size: 11px; font-weight: 600; letter-spacing: 0.04em; text-transform: uppercase; color: var(--fg-3); }
+.shortcut-item { display: flex; flex-direction: column; gap: 4px; }
+.shortcut-controls { display: flex; align-items: center; gap: 4px; }
+.shortcut-key {
+  min-width: 96px; height: 26px; padding: 0 10px; box-sizing: border-box;
+  border: 1px solid var(--line-2); border-radius: var(--r-sm); background: var(--surface-0); color: var(--fg);
+  font-family: var(--mono); font-size: 12px; cursor: pointer;
+  transition: border-color var(--t-fast), box-shadow var(--t-fast);
+}
+.shortcut-key:hover { border-color: var(--fg-3); }
+.shortcut-key:focus-visible { outline: none; box-shadow: var(--ring); }
+.shortcut-key.none { color: var(--fg-3); }
+.shortcut-key.recording { border-color: var(--accent); box-shadow: var(--ring); color: var(--fg-2); }
+.settings-body .shortcut-issue { color: var(--err-fg); text-align: right; }
 .setting-row { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
 .setting-row > span { white-space: nowrap; }
 .font-picker { position: relative; width: 220px; min-width: 0; }

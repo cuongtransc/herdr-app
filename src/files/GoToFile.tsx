@@ -1,5 +1,6 @@
 import { useMemo, useState, type KeyboardEvent, type RefObject } from "react";
 import type { FileList } from "../lib/types";
+import { useShortcutLabel } from "../shortcuts/store";
 import { rankFiles } from "./fuzzy";
 import { GOTO_RESULTS } from "./limits";
 
@@ -11,6 +12,7 @@ interface Props {
 }
 
 export function GoToFile({ list, recent, onOpen, inputRef }: Props) {
+  const gotoKey = useShortcutLabel("files.goto");
   const [query, setQuery] = useState("");
   const [sel, setSel] = useState(0);
   const [focused, setFocused] = useState(false);
@@ -57,7 +59,7 @@ export function GoToFile({ list, recent, onOpen, inputRef }: Props) {
         aria-controls="files-goto-list"
         aria-autocomplete="list"
         aria-activedescendant={visible ? `files-goto-${active}` : undefined}
-        placeholder={refused ? "Too many files at this root" : "Go to file…  ⌘P"}
+        placeholder={refused ? "Too many files at this root" : gotoKey ? `Go to file…  ${gotoKey}` : "Go to file…"}
         disabled={refused}
         value={query}
         onChange={(e) => {

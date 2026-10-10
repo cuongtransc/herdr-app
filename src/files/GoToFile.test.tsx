@@ -1,9 +1,14 @@
-import { fireEvent, render, screen } from "@testing-library/react";
+import { act, fireEvent, render, screen } from "@testing-library/react";
 import { createRef } from "react";
-import { describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
+import { loadBindings, useShortcuts } from "../shortcuts/store";
 import { GoToFile } from "./GoToFile";
 
 describe("GoToFile", () => {
+  beforeEach(() => {
+    localStorage.clear();
+    useShortcuts.setState({ bindings: loadBindings(), recording: false });
+  });
   it("opens the best match pinned on Enter", () => {
     const onOpen = vi.fn();
     render(<GoToFile list={{ paths: ["docs/tree.md", "src/a.ts"], capped: false, refused: false }} recent={[]} onOpen={onOpen} inputRef={createRef()} />);
@@ -62,5 +67,12 @@ describe("GoToFile", () => {
     fireEvent.focus(input);
     fireEvent.mouseDown(screen.getAllByRole("option")[0]);
     expect(onOpen).toHaveBeenCalledWith("a.ts", true);
+  });
+
+  it("shows the Go to file key in its placeholder, and none when unbound", () => {
+    render(<GoToFile list={{ paths: ["a"], capped: false, refused: false }} recent={[]} onOpen={() => {}} inputRef={createRef()} />);
+    expect(screen.getByRole("combobox").getAttribute("placeholder")).toBe("Go to file…  ⌘P");
+    act(() => useShortcuts.getState().set("files.goto", null));
+    expect(screen.getByRole("combobox").getAttribute("placeholder")).toBe("Go to file…");
   });
 });

@@ -18,8 +18,14 @@ import { useLensSettings } from "./settings/lens";
 import { useLayout } from "./settings/layout";
 import { DEFAULTS as FONT_DEFAULTS, useSettings } from "./settings/store";
 import { initialSlots, useQuota } from "./quota/store";
+import { loadBindings, useShortcuts } from "./shortcuts/store";
 
 describe("App shell", () => {
+  beforeEach(() => {
+    localStorage.clear();
+    useShortcuts.setState({ bindings: loadBindings(), recording: false });
+  });
+
   it("opens Settings from the app menu's Settings… ⌘,", async () => {
     const { listen } = await import("@tauri-apps/api/event");
     render(<App />);
@@ -384,20 +390,32 @@ describe("App shell", () => {
       expect(await screen.findByText("Select a pane")).toBeTruthy();
     });
 
-    it("⌘E leaves Focus, whose hidden agents column holds the Files panel", () => {
+    it("⌘E leaves Focus and opens the Files panel with the tree focused", () => {
       useLayout.setState({ layout: "focus" });
+      useFilesPanel.setState({ collapsed: false });
       render(<App />);
-      fireEvent.keyDown(window, { key: "e", metaKey: true });
+      fireEvent.keyDown(window, { key: "e", code: "KeyE", metaKey: true });
       expect(useLayout.getState().layout).toBe("normal");
+      expect(useFilesPanel.getState().collapsed).toBe(false);
       expect(useFilesPanel.getState().focusTick).toBe(1);
     });
 
-    it("⌘E expands the Files panel and focuses it", () => {
+    it("⌘E opens a collapsed Files panel and collapses a shown one", () => {
       useFilesPanel.setState({ collapsed: true });
       render(<App />);
-      fireEvent.keyDown(window, { key: "e", metaKey: true });
+      fireEvent.keyDown(window, { key: "e", code: "KeyE", metaKey: true });
       expect(useFilesPanel.getState().collapsed).toBe(false);
       expect(useFilesPanel.getState().focusTick).toBe(1);
+      fireEvent.keyDown(window, { key: "e", code: "KeyE", metaKey: true });
+      expect(useFilesPanel.getState().collapsed).toBe(true);
+      expect(useFilesPanel.getState().focusTick).toBe(1);
+    });
+
+    it("⌘E works whatever character an input method puts on the key", () => {
+      useFilesPanel.setState({ collapsed: true });
+      render(<App />);
+      fireEvent.keyDown(window, { key: "ê", code: "KeyE", metaKey: true });
+      expect(useFilesPanel.getState().collapsed).toBe(false);
     });
 
     it("⌘P focuses Go to file, but not while the palette is open", () => {
@@ -423,4 +441,51 @@ describe("App shell", () => {
     });
   });
 
+  describe("rebound shortcuts", () => {
+    const key = (k: string, code: string, m: Record<string, boolean> = {}) => fireEvent.keyDown(window, { key: k, code, metaKey: true, ...m });
+
+    it("runs the action on its new key, and the old key does nothing", () => {
+      useLayout.setState({ layout: "normal" });
+      act(() => useShortcuts.getState().set("layout.sidebar", { code: "KeyL", shift: false, alt: false, ctrl: false }));
+      render(<App />);
+      key("b", "KeyB");
+      expect(useLayout.getState().layout).toBe("normal");
+      key("l", "KeyL");
+      expect(useLayout.getState().layout).toBe("sidebar-hidden");
+    });
+
+    it("a None action has no key", () => {
+      act(() => useShortcuts.getState().set("board", null));
+      render(<App />);
+      key("D", "KeyD", { shiftKey: true });
+      expect(useApp.getState().dashboardOpen).toBe(false);
+    });
+
+    it("runs nothing while Settings records a key", () => {
+      useLayout.setState({ layout: "normal" });
+      act(() => useShortcuts.getState().setRecording(true));
+      render(<App />);
+      key("b", "KeyB");
+      expect(useLayout.getState().layout).toBe("normal");
+    });
+
+    it("a held ⌘K opens the palette once", () => {
+      render(<App />);
+      key("k", "KeyK");
+      key("k", "KeyK", { repeat: true });
+      expect(screen.getByRole("dialog")).toBeTruthy();
+    });
+
+    it("leaves ⌘P to an open dialog but still toggles the sidebar over one", () => {
+      useLayout.setState({ layout: "normal" });
+      render(<App />);
+      key("k", "KeyK");
+      expect(document.querySelector(".overlay")).toBeTruthy();
+      const before = useFilesPanel.getState().gotoTick;
+      key("p", "KeyP");
+      expect(useFilesPanel.getState().gotoTick).toBe(before);
+      key("b", "KeyB");
+      expect(useLayout.getState().layout).toBe("sidebar-hidden");
+    });
+  });
 });

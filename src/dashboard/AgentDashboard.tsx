@@ -1,6 +1,8 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { AgentIcon } from "../agents/AgentIcon";
 import { StatusDot } from "../sidebar/StatusDot";
+import { actionFor } from "../shortcuts/dispatch";
+import { useShortcutLabel, useShortcuts } from "../shortcuts/store";
 import { useApp } from "../store/app";
 import { CloseIcon, FilterIcon, FolderIcon, LaptopIcon, SearchIcon, ServerIcon } from "../ui/icons";
 import { QuotaColumn } from "./QuotaColumn";
@@ -93,6 +95,7 @@ export function AgentDashboard() {
   const [filters, setFilters] = useState<Filters>({ machine: [], agent: [] });
   const [filterOpen, setFilterOpen] = useState(false);
   const search = useRef<HTMLInputElement>(null);
+  const jumpKey = useShortcutLabel("jump");
   const filterOpenRef = useRef(filterOpen);
   filterOpenRef.current = filterOpen;
 
@@ -100,7 +103,7 @@ export function AgentDashboard() {
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
-      if (e.metaKey && e.key.toLowerCase() === "k") {
+      if (actionFor(e, useShortcuts.getState().bindings) === "jump") {
         e.preventDefault();
         search.current?.focus();
         search.current?.select();
@@ -152,10 +155,11 @@ export function AgentDashboard() {
               <CloseIcon />
             </button>
           ) : (
-            <span className="dash-search-keys" aria-hidden="true">
-              <kbd>⌘</kbd>
-              <kbd>K</kbd>
-            </span>
+            jumpKey && (
+              <span className="dash-search-keys" aria-hidden="true">
+                <kbd>{jumpKey}</kbd>
+              </span>
+            )
           )}
         </label>
         <div className="dash-filter">
