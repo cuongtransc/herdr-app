@@ -6,7 +6,7 @@ vi.mock("../ui/Toast", () => ({ showToast: vi.fn() }));
 
 import { invoke } from "@tauri-apps/api/core";
 import { showToast } from "../ui/Toast";
-import { filesImage, filesListAll, filesListDir, filesRead, herdrCall } from "./ipc";
+import { completeFiles, filesImage, filesListAll, filesListDir, filesRead, filesWatch, herdrCall } from "./ipc";
 
 describe("herdrCall", () => {
   it("toasts on timeout and rethrows", async () => {
@@ -30,12 +30,18 @@ describe("files ipc", () => {
   });
   it("passes camelCase args to the other files commands", async () => {
     (invoke as any).mockResolvedValue(null);
-    await filesListDir("devtuf", "~/app", "src");
-    expect(invoke).toHaveBeenLastCalledWith("files_list_dir", { machineId: "devtuf", root: "~/app", rel: "src", showHeavy: false });
-    await filesListDir("devtuf", "~/app", "src", true);
-    expect(invoke).toHaveBeenLastCalledWith("files_list_dir", { machineId: "devtuf", root: "~/app", rel: "src", showHeavy: true });
-    await filesListAll("devtuf", "~/app");
-    expect(invoke).toHaveBeenLastCalledWith("files_list_all", { machineId: "devtuf", root: "~/app" });
+    const hidden = ["out"];
+    await filesListDir("devtuf", "~/app", "src", hidden);
+    expect(invoke).toHaveBeenLastCalledWith("files_list_dir", { machineId: "devtuf", root: "~/app", rel: "src", showHeavy: false, hidden });
+    await filesListDir("devtuf", "~/app", "src", hidden, true);
+    expect(invoke).toHaveBeenLastCalledWith("files_list_dir", { machineId: "devtuf", root: "~/app", rel: "src", showHeavy: true, hidden });
+    await filesListAll("devtuf", "~/app", hidden);
+    expect(invoke).toHaveBeenLastCalledWith("files_list_all", { machineId: "devtuf", root: "~/app", hidden });
+    const events = {} as never;
+    await filesWatch("devtuf", "~/app", hidden, events);
+    expect(invoke).toHaveBeenLastCalledWith("files_watch", { machineId: "devtuf", root: "~/app", hidden, events });
+    await completeFiles({ machine_id: "devtuf", session: "default", pane_id: "p1" }, hidden);
+    expect(invoke).toHaveBeenLastCalledWith("complete_files", { machineId: "devtuf", session: "default", paneId: "p1", hidden });
     await filesImage("local", "/x", "a.png");
     expect(invoke).toHaveBeenLastCalledWith("files_image", { machineId: "local", root: "/x", rel: "a.png" });
   });

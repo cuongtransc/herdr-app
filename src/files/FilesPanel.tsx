@@ -3,6 +3,7 @@ import { useShallow } from "zustand/react/shallow";
 import { filesListAll } from "../lib/ipc";
 import type { FileList } from "../lib/types";
 import { activeItem, useApp } from "../store/app";
+import { useHiddenFolders } from "../settings/hiddenFolders";
 import { ActionsProvider, useActions } from "../sidebar/actions";
 import { ChevronIcon, EyeIcon, EyeOffIcon, RefreshIcon } from "../ui/icons";
 import { setFolder, suggestFolder, useFolder } from "../workspaces/folder";
@@ -179,9 +180,9 @@ function WorkspacePanel({ wsRef: ref, section }: { wsRef: WorkspaceRef; section:
           <button
             type="button"
             className="section-action"
-            aria-label="Show heavy folders"
+            aria-label="Show hidden folders"
             aria-pressed={showHeavy}
-            title={showHeavy ? "Hide .git, node_modules and other heavy folders" : "Show .git, node_modules and other heavy folders"}
+            title={showHeavy ? "Hide the hidden folders again" : "Show hidden folders (.git, node_modules…; edit the list in Settings → Files)"}
             onClick={() => setShowHeavy((on) => !on)}
           >
             {showHeavy ? <EyeIcon /> : <EyeOffIcon />}
@@ -242,6 +243,7 @@ function PanelBody({ wsRef, root, online, showHeavy, hidden, gotoRef, onMissing 
   const machineId = wsRef.machine_id;
   const key = filesKey(wsRef, root);
   const recent = useFiles((s) => s.ws(key).recent);
+  const hiddenFolders = useHiddenFolders((s) => s.folders);
   const [list, setList] = useState<FileList | null>(null);
   const batch = useFilesBus((s) => s.batches[key] ?? null);
   const reloadKey = useFilesBus((s) => s.reloads[key] ?? 0);
@@ -256,7 +258,7 @@ function PanelBody({ wsRef, root, online, showHeavy, hidden, gotoRef, onMissing 
 
   useEffect(() => {
     let gone = false;
-    filesListAll(machineId, root).then(
+    filesListAll(machineId, root, hiddenFolders).then(
       (l) => !gone && setList(l),
       (e) => {
         if (gone) return;
@@ -267,7 +269,7 @@ function PanelBody({ wsRef, root, online, showHeavy, hidden, gotoRef, onMissing 
     return () => {
       gone = true;
     };
-  }, [machineId, root, reloadKey]);
+  }, [machineId, root, hiddenFolders, reloadKey]);
 
   // The mount just listed everything, so the first Resync of a watch that started with it is
   // skipped; a watch started later (back online) or restarted after an error reloads.
@@ -279,6 +281,7 @@ function PanelBody({ wsRef, root, online, showHeavy, hidden, gotoRef, onMissing 
     enabled: online,
     machineId,
     root,
+    hidden: hiddenFolders,
     onResync: () => {
       setWatchError(null);
       if (skipResync.current) skipResync.current = false;

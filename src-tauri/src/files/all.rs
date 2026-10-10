@@ -2,7 +2,7 @@ use serde::Serialize;
 
 use super::paths::{io_error, script_argv};
 use super::MAX_LIST_FILES;
-use crate::complete::files::{find_prune, is_home, SKIP_DIRS};
+use crate::complete::files::{is_home, HiddenFolders};
 use crate::error::{AppError, AppResult};
 use crate::transport::{exec_bytes, Transport};
 
@@ -22,8 +22,8 @@ pub struct FileList {
 /// deleted from disk; elsewhere `find` walks the folder, keeping symlinks to files as git
 /// does. `rev-parse` succeeds inside `.git` or a bare repository too, so its answer must be
 /// `true`. Exit 3 when the root cannot be entered.
-fn script() -> String {
-    let prune = find_prune();
+fn script(hidden: &HiddenFolders) -> String {
+    let prune = hidden.find_prune();
     format!(
         r#"cd "$1" || exit 3
 if [ "$(git rev-parse --is-inside-work-tree 2>/dev/null)" = true ]; then
@@ -39,7 +39,12 @@ fi | head -c {MAX_OUTPUT_BYTES}"#
 
 /// Every file below `root`, `/`-separated and sorted. The home folder and `/` are
 /// refused (`refused: true`) without running anything.
-pub async fn list_all(t: &dyn Transport, home: &str, root: &str) -> AppResult<FileList> {
+pub async fn list_all(
+    t: &dyn Transport,
+    home: &str,
+    root: &str,
+    hidden: &HiddenFolders,
+) -> AppResult<FileList> {
     if is_home(home, root) || root.trim_end_matches('/').is_empty() {
         return Ok(FileList {
             paths: Vec::new(),
@@ -47,7 +52,7 @@ pub async fn list_all(t: &dyn Transport, home: &str, root: &str) -> AppResult<Fi
             refused: true,
         });
     }
-    let out = exec_bytes(t, &script_argv(&script(), &[root])).await?;
+    let out = exec_bytes(t, &script_argv(&script(hidden), &[root])).await?;
     match out.status {
         0 => {}
         3 => {
@@ -58,12 +63,22 @@ pub async fn list_all(t: &dyn Transport, home: &str, root: &str) -> AppResult<Fi
         }
         s => return Err(io_error(s, &out.stderr)),
     }
-    Ok(parse_list(&out.stdout, MAX_LIST_FILES, MAX_OUTPUT_BYTES))
+    Ok(parse_list(
+        &out.stdout,
+        MAX_LIST_FILES,
+        MAX_OUTPUT_BYTES,
+        hidden,
+    ))
 }
 
 /// Reads the script's output: `capped` when more than `max_files` paths were listed or the
 /// output reached `max_bytes` (and so was cut).
-fn parse_list(stdout: &[u8], max_files: usize, max_bytes: usize) -> FileList {
+fn parse_list(
+    stdout: &[u8],
+    max_files: usize,
+    max_bytes: usize,
+    hidden: &HiddenFolders,
+) -> FileList {
     let mut records: Vec<&[u8]> = stdout.split(|b| *b == 0).collect();
     // The last piece is empty after a final NUL; otherwise the output was cut mid-record.
     records.pop();
@@ -79,7 +94,7 @@ fn parse_list(stdout: &[u8], max_files: usize, max_bytes: usize) -> FileList {
         .map(|p| p.strip_prefix("./").map(str::to_string).unwrap_or(p))
         // Only folders are skipped: a file named `build` is listed.
         .filter(|p| match p.rsplit_once('/') {
-            Some((dirs, _)) => !dirs.split('/').any(|seg| SKIP_DIRS.contains(&seg)),
+            Some((dirs, _)) => !dirs.split('/').any(|seg| hidden.contains(seg)),
             None => true,
         })
         .collect();
@@ -134,9 +149,14 @@ mod tests {
             .current_dir(&r)
             .status()
             .unwrap();
-        let got = list_all(&LocalTransport, "/nonexistent-home", &r.to_string_lossy())
-            .await
-            .unwrap();
+        let got = list_all(
+            &LocalTransport,
+            "/nonexistent-home",
+            &r.to_string_lossy(),
+            &HiddenFolders::default(),
+        )
+        .await
+        .unwrap();
         assert_eq!(
             got,
             FileList {
@@ -150,6 +170,7 @@ mod tests {
             &LocalTransport,
             "/nonexistent-home",
             &r.join("src").to_string_lossy(),
+            &HiddenFolders::default(),
         )
         .await
         .unwrap();
@@ -164,9 +185,14 @@ mod tests {
         std::os::unix::fs::symlink("a.md", r.join("link.md")).unwrap();
         std::os::unix::fs::symlink("deep", r.join("dirlink")).unwrap();
         std::os::unix::fs::symlink("gone", r.join("dangling")).unwrap();
-        let got = list_all(&LocalTransport, "/nonexistent-home", &r.to_string_lossy())
-            .await
-            .unwrap();
+        let got = list_all(
+            &LocalTransport,
+            "/nonexistent-home",
+            &r.to_string_lossy(),
+            &HiddenFolders::default(),
+        )
+        .await
+        .unwrap();
         assert_eq!(
             got.paths,
             vec!["a.md", "deep/b.md", "deep/build", "link.md"]
@@ -176,7 +202,9 @@ mod tests {
     #[tokio::test]
     async fn home_and_slash_are_refused() {
         for (home, root) in [("/home/u", "/home/u/"), ("/home/u", "/")] {
-            let got = list_all(&LocalTransport, home, root).await.unwrap();
+            let got = list_all(&LocalTransport, home, root, &HiddenFolders::default())
+                .await
+                .unwrap();
             assert!(got.refused && got.paths.is_empty(), "{root}");
         }
     }
@@ -189,6 +217,7 @@ mod tests {
             &LocalTransport,
             "/nonexistent-home",
             &gone.to_string_lossy(),
+            &HiddenFolders::default(),
         )
         .await
         .unwrap_err();
@@ -223,9 +252,14 @@ mod tests {
         git(&r, &["add", "-f", "."]);
         git(&r, &["commit", "-qm", "init"]);
         std::fs::remove_file(r.join("gone.md")).unwrap();
-        let got = list_all(&LocalTransport, "/nonexistent-home", &r.to_string_lossy())
-            .await
-            .unwrap();
+        let got = list_all(
+            &LocalTransport,
+            "/nonexistent-home",
+            &r.to_string_lossy(),
+            &HiddenFolders::default(),
+        )
+        .await
+        .unwrap();
         assert_eq!(got.paths, vec!["keep.md", "scripts/build"]);
     }
 
@@ -239,6 +273,7 @@ mod tests {
             &LocalTransport,
             "/nonexistent-home",
             &r.join(".git").to_string_lossy(),
+            &HiddenFolders::default(),
         )
         .await
         .unwrap();
@@ -248,7 +283,7 @@ mod tests {
     #[test]
     fn parse_caps_the_count_and_notices_a_byte_cut() {
         let out = b"\0c\0a\0b\0a\0";
-        let got = parse_list(out, 2, 1 << 20);
+        let got = parse_list(out, 2, 1 << 20, &HiddenFolders::default());
         assert_eq!(
             got,
             FileList {
@@ -257,11 +292,11 @@ mod tests {
                 refused: false
             }
         );
-        let got = parse_list(out, 3, 1 << 20);
+        let got = parse_list(out, 3, 1 << 20, &HiddenFolders::default());
         assert!(!got.capped);
         // Output that filled the byte limit was cut: the partial last record is dropped.
         let cut = b"\0./a\0./b\0./lon";
-        let got = parse_list(cut, 10, cut.len());
+        let got = parse_list(cut, 10, cut.len(), &HiddenFolders::default());
         assert_eq!(
             (got.paths, got.capped),
             (vec!["a".into(), "b".into()], true)
@@ -274,15 +309,44 @@ mod tests {
             b"x\0\0x\0y\0node_modules/m.js\0a/target/t\0target\0",
             10,
             1 << 20,
+            &HiddenFolders::default(),
         );
         assert_eq!(got.paths, vec!["target", "y"]);
     }
 
     #[tokio::test]
     async fn a_failure_without_stderr_reports_the_exit_status() {
-        let e = list_all(&crate::files::Canned("exit 7"), "/h", "/r")
-            .await
-            .unwrap_err();
+        let e = list_all(
+            &crate::files::Canned("exit 7"),
+            "/h",
+            "/r",
+            &HiddenFolders::default(),
+        )
+        .await
+        .unwrap_err();
         assert_eq!((e.code.as_str(), e.message.as_str()), ("io", "exit 7"));
+    }
+    #[tokio::test]
+    async fn a_custom_list_hides_its_folders_in_a_plain_folder_and_a_repo() {
+        let tmp = tempfile::tempdir().unwrap();
+        let r = tmp.path();
+        mk(r, &["out/a.js", "node_modules/m.js", "keep.md"]);
+        let hidden = HiddenFolders::new(["out"]);
+        let got = list_all(
+            &LocalTransport,
+            "/nonexistent-home",
+            &r.to_string_lossy(),
+            &hidden,
+        )
+        .await
+        .unwrap();
+        assert_eq!(got.paths, vec!["keep.md", "node_modules/m.js"]);
+        let got = parse_list(
+            b"\0out/a.js\0node_modules/m.js\0out\0",
+            10,
+            1 << 20,
+            &hidden,
+        );
+        assert_eq!(got.paths, vec!["node_modules/m.js", "out"]);
     }
 }

@@ -3,6 +3,7 @@ import { createPortal } from "react-dom";
 import { open as openDialog } from "@tauri-apps/plugin-dialog";
 import { filesListDir } from "../lib/ipc";
 import type { FileChange, FileEntry } from "../lib/types";
+import { useHiddenFolders } from "../settings/hiddenFolders";
 import { ContextMenu, type MenuItem } from "../sidebar/ContextMenu";
 import { ArrowDownIcon, ArrowUpIcon, ChevronIcon, FileIcon, FolderIcon, FolderInputIcon, FolderOpenIcon } from "../ui/icons";
 import { startDownload, startUpload } from "./transfer";
@@ -38,6 +39,7 @@ const kindClass = (kind: FileEntry["kind"]) => (kind === "dirlink" ? "files-tree
 export function FileTree({ machineId, root, filesKey, onOpen, reloadKey, showHeavy = false, changes = null }: Props) {
   const expanded = useFiles((s) => s.byWs[filesKey]?.expanded ?? NO_DIRS);
   const toggleDir = useFiles((s) => s.toggleDir);
+  const hidden = useHiddenFolders((s) => s.folders);
   const [entries, setEntries] = useState<Record<string, FileEntry[]>>({});
   const [errors, setErrors] = useState<Record<string, string>>({});
   /** The item Tab lands on: the last focused one, else the first. */
@@ -71,7 +73,7 @@ export function FileTree({ machineId, root, filesKey, onOpen, reloadKey, showHea
       const token = ++lastToken.current;
       tokens.current.set(rel, token);
       inflight.current.add(rel);
-      filesListDir(machineId, root, rel, showHeavy).then(
+      filesListDir(machineId, root, rel, hidden, showHeavy).then(
         (list) => {
           if (g !== gen.current || tokens.current.get(rel) !== token) return;
           inflight.current.delete(rel);
@@ -85,7 +87,7 @@ export function FileTree({ machineId, root, filesKey, onOpen, reloadKey, showHea
         },
       );
     },
-    [machineId, root, showHeavy],
+    [machineId, root, hidden, showHeavy],
   );
 
   // Initial mount, a new root, or a reload: refetch the root and open folders. Children of

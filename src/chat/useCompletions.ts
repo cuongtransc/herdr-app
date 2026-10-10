@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { completeCommands, completeEntries, completeFiles } from "../lib/ipc";
 import { paneKey } from "../lib/types";
+import { useHiddenFolders } from "../settings/hiddenFolders";
 import type { PaneRef, SlashCommand } from "../lib/types";
 
 type Kind = "slash" | "file";
@@ -38,7 +39,7 @@ export function useCompletions(
     if (!key || !kind || !outdated) return;
     let live = true;
     const request =
-      kind === "slash" ? completeCommands(pane) : dir !== undefined ? completeEntries(pane, dir) : completeFiles(pane);
+      kind === "slash" ? completeCommands(pane) : dir !== undefined ? completeEntries(pane, dir) : completeFiles(pane, useHiddenFolders.getState().folders);
     request.then(
       (data) => {
         cache.set(key, { at: Date.now(), data });

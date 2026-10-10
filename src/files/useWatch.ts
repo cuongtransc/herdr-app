@@ -7,6 +7,8 @@ interface Options {
   enabled: boolean;
   machineId: string;
   root: string;
+  /** Folder names the watch leaves out; a different list restarts it. */
+  hidden: string[];
   onChanges(changes: FileChange[]): void;
   onResync(): void;
   onError(message: string): void;
@@ -20,6 +22,8 @@ export function useWatch(opts: Options) {
   const latest = useRef(opts);
   latest.current = opts;
   const { enabled, machineId, root } = opts;
+  // By value: an equal list in a new array must not restart the watch.
+  const hiddenKey = JSON.stringify(opts.hidden);
 
   useEffect(() => {
     if (!enabled) return;
@@ -34,7 +38,7 @@ export function useWatch(opts: Options) {
     };
     // Start in effect order: the backend holds one watch, so a stale start must never land after a newer one.
     pending = pending
-      .then(() => (stopped ? null : filesWatch(machineId, root, events)))
+      .then(() => (stopped ? null : filesWatch(machineId, root, JSON.parse(hiddenKey) as string[], events)))
       .then(
         (watchId) => {
           if (watchId === null) return;
@@ -50,5 +54,5 @@ export function useWatch(opts: Options) {
       stopped = true;
       if (id !== null) void filesUnwatch(id).catch(() => {});
     };
-  }, [enabled, machineId, root]);
+  }, [enabled, machineId, root, hiddenKey]);
 }

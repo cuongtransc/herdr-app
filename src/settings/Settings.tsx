@@ -3,6 +3,7 @@ import { create } from "zustand";
 import { notificationsEnabled, setNotificationsEnabled } from "../notify";
 import { CloseIcon, GearIcon, GripIcon, SearchIcon } from "../ui/icons";
 import { FontPicker } from "./FontPicker";
+import { DEFAULT_HIDDEN_FOLDERS, folderNameError, useHiddenFolders } from "./hiddenFolders";
 import { CHAT_WIDTHS, NEW_AGENT_LENSES, useLensSettings } from "./lens";
 import { useNewTab } from "./newTab";
 import { AGENTS } from "../agents/openAgentTab";
@@ -321,12 +322,74 @@ function ChatSettings() {
   );
 }
 
+function FilesSettings() {
+  const h = useHiddenFolders();
+  const [draft, setDraft] = useState("");
+  const [error, setError] = useState<string | null>(null);
+  const isDefault = h.folders.length === DEFAULT_HIDDEN_FOLDERS.length && h.folders.every((f, i) => f === DEFAULT_HIDDEN_FOLDERS[i]);
+  const add = () => {
+    const why = folderNameError(draft, h.folders);
+    setError(why);
+    if (why === null && h.add(draft)) setDraft("");
+  };
+  return (
+    <>
+      <div className="setting-row">
+        <span id="hidden-folders-label">Hidden folders</span>
+      </div>
+      <p className="note">
+        Left out of the Files tree, Go to file, <code>@</code> completion and auto-refresh, on every Machine. The eye button in the Files panel shows them in the tree for a while.
+      </p>
+      <ul className="hidden-folder-list" aria-label="Hidden folders">
+        {h.folders.map((f) => (
+          <li key={f} className="hidden-folder">
+            <span>{f}</span>
+            <button className="icon-btn" aria-label={`Remove ${f}`} onClick={() => h.remove(f)}>
+              <CloseIcon />
+            </button>
+          </li>
+        ))}
+      </ul>
+      <div className="hidden-folder-add">
+        <input
+          spellCheck={false}
+          autoCorrect="off"
+          autoCapitalize="off"
+          aria-label="Folder name"
+          placeholder="Folder name, e.g. coverage"
+          value={draft}
+          onChange={(e) => {
+            setDraft(e.target.value);
+            setError(null);
+          }}
+          onKeyDown={(e) => e.key === "Enter" && add()}
+        />
+        <button className="btn btn-xs" aria-label="Add folder" onClick={add}>
+          Add
+        </button>
+      </div>
+      {error && (
+        <p className="note hidden-folder-error" role="alert">
+          {error}
+        </p>
+      )}
+      <p className="note">A name matches a folder of exactly that name at any depth; files with the name stay listed.</p>
+      <div className="settings-foot">
+        <button className="btn btn-xs" aria-label="Reset hidden folders" disabled={isDefault} onClick={h.reset}>
+          Reset to defaults
+        </button>
+      </div>
+    </>
+  );
+}
+
 /** Add a section here for each new group of settings. */
 const SECTIONS = [
   { id: "general", label: "General", Body: GeneralSettings },
   { id: "appearance", label: "Appearance", Body: AppearanceSettings },
   { id: "fonts", label: "Fonts", Body: FontSettings },
   { id: "chat", label: "Chat", Body: ChatSettings },
+  { id: "files", label: "Files", Body: FilesSettings },
 ] as const;
 
 type SectionId = (typeof SECTIONS)[number]["id"];

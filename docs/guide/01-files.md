@@ -11,7 +11,8 @@ whichever Machine it lives.
 | Read a file | Click it: it opens as an item in the **Open strip**, next to the open agents. The **File viewer** has Copy path, Copy contents, an Outline for Markdown, and find |
 | Copy a file to the Mac | Right-click → **Download**. It lands in `~/Downloads`; a name already there gets `name (1).ext` |
 | Copy files to the Workspace | Right-click a folder → **Upload Files…** or **Upload Folder…** (the macOS open panel; drag and drop is off) |
-| Show folders hidden for size | **Show heavy folders** on the panel header |
+| Show the hidden folders | **Show hidden folders** (the eye) on the panel header |
+| Change which folders are hidden | Settings → **Files**: add or remove a folder name, or **Reset to defaults** (`.git`, `node_modules`, `target`, …) |
 
 Herdr never edits, renames, deletes or overwrites a file in a Workspace: agents work in the same folders. An upload
 whose name is taken gets the next free name instead. Why: [ADR 0005](../adr/0005-files-write-only-by-upload-never-overwrite.md).
