@@ -520,7 +520,10 @@ kbd {
   display: flex; align-items: center; gap: 8px; height: var(--titlebar); padding: 0 16px; box-sizing: border-box;
   border-bottom: 1px solid var(--line);
 }
-.agents-list { flex: 1; min-height: 0; overflow-y: auto; display: flex; flex-direction: column; }
+/* Always the scrollbar's room (its track is transparent): opening the Files panel shortens the
+   list, and a scrollbar appearing then would narrow every row. `overflow-y: scroll`, not
+   `scrollbar-gutter`, which WKWebView may not support. */
+.agents-list { flex: 1; min-height: 0; overflow-y: scroll; display: flex; flex-direction: column; }
 .agents-title { font-weight: 600; font-size: 13px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; pointer-events: none; }
 .count {
   flex: none; min-width: 18px; height: 18px; padding: 0 5px; box-sizing: border-box; display: grid; place-items: center;
