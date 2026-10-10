@@ -32,6 +32,8 @@ export interface ForkOrigin {
   at: number;
   /** The worktree Claude made for it, if any. */
   worktree: string | null;
+  /** The original's transcript: the fork's Chat lens shows it until the fork writes its own. */
+  path?: string;
 }
 
 const KEY = "herdr-app:forks";
@@ -123,7 +125,7 @@ export async function forkSession(
   const key = paneKey(fork);
   const title = pane.title.trim();
   // Opens on Chat whatever new agents open on: its banner says what it is and leads back.
-  useForks.getState().add(key, { of: ref, from: title || "a Claude session", at: now.getTime(), worktree: tree });
+  useForks.getState().add(key, { of: ref, from: title || "a Claude session", at: now.getTime(), worktree: tree, path: where.path });
   useApp.getState().setLensOverride(key, "chat");
   useApp.getState().select(fork);
   const args = ["--resume", session.value, "--fork-session", "--name", title ? `Fork · ${title}` : "Fork", ...(tree ? ["--worktree", tree] : [])];

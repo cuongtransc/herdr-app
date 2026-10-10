@@ -157,8 +157,36 @@ export function ChatLens({ pane, view }: { pane: PaneRef; view: PaneView }) {
   }, [key]);
 
   // A new Claude has no transcript until its first prompt: chat with it on the expected path.
-  const pending = !!located?.pending && state.items.length === 0;
-  usePendingTranscript(pane, located, state.items.length === 0, view.status, () => open(null));
+  // A fork has no transcript until its first message (Claude writes it then, history included):
+  // meanwhile show the original's, up to the fork, from its file.
+  const [preview, setPreview] = useState<string | null>(null);
+  useEffect(() => setPreview(null), [key]);
+  useEffect(() => {
+    if (!forkOf || !located?.pending || preview || state.items.length > 0) return;
+    let gone = false;
+    const known = located;
+    const path = forkOf.path ? Promise.resolve(forkOf.path) : chatLocate(forkOf.of).then((l) => (l.pending ? null : l.path));
+    path.then(
+      (p) => {
+        if (gone || !p) return;
+        setPreview(p);
+        open(p, known);
+      },
+      () => {},
+    );
+    return () => {
+      gone = true;
+    };
+  }, [forkOf, located, preview, state.items.length, open]);
+  const items = useMemo(
+    () => (preview && forkOf ? state.items.filter((i) => !i.ts || Date.parse(i.ts) <= forkOf.at) : state.items),
+    [preview, forkOf, state.items],
+  );
+  const pending = !!located?.pending && state.items.length === 0 && !preview;
+  usePendingTranscript(pane, located, state.items.length === 0 || preview !== null, view.status, () => {
+    setPreview(null);
+    open(null);
+  });
 
   const choose = (path: string) => {
     rememberTranscript(key, path);
@@ -166,11 +194,11 @@ export function ChatLens({ pane, view }: { pane: PaneRef; view: PaneView }) {
   };
 
   // Tool results render inside their call; each turn's work folds into one row.
-  const { rows, results } = useMemo(() => buildRows(state.items, state.total - state.items.length), [state.items, state.total]);
-  const asked = useMemo(() => pendingQuestions(state.items), [state.items]);
+  const { rows, results } = useMemo(() => buildRows(items, state.total - state.items.length), [items, state.total, state.items.length]);
+  const asked = useMemo(() => pendingQuestions(items), [items]);
   const sessionPrompts = useMemo(
-    () => state.items.flatMap((i) => (i.kind === "user" && i.text.trim() ? [i.text] : [])),
-    [state.items],
+    () => items.flatMap((i) => (i.kind === "user" && i.text.trim() ? [i.text] : [])),
+    [items],
   );
   const toggle = useCallback((id: string, wasOpen: boolean) => {
     setChosenOpen((m) => new Map(m).set(id, !wasOpen));
@@ -289,6 +317,9 @@ export function ChatLens({ pane, view }: { pane: PaneRef; view: PaneView }) {
         </div>
       )}
       {pending && !err && <div className="chat-notice neutral">New conversation: send the first message to start it.</div>}
+      {preview && forkOf && !err && (
+        <div className="chat-notice neutral">History copied from {forkOf.from} up to the fork. Your first message starts the fork's own transcript.</div>
+      )}
       {!loaded && loadingShown && !pending && !err && <div className="chat-notice neutral">Loading transcript…</div>}
       <div className="chat-scroll" ref={scrollRef} onScroll={onScroll} onWheel={unpick} onPointerDown={unpick} onKeyDown={unpick}>
         <div ref={contentRef} style={{ height: virt.getTotalSize(), position: "relative" }}>
