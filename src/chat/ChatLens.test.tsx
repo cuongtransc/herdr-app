@@ -1,4 +1,4 @@
-import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { act, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 vi.mock("@tauri-apps/api/core", () => ({ invoke: vi.fn().mockResolvedValue([]), Channel: class {} }));
 vi.mock("../lib/ipc", () => ({
@@ -319,5 +319,42 @@ describe("ChatLens", () => {
     expect(head.getAttribute("aria-expanded")).toBe("false");
     fireEvent.click(head);
     expect(head.getAttribute("aria-expanded")).toBe("true");
+  });
+
+  describe("background tasks in folded work", () => {
+    const load = async (extra: unknown[] = []) => {
+      viewport.on = true;
+      opened = Promise.resolve({ agent: "claude", path: "/h/sid.jsonl", ambiguous: false, candidates: ["/h/sid.jsonl"], pending: false });
+      render(<ChatLens pane={pane} view={{ status: "idle", agent: "claude", title: "claude" } as PaneView} />);
+      await act(async () => {});
+      const items = [
+        { kind: "user", text: "run the ci" },
+        { kind: "tool_call", id: "bg1", name: "Bash", input_summary: "mise run ci", input: { command: "mise run ci" } },
+        { kind: "tool_result", call_id: "bg1", output: "started", is_error: false },
+        ...extra,
+        { kind: "assistant_text", markdown: "started it" },
+      ];
+      act(() => channels[channels.length - 1].onmessage({ type: "reset", items, total: items.length }));
+    };
+
+    it("opens the folded work block holding a task when its strip row is clicked", async () => {
+      await load();
+      act(() =>
+        channels[channels.length - 1].onmessage({
+          type: "meta", model: null, effort: null, context_tokens: null, queued: [],
+          background: [{ call_id: "bg1", kind: "bash", description: "Run CI", started: null }],
+        }),
+      );
+      const head = screen.getByRole("button", { name: /^Worked/ });
+      expect(head.getAttribute("aria-expanded")).toBe("false");
+      fireEvent.click(within(screen.getByRole("list", { name: "Background tasks" })).getByRole("button", { name: /Run CI/ }));
+      expect(screen.getByRole("button", { name: /^Worked/ }).getAttribute("aria-expanded")).toBe("true");
+    });
+
+    it("badges a finished task's call with how it ended", async () => {
+      await load([{ kind: "system", text: "Background command finished", task: { call_id: "bg1", status: "completed", exit_code: 0 } }]);
+      fireEvent.click(screen.getByRole("button", { name: /^Worked/ }));
+      expect(screen.getByText("exit 0")).toBeTruthy();
+    });
   });
 });
