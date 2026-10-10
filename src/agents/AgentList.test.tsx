@@ -697,7 +697,7 @@ describe("AgentList lanes by owner (ctc lane list)", () => {
     expect(screen.queryByRole("button", { name: /^a, pi/ })).toBeNull();
     const orphan = card(/^c, pi/).closest("li")!;
     expect(orphan.className).not.toContain("lane-row");
-    expect(within(orphan).getByText("orphan")).toBeTruthy();
+    expect(within(orphan).getByRole("img", { name: "Orphan lane" })).toBeTruthy();
     fireEvent.click(toggle);
     expect([...document.querySelectorAll(".agent-card")].map((b) => b.getAttribute("aria-label")?.split(",")[0])).toEqual([
       "Vault rollout", "Rate limits", "a", "b", "c", "fees",
@@ -708,17 +708,20 @@ describe("AgentList lanes by owner (ctc lane list)", () => {
     vi.mocked(lanesList).mockResolvedValue([owned("w1:pA", "default/w1:gone"), owned("w1:pB", "default/w1:p8"), owned("w1:pC", "default/w1:p8")]);
     render(<AgentList />);
     await screen.findByRole("button", { name: "2 lanes" });
-    expect(within(card(/^a, pi/).closest("li")!).getByText("orphan")).toBeTruthy();
+    expect(within(card(/^a, pi/).closest("li")!).getByRole("img", { name: "Orphan lane" })).toBeTruthy();
   });
 
-  it("badges each row's role from its tab label, the session title staying the main text", async () => {
+  it("marks a role with an icon only where nothing else says it, the session title staying the main text", async () => {
     vi.mocked(lanesList).mockResolvedValue([owned("w1:pA", "default/w1:p8"), owned("w1:pB", "default/w1:p8"), owned("w1:pC", "default/w1:p8")]);
     render(<AgentList />);
     // Before the store answers, the lanes fold by workspace under the orch- tab: wait for the move.
     await vi.waitFor(() => expect(card(/^Rate limits/).closest("li")?.className).toContain("has-lanes"));
     fireEvent.click(screen.getByRole("button", { name: "3 lanes" }));
-    const badge = (name: RegExp) => card(name).querySelector(".role-badge")?.textContent ?? null;
-    expect([badge(/^Vault rollout/), badge(/^Rate limits/), badge(/^a, pi/), badge(/^fees/)]).toEqual(["ORCH", null, "LANE", "BRIEF"]);
+    const mark = (name: RegExp) => card(name).querySelector(".role-mark")?.getAttribute("aria-label") ?? null;
+    // The orch- tab without lanes and the brief carry a mark; the pane with lanes has its "3 lanes"
+    // toggle and a lane its place under it, so neither does. No text tag is left on any row.
+    expect([mark(/^Vault rollout/), mark(/^Rate limits/), mark(/^a, pi/), mark(/^fees/)]).toEqual(["Orchestrator", null, null, "Brief"]);
+    expect(document.querySelector(".role-badge")).toBeNull();
     expect(card(/^Vault rollout/).querySelector(".agent-card-title")?.textContent).toBe("Vault rollout");
   });
 
@@ -727,6 +730,6 @@ describe("AgentList lanes by owner (ctc lane list)", () => {
     await vi.waitFor(() => expect(lanesList).toHaveBeenCalledWith("local"));
     expect(card(/^Vault rollout/).closest("li")?.className).toContain("has-lanes");
     expect(screen.getByRole("button", { name: "3 lanes" })).toBeTruthy();
-    expect(screen.queryByText("orphan")).toBeNull();
+    expect(screen.queryByRole("img", { name: "Orphan lane" })).toBeNull();
   });
 });
