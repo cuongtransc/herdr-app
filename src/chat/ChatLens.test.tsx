@@ -200,6 +200,20 @@ describe("ChatLens", () => {
     expect(screen.queryByRole("list", { name: "Queued messages" })).toBeNull();
   });
 
+  it("shows the background tasks while the agent runs, and hides them once it is gone", () => {
+    const view = { status: "idle", agent: "claude", title: "claude" } as PaneView;
+    const { rerender } = render(<ChatLens pane={pane} view={view} />);
+    act(() =>
+      channels[channels.length - 1].onmessage({
+        type: "meta", model: null, effort: null, context_tokens: null, queued: [],
+        background: [{ call_id: "t1", kind: "bash", description: "Run CI", started: "2026-10-10T17:08:00.000Z" }],
+      }),
+    );
+    expect(screen.getByRole("list", { name: "Background tasks" }).textContent).toContain("Run CI");
+    rerender(<ChatLens pane={pane} view={{ ...view, agent: null }} />);
+    expect(screen.queryByRole("list", { name: "Background tasks" })).toBeNull();
+  });
+
   it("says a forked pane is a fork, of what and since when, and goes back to the original", () => {
     const of = { machine_id: "m1", session: "s", pane_id: "w1:p1" };
     useForks.setState({ forks: { [paneKey(pane)]: { of, from: "Port Files panel", at: new Date(2026, 9, 9, 16, 5).getTime(), worktree: "fork-20261009-1605" } } });

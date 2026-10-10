@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { ChatItem } from "../lib/types";
-import { buildRows, formatWorkDuration, liveStart, workSummary, type ChatRow } from "./workBlocks";
+import { buildRows, formatWorkDuration, liveStart, rowOfCall, workSummary, type ChatRow } from "./workBlocks";
 
 const user = (text: string, ts?: string): ChatItem => ({ kind: "user", text, ts });
 const say = (markdown: string, ts?: string): ChatItem => ({ kind: "assistant_text", markdown, ts });
@@ -151,4 +151,18 @@ describe("liveStart", () => {
   it("is unknown with nothing loaded", () => {
     expect(liveStart([])).toBeNull();
   });
+});
+
+it("finds the row of a tool call, inside a work block or not", () => {
+  const items: ChatItem[] = [
+    { kind: "user", text: "go" },
+    { kind: "tool_call", id: "t1", name: "Bash", input_summary: "ci", input: {} },
+    { kind: "assistant_text", markdown: "running" },
+  ];
+  const { rows } = buildRows(items);
+  const i = rowOfCall(rows, "t1");
+  expect(i).toBeGreaterThanOrEqual(0);
+  const row = rows[i];
+  expect(row.kind === "work" ? row.block.items.some((x) => x.kind === "tool_call" && x.id === "t1") : row.kind === "item" && row.item.kind === "tool_call").toBe(true);
+  expect(rowOfCall(rows, "nope")).toBe(-1);
 });

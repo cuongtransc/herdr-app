@@ -144,3 +144,9 @@ export function formatWorkDuration(start: string | null, end: string | null): st
   if (minutes < 60) return rest > 0 ? `${minutes}m ${rest}s` : `${minutes}m`;
   return `${Math.floor(minutes / 60)}h ${minutes % 60}m`;
 }
+
+/** Index of the row holding the tool call `callId` (a bare item or inside a work block); -1 when not loaded. */
+export function rowOfCall(rows: ChatRow[], callId: string): number {
+  const isCall = (it: ChatItem) => it.kind === "tool_call" && it.id === callId;
+  return rows.findIndex((r) => (r.kind === "item" ? isCall(r.item) : r.block.items.some(isCall)));
+}

@@ -11,11 +11,12 @@ import { emptyChat, prepend, reduce, type ChatState } from "./chatStore";
 import { ChatItemView } from "./ChatItemView";
 import { ChatOpenContext, ChatPaneContext, revokeChatImages } from "./images";
 import { WorkBlockView } from "./WorkBlockView";
-import { buildRows, liveStart } from "./workBlocks";
+import { buildRows, liveStart, rowOfCall } from "./workBlocks";
 import { ChatOutline } from "./ChatOutline";
 import { currentEntry, outline } from "./outline";
 import { Composer } from "./Composer";
 import { QueuedMessages } from "./QueuedMessages";
+import { BackgroundTasks } from "./BackgroundTasks";
 import { BtwPanel } from "./BtwPanel";
 import { WorkingIndicator } from "./WorkingIndicator";
 import { usePiModelPicker } from "./usePiModelPicker";
@@ -298,6 +299,14 @@ export function ChatLens({ pane, view }: { pane: PaneRef; view: PaneView }) {
     setPicked(entries.find((e) => e.row === row)?.key ?? null);
     virt.scrollToIndex(row, { align: "start" });
   };
+  // A task's card may sit in a folded work block: open it, then scroll to it.
+  const jumpToCall = (callId: string) => {
+    const i = rowOfCall(rows, callId);
+    if (i < 0) return;
+    const row = rows[i];
+    if (row.kind === "work") setChosenOpen((m) => new Map(m).set(row.block.id, true));
+    jumpTo(i);
+  };
 
   const err = openError ?? state.error;
   return (
@@ -360,6 +369,7 @@ export function ChatLens({ pane, view }: { pane: PaneRef; view: PaneView }) {
           <ArrowDownIcon /> New messages
         </button>
       )}
+      {view.agent && <BackgroundTasks tasks={state.background} onJump={jumpToCall} />}
       <QueuedMessages texts={state.queued} />
       <BtwPanel pane={pane} />
       <WorkingIndicator status={view.status} start={start} />
