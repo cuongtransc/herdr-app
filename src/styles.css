@@ -623,13 +623,11 @@ kbd {
 .agent-card-close:hover { color: var(--fg); box-shadow: inset 0 0 0 1px var(--line-2); }
 .agent-card-close svg { width: 13px; height: 13px; }
 /* A protected pane (agents/protect.ts): a lock where the close button would be; close is off. */
-/* The tab's role in the orchestrator/lane contract, after the title: a quiet outlined tag, not a
-   status (that is the row's mark). An orphan lane's tag is amber: it has no orchestrator to tell. */
-.role-badge {
-  flex: none; padding: 0 4px; border: 1px solid var(--line-2); border-radius: 4px;
-  color: var(--fg-2); font-size: 9.5px; font-weight: 600; letter-spacing: .05em; line-height: 14px;
-}
-.role-badge.orphan { color: var(--amber-text); border-color: color-mix(in srgb, var(--amber) 45%, transparent); letter-spacing: 0; font-weight: 500; }
+/* The row's role, a mark the size of the lock after the title: Orchestrator, Brief, or an orphan lane
+   (amber: it has no orchestrator to tell). A folded lane needs none: its place says it. */
+.role-mark { flex: none; display: grid; place-items: center; width: 16px; height: 16px; color: var(--fg-3); }
+.role-mark svg { width: 13px; height: 13px; }
+.role-mark.orphan { color: var(--amber-text); }
 .agent-card-lock { flex: none; display: grid; place-items: center; width: 16px; height: 16px; color: var(--fg-3); }
 .agent-card-lock svg { width: 13px; height: 13px; }
 /* Lanes (roles.ts): indented under their orchestrator, regular weight; the orchestrator's row

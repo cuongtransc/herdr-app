@@ -10,7 +10,7 @@ import { stepTriage, triageQueue } from "../dashboard/triage";
 import type { MenuItem } from "../sidebar/ContextMenu";
 import { ActionsProvider, useActions } from "../sidebar/actions";
 import { ActiveToggle } from "../sidebar/ActiveToggle";
-import { BotIcon, CheckIcon, GitBranchIcon, LockIcon, ChevronIcon, CloseIcon, FolderOpenIcon, PencilIcon, PlusIcon, SplitDownIcon, SplitRightIcon, TabPlusIcon, TerminalIcon } from "../ui/icons";
+import { BookIcon, BotIcon, CheckIcon, GitBranchIcon, LayersIcon, LockIcon, UnplugIcon, ChevronIcon, CloseIcon, FolderOpenIcon, PencilIcon, PlusIcon, SplitDownIcon, SplitRightIcon, TabPlusIcon, TerminalIcon } from "../ui/icons";
 import { folderName, suggestFolder, useFolder } from "../workspaces/folder";
 import { AgentIcon } from "./AgentIcon";
 import { isProtected, protectedIn, useProtect } from "./protect";
@@ -78,7 +78,6 @@ interface Row {
 /** A folded lane: one with an owner to fold under. */
 const folded = (r: Row) => r.role === "lane" && !r.orphan;
 
-const ROLE_BADGE = { orch: "ORCH", lane: "LANE", brief: "BRIEF" } as const;
 
 /** "1 in progress, 1 done, 1 blocked" over some lanes. */
 function laneSummary(lanes: Row[]): string {
@@ -227,10 +226,21 @@ function AgentCard({
       >
         <AgentIcon agent={pane.agent} />
         <span className={"agent-card-title" + (activity ? " has-activity" : "")}>{title}</span>
-        {tabKind && <span className={"role-badge " + tabKind}>{ROLE_BADGE[tabKind]}</span>}
+        {/* A role mark the width of the lock. A lane says it by its place under the pane that owns it, and
+            that pane by its "N lanes" toggle, so neither needs one. */}
+        {(row.role === "orch" || tabKind === "orch") && !lanes && (
+          <span className="role-mark" role="img" aria-label="Orchestrator" title="Orchestrator: dispatches lanes">
+            <LayersIcon />
+          </span>
+        )}
+        {tabKind === "brief" && (
+          <span className="role-mark" role="img" aria-label="Brief" title="Brief: a decision to study">
+            <BookIcon />
+          </span>
+        )}
         {row.orphan && (
-          <span className="role-badge orphan" title="No orchestrator owns this lane: the lane store names none, or its pane is gone">
-            orphan
+          <span className="role-mark orphan" role="img" aria-label="Orphan lane" title="Orphan lane: no orchestrator owns it (the lane store names none, or its pane is gone)">
+            <UnplugIcon />
           </span>
         )}
         {isProt && (
