@@ -16,6 +16,7 @@ vi.mock("./complete", async (orig) => {
 import { claudePromptHistory, completeCommands, completeEntries, completeFiles, herdrCall, imageSaveTemp } from "../lib/ipc";
 import { rankFiles } from "./complete";
 import { DEFAULT_QUICK_REPLIES, useQuickReplies } from "../settings/quickReplies";
+import { DEFAULT_HIDDEN_FOLDERS } from "../settings/hiddenFolders";
 import { Composer } from "./Composer";
 import { clearCompletionCache } from "./useCompletions";
 import { useDraftImages } from "./draftImages";
@@ -443,7 +444,7 @@ describe("Composer completion", () => {
     const box = screen.getByRole("textbox");
     type(box, "look at @src/x");
     await screen.findByRole("option", { name: /src\/x\.ts/ });
-    expect(completeFiles).toHaveBeenCalledWith(pane);
+    expect(completeFiles).toHaveBeenCalledWith(pane, DEFAULT_HIDDEN_FOLDERS);
     fireEvent.keyDown(box, { key: "Tab" });
     expect((box as HTMLTextAreaElement).value).toBe("look at @src/x.ts ");
   });

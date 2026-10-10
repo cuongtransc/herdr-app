@@ -74,6 +74,10 @@ _Avoid_: file lens (a Lens views a Pane)
 The live feed of changes under the Files panel's root (`inotifywait`, a `find` poll loop, or FSEvents) that reloads the open file, the loaded folders of the tree and the CHANGED group. One at a time, owned by the Files panel.
 _Avoid_: watcher (herdr's session watcher), polling
 
+**Hidden folders**:
+The folder names (Settings → Files; `.git`, `node_modules`, `target`… by default) left out of the Files tree, Go to file, `@` completion and the Files watch, at any depth and on every Machine. The panel's eye shows them in the tree only.
+_Avoid_: heavy folders, ignored folders (that is `.gitignore`)
+
 **Transcript**:
 The Agent's own conversation file (`.jsonl`) that the Chat lens reads.
 _Avoid_: history, log

@@ -17,6 +17,7 @@ const opts = (enabled: boolean) => ({
   enabled,
   machineId: "m",
   root: "/r",
+  hidden: ["out"],
   onChanges: vi.fn(),
   onResync: vi.fn(),
   onError: vi.fn(),
@@ -38,7 +39,7 @@ describe("useWatch", () => {
   it("subscribes, routes events, and unwatches its own id on cleanup", async () => {
     const o = opts(true);
     const { unmount } = renderHook(() => useWatch(o));
-    await waitFor(() => expect(invoke).toHaveBeenCalledWith("files_watch", { machineId: "m", root: "/r", events: channels[0] }));
+    await waitFor(() => expect(invoke).toHaveBeenCalledWith("files_watch", { machineId: "m", root: "/r", hidden: ["out"], events: channels[0] }));
     channels[0].onmessage!({ type: "resync" });
     channels[0].onmessage!({ type: "changes", changes: [{ path: "a", isDir: false, removed: false }] });
     channels[0].onmessage!({ type: "error", message: "boom" });
@@ -54,10 +55,21 @@ describe("useWatch", () => {
     const { rerender } = renderHook((p: { root: string }) => useWatch({ ...o, root: p.root }), { initialProps: { root: "/r" } });
     await waitFor(() => expect(channels).toHaveLength(1));
     rerender({ root: "/s" });
-    await waitFor(() => expect(invoke).toHaveBeenCalledWith("files_watch", { machineId: "m", root: "/s", events: channels[1] }));
+    await waitFor(() => expect(invoke).toHaveBeenCalledWith("files_watch", { machineId: "m", root: "/s", hidden: ["out"], events: channels[1] }));
     await waitFor(() => expect(invoke).toHaveBeenCalledWith("files_unwatch", { id: 1 }));
     channels[0].onmessage!({ type: "resync" });
     expect(o.onResync).not.toHaveBeenCalled();
+  });
+
+  it("re-subscribes with a new hidden list, but not for an equal one", async () => {
+    const o = opts(true);
+    const { rerender } = renderHook((p: { hidden: string[] }) => useWatch({ ...o, hidden: p.hidden }), { initialProps: { hidden: ["out"] } });
+    await waitFor(() => expect(channels).toHaveLength(1));
+    rerender({ hidden: ["out"] });
+    rerender({ hidden: ["out", "tmp"] });
+    await waitFor(() => expect(invoke).toHaveBeenCalledWith("files_watch", { machineId: "m", root: "/r", hidden: ["out", "tmp"], events: channels[1] }));
+    await waitFor(() => expect(invoke).toHaveBeenCalledWith("files_unwatch", { id: 1 }));
+    expect(channels).toHaveLength(2);
   });
 
   it("reports a refused watch as an error", async () => {
@@ -98,7 +110,7 @@ describe("useWatch", () => {
     await new Promise((r) => setTimeout(r, 20));
     expect(n).toBe(1); // the second start waits for the first
     first.resolve(1);
-    await waitFor(() => expect(invoke).toHaveBeenCalledWith("files_watch", { machineId: "m", root: "/s", events: channels[1] }));
+    await waitFor(() => expect(invoke).toHaveBeenCalledWith("files_watch", { machineId: "m", root: "/s", hidden: ["out"], events: channels[1] }));
     await waitFor(() => expect(invoke).toHaveBeenCalledWith("files_unwatch", { id: 1 }));
     expect(invoke).not.toHaveBeenCalledWith("files_unwatch", { id: 2 });
   });
@@ -109,6 +121,6 @@ describe("useWatch", () => {
     const { rerender } = renderHook((p: { root: string }) => useWatch({ ...o, root: p.root }), { initialProps: { root: "/r" } });
     await waitFor(() => expect(o.onError).toHaveBeenCalledWith("nope"));
     rerender({ root: "/s" });
-    await waitFor(() => expect(invoke).toHaveBeenCalledWith("files_watch", { machineId: "m", root: "/s", events: channels[1] }));
+    await waitFor(() => expect(invoke).toHaveBeenCalledWith("files_watch", { machineId: "m", root: "/s", hidden: ["out"], events: channels[1] }));
   });
 });

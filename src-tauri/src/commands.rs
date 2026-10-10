@@ -1,7 +1,7 @@
 //! Tauri commands: thin wrappers over `MachineManager`.
 use crate::{
     attach::{attach_argv, AttachEvent, AttachKey, AttachManager, Sink},
-    complete::{self, SlashCommand},
+    complete::{self, files::HiddenFolders, SlashCommand},
     error::AppError,
     files::{
         all::{self, FileList},
@@ -553,6 +553,7 @@ pub async fn complete_files(
     machine_id: String,
     session: String,
     pane_id: String,
+    hidden: Option<Vec<String>>,
 ) -> Result<Vec<String>, AppError> {
     let pane_ref = PaneRef {
         machine_id,
@@ -565,7 +566,13 @@ pub async fn complete_files(
     };
     let info = mgr.info(&pane_ref.machine_id)?;
     let transport = mgr.transport(&pane_ref.machine_id)?;
-    complete::list_files(&*transport, &info.home, &cwd).await
+    complete::list_files(
+        &*transport,
+        &info.home,
+        &cwd,
+        &HiddenFolders::from_setting(hidden),
+    )
+    .await
 }
 
 /// The entries of `dir` (relative to a Pane's working directory, e.g. `../`), read on the Pane's Machine.
@@ -791,10 +798,18 @@ pub async fn files_list_dir(
     root: String,
     rel: String,
     show_heavy: Option<bool>,
+    hidden: Option<Vec<String>>,
 ) -> Result<Vec<Entry>, AppError> {
     let root = files_root(&mgr, &machine_id, &root)?;
     let t = mgr.transport(&machine_id)?;
-    list::list_dir(&*t, &root, &rel, show_heavy.unwrap_or(false)).await
+    list::list_dir(
+        &*t,
+        &root,
+        &rel,
+        show_heavy.unwrap_or(false),
+        &HiddenFolders::from_setting(hidden),
+    )
+    .await
 }
 
 #[tauri::command]
@@ -802,11 +817,12 @@ pub async fn files_list_all(
     mgr: Mgr<'_>,
     machine_id: String,
     root: String,
+    hidden: Option<Vec<String>>,
 ) -> Result<FileList, AppError> {
     let home = mgr.info(&machine_id)?.home;
     let root = resolve_root(&home, &root)?;
     let t = mgr.transport(&machine_id)?;
-    all::list_all(&*t, &home, &root).await
+    all::list_all(&*t, &home, &root, &HiddenFolders::from_setting(hidden)).await
 }
 
 #[tauri::command]
@@ -863,6 +879,7 @@ pub async fn files_watch(
     watch: State<'_, Arc<FilesWatch>>,
     machine_id: String,
     root: String,
+    hidden: Option<Vec<String>>,
     events: Channel<WatchEvent>,
 ) -> Result<u64, AppError> {
     let info = mgr.info(&machine_id)?;
@@ -881,7 +898,13 @@ pub async fn files_watch(
             }
         })
     };
-    Ok(watch.start(transport, machine_id == machines::LOCAL, root, sink))
+    Ok(watch.start(
+        transport,
+        machine_id == machines::LOCAL,
+        root,
+        HiddenFolders::from_setting(hidden),
+        sink,
+    ))
 }
 
 #[tauri::command]

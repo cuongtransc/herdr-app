@@ -28,6 +28,7 @@ import { FilesPanel } from "./FilesPanel";
 import { useFilesPanel } from "./panelStore";
 import { useFilesBus } from "./bus";
 import { useFiles } from "./store";
+import { DEFAULT_HIDDEN_FOLDERS, loadHiddenFolders, useHiddenFolders } from "../settings/hiddenFolders";
 
 const ref = { machine_id: "local", session: "default", workspace_id: "w1" };
 
@@ -36,6 +37,7 @@ const selected = { machine_id: "local", session: "default", pane_id: "p1" };
 describe("FilesPanel", () => {
   beforeEach(() => {
     localStorage.clear();
+    useHiddenFolders.setState({ folders: loadHiddenFolders() });
     channels.length = 0;
     changedReply.value = { repo: false, total: 0, changes: [] };
     useFiles.setState(useFiles.getInitialState(), true);
@@ -78,15 +80,27 @@ describe("FilesPanel", () => {
     expect(vi.mocked(invoke).mock.calls.filter(([c]) => c === "files_changed").length).toBe(before + 1);
   });
 
-  it("toggles heavy folders in the tree, hidden by default", async () => {
+  it("toggles the hidden folders in the tree, hidden by default", async () => {
     render(<FilesPanel />);
-    const btn = screen.getByRole("button", { name: "Show heavy folders" });
+    const btn = screen.getByRole("button", { name: "Show hidden folders" });
     expect(btn.getAttribute("aria-pressed")).toBe("false");
     fireEvent.click(btn);
     expect(btn.getAttribute("aria-pressed")).toBe("true");
     await waitFor(() =>
-      expect(vi.mocked(invoke)).toHaveBeenCalledWith("files_list_dir", { machineId: "local", root: "/r", rel: "", showHeavy: true }),
+      expect(vi.mocked(invoke)).toHaveBeenCalledWith("files_list_dir", { machineId: "local", root: "/r", rel: "", showHeavy: true, hidden: DEFAULT_HIDDEN_FOLDERS }),
     );
+  });
+
+  it("lists and watches again with the hidden list edited in Settings", async () => {
+    render(<FilesPanel />);
+    await waitFor(() => expect(vi.mocked(invoke)).toHaveBeenCalledWith("files_watch", expect.objectContaining({ hidden: DEFAULT_HIDDEN_FOLDERS })));
+    act(() => void useHiddenFolders.getState().add("tmp"));
+    const hidden = [...DEFAULT_HIDDEN_FOLDERS, "tmp"];
+    await waitFor(() => {
+      expect(vi.mocked(invoke)).toHaveBeenCalledWith("files_list_all", { machineId: "local", root: "/r", hidden });
+      expect(vi.mocked(invoke)).toHaveBeenCalledWith("files_list_dir", { machineId: "local", root: "/r", rel: "", showHeavy: false, hidden });
+      expect(vi.mocked(invoke)).toHaveBeenCalledWith("files_watch", expect.objectContaining({ root: "/r", hidden }));
+    });
   });
 
   it("shows Machine offline when the machine is not connected", () => {
@@ -134,7 +148,7 @@ describe("FilesPanel", () => {
     expect(head.getAttribute("aria-expanded")).toBe("false");
     // Its actions go with the tree.
     expect(screen.queryByRole("button", { name: "Reload" })).toBeNull();
-    expect(screen.queryByRole("button", { name: "Show heavy folders" })).toBeNull();
+    expect(screen.queryByRole("button", { name: "Show hidden folders" })).toBeNull();
     act(() => useFilesPanel.getState().focusTree());
     await waitFor(() => expect(document.activeElement?.closest("[role=tree]")).toBeTruthy());
   });

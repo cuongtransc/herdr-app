@@ -111,8 +111,9 @@ export const completeCommands = (p: PaneRef) =>
 /** Claude Code's own prompts for the Pane's folder (`~/.claude/history.jsonl` on its Machine), oldest first. */
 export const claudePromptHistory = (p: PaneRef) =>
   invoke<string[]>("claude_prompt_history", { machineId: p.machine_id, session: p.session, paneId: p.pane_id });
-export const completeFiles = (p: PaneRef) =>
-  invoke<string[]>("complete_files", { machineId: p.machine_id, session: p.session, paneId: p.pane_id });
+/** `hidden`: the folder names left out (Settings → Files). */
+export const completeFiles = (p: PaneRef, hidden: string[]) =>
+  invoke<string[]>("complete_files", { machineId: p.machine_id, session: p.session, paneId: p.pane_id, hidden });
 /** Entries of `dir` (relative to the Pane's folder, e.g. `../`), folders ending in `/`; empty when it is missing. */
 export const completeEntries = (p: PaneRef, dir: string) =>
   invoke<string[]>("complete_entries", { machineId: p.machine_id, session: p.session, paneId: p.pane_id, dir });
@@ -131,16 +132,18 @@ export const quotaCta = (poll: boolean) => invoke<CtaQuota>("quota_cta", { poll 
 /** `ctc lane list --json` on the Machine; null when its ctc reports no owner. */
 export const lanesList = (machineId: string) => invoke<LaneRecord[] | null>("lanes_list", { machineId });
 
-/** `showHeavy` also lists `.git`, `node_modules` and the other heavy folders. */
-export const filesListDir = (machineId: string, root: string, rel: string, showHeavy = false) =>
-  invoke<FileEntry[]>("files_list_dir", { machineId, root, rel, showHeavy });
-export const filesListAll = (machineId: string, root: string) => invoke<FileList>("files_list_all", { machineId, root });
+/** `hidden`: the folder names left out (Settings → Files); `showHeavy` lists them after all. */
+export const filesListDir = (machineId: string, root: string, rel: string, hidden: string[], showHeavy = false) =>
+  invoke<FileEntry[]>("files_list_dir", { machineId, root, rel, showHeavy, hidden });
+export const filesListAll = (machineId: string, root: string, hidden: string[]) =>
+  invoke<FileList>("files_list_all", { machineId, root, hidden });
 export const filesRead = (machineId: string, root: string, rel: string) =>
   invoke<FileContent>("files_read", { machineId, root, rel });
 export const filesChanged = (machineId: string, root: string) => invoke<Changed>("files_changed", { machineId, root });
 export const filesImage = (machineId: string, root: string, rel: string) =>
   invoke<ArrayBuffer>("files_image", { machineId, root, rel });
-export const filesWatch = (machineId: string, root: string, events: Channel<WatchEvent>) => invoke<number>("files_watch", { machineId, root, events });
+export const filesWatch = (machineId: string, root: string, hidden: string[], events: Channel<WatchEvent>) =>
+  invoke<number>("files_watch", { machineId, root, hidden, events });
 export const filesUnwatch = (id: number) => invoke<void>("files_unwatch", { id });
 export const filesUpload = (machineId: string, root: string, destRel: string, sources: string[]) =>
   invoke<string[]>("files_upload", { machineId, root, destRel, sources });

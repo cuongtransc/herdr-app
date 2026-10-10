@@ -18,7 +18,7 @@ use super::watch::{
     adds_excluded_dir, dedupe, exit_message, inotify_cmd, parse_inotify_line, parse_poll_record,
     poll_cmd, root_removed, Backoff, Change, PollRecord, WatchEvent, ESTABLISHED,
 };
-use crate::complete::files::SKIP_DIRS;
+use crate::complete::files::HiddenFolders;
 use crate::error::{AppError, AppResult};
 use crate::transport::{exec, Transport};
 
@@ -47,6 +47,7 @@ impl FilesWatch {
         t: Arc<dyn Transport>,
         local: bool,
         root: String,
+        hidden: HiddenFolders,
         sink: impl FnOnce(u64) -> WatchSink,
     ) -> u64 {
         let mut current = self.current.lock().unwrap();
@@ -54,7 +55,10 @@ impl FilesWatch {
         if let Some((_, old)) = current.take() {
             old.abort();
         }
-        *current = Some((id, tokio::spawn(run_watch(t, local, root, sink(id)))));
+        *current = Some((
+            id,
+            tokio::spawn(run_watch(t, local, root, hidden, sink(id))),
+        ));
         id
     }
 
@@ -75,7 +79,13 @@ impl FilesWatch {
 }
 
 /// Watch `root` until the task is aborted, restarting after errors with a backoff.
-pub async fn run_watch(t: Arc<dyn Transport>, local: bool, root: String, sink: WatchSink) {
+pub async fn run_watch(
+    t: Arc<dyn Transport>,
+    local: bool,
+    root: String,
+    hidden: HiddenFolders,
+    sink: WatchSink,
+) {
     // Whether the current attempt delivered any change: an attempt that did not is a failure
     // of inotify itself (e.g. its watch limit), not of the connection.
     let got_event = Arc::new(AtomicBool::new(false));
@@ -96,7 +106,7 @@ pub async fn run_watch(t: Arc<dyn Transport>, local: bool, root: String, sink: W
         got_event.store(false, Ordering::Relaxed);
         let mut inotify = false;
         let result = if local {
-            watch_local(&root, &tracked, &mut backoff).await
+            watch_local(&root, &hidden, &tracked, &mut backoff).await
         } else {
             if has_inotify.is_none() {
                 // Only a definite yes/no is cached: an unreachable Machine is probed again.
@@ -111,9 +121,9 @@ pub async fn run_watch(t: Arc<dyn Transport>, local: bool, root: String, sink: W
             }
             if has_inotify == Some(true) && !poll_only {
                 inotify = true;
-                watch_inotify(&*t, &root, &tracked, &mut backoff).await
+                watch_inotify(&*t, &root, &hidden, &tracked, &mut backoff).await
             } else {
-                watch_poll(&*t, &root, &tracked, &mut backoff).await
+                watch_poll(&*t, &root, &hidden, &tracked, &mut backoff).await
             }
         };
         // Only consecutive inotify sessions that failed without an event count.
@@ -255,10 +265,11 @@ impl StderrTail {
 pub(crate) async fn watch_poll(
     t: &dyn Transport,
     root: &str,
+    hidden: &HiddenFolders,
     sink: &WatchSink,
     backoff: &mut Backoff,
 ) -> AppResult<()> {
-    let mut child = spawn_stream(t, &poll_cmd(root))?;
+    let mut child = spawn_stream(t, &poll_cmd(root, hidden))?;
     let _stdin = child.stdin.take();
     let stdout = child.stdout.take().ok_or_else(|| missing_pipe("stdout"))?;
     let mut reader = BufReader::new(stdout);
@@ -295,16 +306,17 @@ pub(crate) async fn watch_poll(
     }
 }
 
-/// `Ok(())` means restart: a heavy folder appeared, and `inotifywait -r` would otherwise
+/// `Ok(())` means restart: a hidden folder appeared, and `inotifywait -r` would otherwise
 /// watch everything inside it. Stderr is read alongside stdout: `Watches established.` there
 /// means the watch is up, and the rest is kept for the exit message.
 pub(crate) async fn watch_inotify(
     t: &dyn Transport,
     root: &str,
+    hidden: &HiddenFolders,
     sink: &WatchSink,
     backoff: &mut Backoff,
 ) -> AppResult<()> {
-    let mut child = spawn_stream(t, &inotify_cmd(root))?;
+    let mut child = spawn_stream(t, &inotify_cmd(root, hidden))?;
     let _stdin = child.stdin.take();
     let mut out = BufReader::new(child.stdout.take().ok_or_else(|| missing_pipe("stdout"))?);
     let mut err = BufReader::new(child.stderr.take().ok_or_else(|| missing_pipe("stderr"))?);
@@ -355,7 +367,7 @@ pub(crate) async fn watch_inotify(
                     batch.flush(sink);
                     return Err(root_gone(sink, root));
                 }
-                let restart = adds_excluded_dir(&change);
+                let restart = adds_excluded_dir(&change, hidden);
                 batch.push(change);
                 if restart {
                     batch.flush(sink);
@@ -369,6 +381,7 @@ pub(crate) async fn watch_inotify(
 /// FSEvents (or the OS equivalent) on this machine, batched the same way.
 pub(crate) async fn watch_local(
     root: &str,
+    hidden: &HiddenFolders,
     sink: &WatchSink,
     backoff: &mut Backoff,
 ) -> AppResult<()> {
@@ -395,7 +408,7 @@ pub(crate) async fn watch_local(
                 Some(Ok(event)) => {
                     backoff.reset();
                     for p in &event.paths {
-                        if let Some(change) = local_change(&roots, p, &event.kind) {
+                        if let Some(change) = local_change(&roots, p, &event.kind, hidden) {
                             batch.push(change);
                         }
                     }
@@ -410,16 +423,21 @@ pub(crate) async fn watch_local(
 /// The `Change` for one FSEvents path under any spelling of the root (as configured and
 /// canonicalized, e.g. `/var/...` vs `/private/var/...`). The file system is consulted for
 /// `removed` and `is_dir` because FSEvents coalesces event kinds.
-fn local_change(roots: &[PathBuf], path: &Path, kind: &EventKind) -> Option<Change> {
+fn local_change(
+    roots: &[PathBuf],
+    path: &Path,
+    kind: &EventKind,
+    hidden: &HiddenFolders,
+) -> Option<Change> {
     if matches!(kind, EventKind::Access(_)) {
         return None;
     }
     let rel = roots.iter().find_map(|r| path.strip_prefix(r).ok())?;
     let rel = rel.to_string_lossy().into_owned();
-    // What happens inside a heavy folder is dropped; the folder's own creation still counts.
+    // What happens inside a hidden folder is dropped; the folder's own creation still counts.
     let mut above = rel.split('/');
     above.next_back();
-    if above.any(|seg| SKIP_DIRS.contains(&seg)) {
+    if above.any(|seg| hidden.contains(seg)) {
         return None;
     }
     let (is_dir, removed) = match std::fs::symlink_metadata(path) {
@@ -488,7 +506,14 @@ mod tests {
         let (sink, mut rx) = collect();
         let r = root_s.clone();
         let task = tokio::spawn(async move {
-            watch_poll(&LocalTransport, &r, &sink, &mut Backoff::default()).await
+            watch_poll(
+                &LocalTransport,
+                &r,
+                &HiddenFolders::default(),
+                &sink,
+                &mut Backoff::default(),
+            )
+            .await
         });
         assert!(matches!(rx.recv().await, Some(WatchEvent::Resync)));
         // Marker mtimes have 1 s resolution on some filesystems: write a second after the first scan.
@@ -514,7 +539,14 @@ mod tests {
         let link = dir.path().join("link").to_string_lossy().into_owned();
         let (sink, mut rx) = collect();
         let task = tokio::spawn(async move {
-            watch_poll(&LocalTransport, &link, &sink, &mut Backoff::default()).await
+            watch_poll(
+                &LocalTransport,
+                &link,
+                &HiddenFolders::default(),
+                &sink,
+                &mut Backoff::default(),
+            )
+            .await
         });
         assert!(matches!(rx.recv().await, Some(WatchEvent::Resync)));
         tokio::time::sleep(Duration::from_millis(1200)).await;
@@ -531,7 +563,14 @@ mod tests {
         let r = root.to_string_lossy().into_owned();
         let (sink, mut rx) = collect();
         let task = tokio::spawn(async move {
-            watch_poll(&LocalTransport, &r, &sink, &mut Backoff::default()).await
+            watch_poll(
+                &LocalTransport,
+                &r,
+                &HiddenFolders::default(),
+                &sink,
+                &mut Backoff::default(),
+            )
+            .await
         });
         assert!(matches!(rx.recv().await, Some(WatchEvent::Resync)));
         tokio::time::sleep(Duration::from_millis(1200)).await;
@@ -548,7 +587,14 @@ mod tests {
         let r = root.to_string_lossy().into_owned();
         let (sink, mut rx) = collect();
         let task = tokio::spawn(async move {
-            watch_poll(&LocalTransport, &r, &sink, &mut Backoff::default()).await
+            watch_poll(
+                &LocalTransport,
+                &r,
+                &HiddenFolders::default(),
+                &sink,
+                &mut Backoff::default(),
+            )
+            .await
         });
         assert!(matches!(rx.recv().await, Some(WatchEvent::Resync)));
         std::fs::remove_dir(&root).unwrap();
@@ -563,7 +609,10 @@ mod tests {
         let dir = tempfile::tempdir().unwrap();
         let mut child = spawn_stream(
             &LocalTransport,
-            &crate::files::watch::poll_cmd(&dir.path().to_string_lossy()),
+            &crate::files::watch::poll_cmd(
+                &dir.path().to_string_lossy(),
+                &HiddenFolders::default(),
+            ),
         )
         .unwrap();
         tokio::time::sleep(Duration::from_millis(300)).await;
@@ -634,7 +683,13 @@ mod tests {
     async fn run_until(fake: Arc<Fake>, done: impl Fn(&Fake) -> bool) -> Vec<WatchEvent> {
         let (sink, mut rx) = collect();
         let t: Arc<dyn crate::transport::Transport> = fake.clone();
-        let task = tokio::spawn(run_watch(t, false, "/r".into(), sink));
+        let task = tokio::spawn(run_watch(
+            t,
+            false,
+            "/r".into(),
+            HiddenFolders::default(),
+            sink,
+        ));
         let deadline = tokio::time::Instant::now() + Duration::from_secs(15);
         while !done(&fake) {
             assert!(
@@ -683,7 +738,14 @@ mod tests {
             ..Default::default()
         };
         let task = tokio::spawn(async move {
-            watch_inotify(&fake, "/r", &sink, &mut Backoff::default()).await
+            watch_inotify(
+                &fake,
+                "/r",
+                &HiddenFolders::default(),
+                &sink,
+                &mut Backoff::default(),
+            )
+            .await
         });
         (task, rx)
     }
@@ -822,8 +884,15 @@ mod tests {
         let dir = tempfile::tempdir().unwrap();
         let root = dir.path().to_string_lossy().into_owned();
         let (sink, mut rx) = collect();
-        let task =
-            tokio::spawn(async move { watch_local(&root, &sink, &mut Backoff::default()).await });
+        let task = tokio::spawn(async move {
+            watch_local(
+                &root,
+                &HiddenFolders::default(),
+                &sink,
+                &mut Backoff::default(),
+            )
+            .await
+        });
         assert!(matches!(rx.recv().await, Some(WatchEvent::Resync)));
         let target = dir.path().join("notes.md");
         // FSEvents needs a moment to start; keep writing until an event arrives.
@@ -862,8 +931,20 @@ mod tests {
         let w = FilesWatch::default();
         let (sink, _rx) = collect();
         let s = sink.clone();
-        let first = w.start(Arc::new(LocalTransport), true, root.clone(), |_| s);
-        let second = w.start(Arc::new(LocalTransport), true, root, |_| sink);
+        let first = w.start(
+            Arc::new(LocalTransport),
+            true,
+            root.clone(),
+            HiddenFolders::default(),
+            |_| s,
+        );
+        let second = w.start(
+            Arc::new(LocalTransport),
+            true,
+            root,
+            HiddenFolders::default(),
+            |_| sink,
+        );
         assert!(second > first);
         w.stop(first);
         assert!(w.is_running());
@@ -878,9 +959,13 @@ mod tests {
         let root = dir.path().to_string_lossy().into_owned();
         let w = Arc::new(FilesWatch::default());
         let w2 = w.clone();
-        w.start(Arc::new(LocalTransport), true, root, move |id| {
-            Arc::new(move |_| w2.stop(id))
-        });
+        w.start(
+            Arc::new(LocalTransport),
+            true,
+            root,
+            HiddenFolders::default(),
+            move |id| Arc::new(move |_| w2.stop(id)),
+        );
         let deadline = tokio::time::Instant::now() + Duration::from_secs(5);
         while w.is_running() {
             assert!(
@@ -900,7 +985,12 @@ mod tests {
         let roots = [dir.path().to_path_buf()];
         let kind = EventKind::Create(CreateKind::Any);
         assert_eq!(
-            local_change(&roots, &dir.path().join("node_modules"), &kind),
+            local_change(
+                &roots,
+                &dir.path().join("node_modules"),
+                &kind,
+                &HiddenFolders::default()
+            ),
             Some(Change {
                 path: "node_modules".into(),
                 is_dir: true,
@@ -908,7 +998,12 @@ mod tests {
             })
         );
         assert_eq!(
-            local_change(&roots, &dir.path().join("node_modules/x.js"), &kind),
+            local_change(
+                &roots,
+                &dir.path().join("node_modules/x.js"),
+                &kind,
+                &HiddenFolders::default()
+            ),
             None
         );
     }

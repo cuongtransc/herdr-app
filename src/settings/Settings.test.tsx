@@ -6,6 +6,7 @@ vi.mock("../lib/ipc", () => ({
     monospace === false ? ["Avenir Next", "Helvetica", "Lilex", "Menlo"] : ["CaskaydiaCove Nerd Font Mono", "Lilex", "Menlo"]),
   fontFace: vi.fn(async () => { throw { code: "not_found" }; }),
 }));
+import { DEFAULT_HIDDEN_FOLDERS, loadHiddenFolders, useHiddenFolders } from "./hiddenFolders";
 import { loadLensSettings, useLensSettings } from "./lens";
 import { DEFAULT_QUICK_REPLIES, QUICK_REPLIES_MAX, useQuickReplies } from "./quickReplies";
 import { Settings, useSettingsOpen } from "./Settings";
@@ -17,6 +18,7 @@ beforeEach(() => {
   useSettingsOpen.setState({ open: false });
   localStorage.clear();
   useSettings.setState({ ...DEFAULTS });
+  useHiddenFolders.setState({ folders: loadHiddenFolders() });
 });
 
 function openSettings() {
@@ -171,6 +173,35 @@ describe("Settings quick replies", () => {
 });
 
 describe("Settings fonts", () => {
+  it("adds, removes and resets the Files panel's hidden folders", () => {
+    render(<Settings />);
+    fireEvent.click(screen.getByRole("button", { name: "Settings" }));
+    fireEvent.click(screen.getByRole("tab", { name: "Files" }));
+    const list = screen.getByRole("list", { name: "Hidden folders" });
+    expect(within(list).getAllByRole("listitem").map((li) => li.textContent)).toEqual(DEFAULT_HIDDEN_FOLDERS);
+    const reset = screen.getByRole("button", { name: "Reset hidden folders" });
+    expect((reset as HTMLButtonElement).disabled).toBe(true);
+
+    const input = screen.getByRole("textbox", { name: "Folder name" });
+    fireEvent.change(input, { target: { value: "a/b" } });
+    fireEvent.keyDown(input, { key: "Enter" });
+    expect(screen.getByRole("alert").textContent).toBe("A folder name, not a path");
+    expect(useHiddenFolders.getState().folders).toEqual(DEFAULT_HIDDEN_FOLDERS);
+
+    fireEvent.change(input, { target: { value: " coverage " } });
+    expect(screen.queryByRole("alert")).toBeNull();
+    fireEvent.click(screen.getByRole("button", { name: "Add folder" }));
+    expect(useHiddenFolders.getState().folders).toEqual([...DEFAULT_HIDDEN_FOLDERS, "coverage"]);
+    expect((input as HTMLInputElement).value).toBe("");
+
+    fireEvent.click(screen.getByRole("button", { name: "Remove node_modules" }));
+    expect(useHiddenFolders.getState().folders).not.toContain("node_modules");
+    expect(loadHiddenFolders()).toEqual(useHiddenFolders.getState().folders);
+
+    fireEvent.click(reset);
+    expect(useHiddenFolders.getState().folders).toEqual(DEFAULT_HIDDEN_FOLDERS);
+  });
+
   it("searches installed fonts and picks one with a click", async () => {
     openSettings();
     const box = screen.getByRole("combobox", { name: "Terminal font" });

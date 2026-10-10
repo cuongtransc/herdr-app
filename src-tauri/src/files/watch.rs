@@ -6,7 +6,7 @@ use std::time::Duration;
 
 use serde::Serialize;
 
-use crate::complete::files::SKIP_DIRS;
+use crate::complete::files::{glob_escape, HiddenFolders};
 use crate::transport::sh_quote;
 
 const BACKOFF_SECS: [u64; 4] = [1, 2, 5, 10];
@@ -44,26 +44,28 @@ pub enum WatchEvent {
 /// anchored at the root: a root that itself sits under, say, `.worktrees` keeps its events.
 ///
 /// Without `-q`, `inotifywait` says `Watches established.` on stderr once it is watching.
-pub fn inotify_cmd(abs: &str) -> String {
+pub fn inotify_cmd(abs: &str, hidden: &HiddenFolders) -> String {
     let q = sh_quote(abs);
-    let names = SKIP_DIRS
+    let names = hidden
+        .names()
         .iter()
         .map(|n| ere_escape(n))
         .collect::<Vec<_>>()
         .join("|");
-    let filter = format!(
-        "^{}/(.*/)?({names})/",
-        ere_escape(abs.trim_end_matches('/'))
-    );
-    let find_names = SKIP_DIRS
-        .iter()
-        .map(|n| format!("-name {}", sh_quote(n)))
-        .collect::<Vec<_>>()
-        .join(" -o ");
+    // With nothing hidden there is nothing to filter: `()` would match every folder.
+    let exclude = if names.is_empty() {
+        String::new()
+    } else {
+        let filter = format!(
+            "^{}/(.*/)?({names})/",
+            ere_escape(abs.trim_end_matches('/'))
+        );
+        format!(" --exclude {}", sh_quote(&filter))
+    };
+    let find_names = hidden.find_names();
     // The root stays on the command line (not in the list) so `ps` shows what is watched.
     format!(
-        "exec 3<&0; (cat; kill $$) <&3 >/dev/null 2>&1 & exec inotifywait -m -r -e close_write,create,delete,moved_to,moved_from,delete_self,move_self --format '%e|%w%f' --exclude {} --fromfile - {q} 3<&- <<HERDR_WATCH\n$(find -H {q} -mindepth 1 \\( {find_names} \\) -prune -printf '@%p\\n' 2>/dev/null)\nHERDR_WATCH\n",
-        sh_quote(&filter)
+        "exec 3<&0; (cat; kill $$) <&3 >/dev/null 2>&1 & exec inotifywait -m -r -e close_write,create,delete,moved_to,moved_from,delete_self,move_self --format '%e|%w%f'{exclude} --fromfile - {q} 3<&- <<HERDR_WATCH\n$(find -H {q} -mindepth 1 \\( {find_names} \\) -prune -printf '@%p\\n' 2>/dev/null)\nHERDR_WATCH\n"
     )
 }
 
@@ -73,13 +75,9 @@ pub fn inotify_cmd(abs: &str) -> String {
 /// and busybox lack); the new marker is touched *before* the scan so nothing is missed.
 /// Heavy folders are pruned, but never the root itself (a root may be named `build`). Once the
 /// root is gone an `x` record ends the loop. Same stdin watchdog as `inotify_cmd`.
-pub fn poll_cmd(abs: &str) -> String {
+pub fn poll_cmd(abs: &str, hidden: &HiddenFolders) -> String {
     let q = sh_quote(abs);
-    let names = SKIP_DIRS
-        .iter()
-        .map(|n| format!("-name {}", sh_quote(n)))
-        .collect::<Vec<_>>()
-        .join(" -o ");
+    let names = hidden.find_names();
     // `-path` takes a glob, so the root's own glob characters are escaped.
     let prune = format!(
         "\\( ! -path {} -type d \\( {names} \\) \\) -prune",
@@ -101,18 +99,6 @@ done\n"
     )
 }
 
-/// Escape a path for a `find -path` glob.
-fn glob_escape(path: &str) -> String {
-    let mut out = String::with_capacity(path.len());
-    for c in path.chars() {
-        if "*?[]\\".contains(c) {
-            out.push('\\');
-        }
-        out.push(c);
-    }
-    out
-}
-
 /// Escape a name for a POSIX extended regex.
 fn ere_escape(name: &str) -> String {
     let mut out = String::with_capacity(name.len());
@@ -125,12 +111,12 @@ fn ere_escape(name: &str) -> String {
     out
 }
 
-/// True when `change` is a heavy folder appearing (created or moved in). `inotifywait -r`
+/// True when `change` is a hidden folder appearing (created or moved in). `inotifywait -r`
 /// starts watching everything inside it, so the watcher is restarted to leave it out again.
-pub fn adds_excluded_dir(change: &Change) -> bool {
+pub fn adds_excluded_dir(change: &Change, hidden: &HiddenFolders) -> bool {
     change.is_dir
         && !change.removed
-        && SKIP_DIRS.contains(&change.path.rsplit('/').next().unwrap_or(""))
+        && hidden.contains(change.path.rsplit('/').next().unwrap_or(""))
 }
 
 /// Why the watch session ended, from its stderr: the first non-empty line (`inotifywait`
@@ -274,18 +260,18 @@ mod tests {
 
     #[test]
     fn inotify_cmd_watches_recursively_and_skips_heavy_dirs() {
-        let cmd = inotify_cmd("/r/p q");
+        let cmd = inotify_cmd("/r/p q", &HiddenFolders::default());
         assert!(cmd.starts_with("exec 3<&0; (cat; kill $$) <&3 >/dev/null 2>&1 & exec inotifywait -m -r -e close_write,create,delete,moved_to,moved_from,delete_self,move_self --format '%e|%w%f'"), "{cmd}");
         // Events inside a heavy folder below the root are dropped, the folder's own creation is not.
         assert!(cmd.contains(r"--exclude '^/r/p q/(.*/)?(\.git|node_modules|\.venv|venv|__pycache__|target|dist|build|\.next|\.worktrees)/'"), "{cmd}");
         // Heavy folders present now get no watches at all.
         assert!(cmd.contains(" --fromfile - '/r/p q' 3<&- <<HERDR_WATCH\n$(find -H '/r/p q' -mindepth 1 \\( -name '.git' -o -name 'node_modules' -o -name '.venv' -o -name 'venv' -o -name '__pycache__' -o -name 'target' -o -name 'dist' -o -name 'build' -o -name '.next' -o -name '.worktrees' \\) -prune -printf '@%p\\n' 2>/dev/null)\nHERDR_WATCH\n"), "{cmd}");
-        assert!(inotify_cmd("/it's").contains(r"'/it'\''s'"));
+        assert!(inotify_cmd("/it's", &HiddenFolders::default()).contains(r"'/it'\''s'"));
     }
 
     #[test]
     fn poll_cmd_loops_on_a_marker_file_with_heavy_dirs_pruned() {
-        let cmd = poll_cmd("/r/p q");
+        let cmd = poll_cmd("/r/p q", &HiddenFolders::default());
         assert!(
             cmd.starts_with("exec 3<&0; (cat; kill $$) <&3 >/dev/null 2>&1 &\n"),
             "{cmd}"
@@ -301,7 +287,7 @@ mod tests {
             cmd.contains("[ -d '/r/p q' ] || { printf 'x\\t\\0'; exit 1; }"),
             "{cmd}"
         );
-        assert!(poll_cmd("/r/a*[b]").contains(r"-path '/r/a\*\[b\]'"));
+        assert!(poll_cmd("/r/a*[b]", &HiddenFolders::default()).contains(r"-path '/r/a\*\[b\]'"));
         assert!(
             cmd.contains(r"-type d -exec printf 'd\t%s\0' {} + -o -exec printf 'f\t%s\0' {} +"),
             "{cmd}"
@@ -362,12 +348,30 @@ mod tests {
 
     #[test]
     fn adds_excluded_dir_only_for_new_heavy_folders() {
-        assert!(adds_excluded_dir(&c("web/node_modules", true, false)));
-        assert!(adds_excluded_dir(&c(".venv", true, false)));
-        assert!(!adds_excluded_dir(&c("web/node_modules", true, true)));
-        assert!(!adds_excluded_dir(&c("web/node_modules", false, false)));
-        assert!(!adds_excluded_dir(&c("node_modules/x", true, false)));
-        assert!(!adds_excluded_dir(&c("my_venv", true, false)));
+        assert!(adds_excluded_dir(
+            &c("web/node_modules", true, false),
+            &HiddenFolders::default()
+        ));
+        assert!(adds_excluded_dir(
+            &c(".venv", true, false),
+            &HiddenFolders::default()
+        ));
+        assert!(!adds_excluded_dir(
+            &c("web/node_modules", true, true),
+            &HiddenFolders::default()
+        ));
+        assert!(!adds_excluded_dir(
+            &c("web/node_modules", false, false),
+            &HiddenFolders::default()
+        ));
+        assert!(!adds_excluded_dir(
+            &c("node_modules/x", true, false),
+            &HiddenFolders::default()
+        ));
+        assert!(!adds_excluded_dir(
+            &c("my_venv", true, false),
+            &HiddenFolders::default()
+        ));
     }
 
     #[test]
@@ -396,14 +400,43 @@ mod tests {
     }
 
     #[test]
+    fn scripts_use_the_custom_list() {
+        let hidden = HiddenFolders::new(["out", "a*b"]);
+        let cmd = inotify_cmd("/r", &hidden);
+        assert!(cmd.contains(r"--exclude '^/r/(.*/)?(out|a\*b)/'"), "{cmd}");
+        assert!(
+            cmd.contains(r"\( -name 'out' -o -name 'a\*b' \) -prune"),
+            "{cmd}"
+        );
+        assert!(!cmd.contains("node_modules"), "{cmd}");
+        let cmd = poll_cmd("/r", &hidden);
+        assert!(
+            cmd.contains(r"-type d \( -name 'out' -o -name 'a\*b' \) \) -prune"),
+            "{cmd}"
+        );
+        assert!(adds_excluded_dir(&c("web/out", true, false), &hidden));
+        assert!(!adds_excluded_dir(&c("node_modules", true, false), &hidden));
+    }
+
+    #[test]
+    fn nothing_hidden_filters_no_event() {
+        let none = HiddenFolders::new(Vec::<String>::new());
+        let cmd = inotify_cmd("/r", &none);
+        assert!(!cmd.contains("--exclude"), "{cmd}");
+        assert!(cmd.contains(r"\( -name '' \) -prune"), "{cmd}");
+        assert!(poll_cmd("/r", &none).contains(r"-type d \( -name '' \) \) -prune"));
+    }
+
+    #[test]
     fn inotify_filter_is_anchored_at_the_root() {
         // A root under (or named like) a heavy folder still gets events.
-        let cmd = inotify_cmd("/w/.worktrees/x");
+        let cmd = inotify_cmd("/w/.worktrees/x", &HiddenFolders::default());
         assert!(
             cmd.contains(r"--exclude '^/w/\.worktrees/x/(.*/)?(\.git|"),
             "{cmd}"
         );
-        assert!(inotify_cmd("/w/build/").contains(r"--exclude '^/w/build/(.*/)?("));
+        assert!(inotify_cmd("/w/build/", &HiddenFolders::default())
+            .contains(r"--exclude '^/w/build/(.*/)?("));
     }
 
     #[test]
@@ -442,8 +475,8 @@ mod tests {
 
     #[test]
     fn both_scripts_follow_a_symlinked_root() {
-        assert!(poll_cmd("/r").contains("find -H '/r' "));
-        assert!(inotify_cmd("/r").contains("$(find -H '/r' -mindepth 1"));
+        assert!(poll_cmd("/r", &HiddenFolders::default()).contains("find -H '/r' "));
+        assert!(inotify_cmd("/r", &HiddenFolders::default()).contains("$(find -H '/r' -mindepth 1"));
     }
 
     #[test]
