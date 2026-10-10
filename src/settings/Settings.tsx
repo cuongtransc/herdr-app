@@ -3,6 +3,7 @@ import { create } from "zustand";
 import { notificationsEnabled, setNotificationsEnabled } from "../notify";
 import { CloseIcon, GearIcon, GripIcon, SearchIcon } from "../ui/icons";
 import { FontPicker } from "./FontPicker";
+import { ShortcutsSettings } from "./ShortcutsSettings";
 import { DEFAULT_HIDDEN_FOLDERS, folderNameError, useHiddenFolders } from "./hiddenFolders";
 import { CHAT_WIDTHS, NEW_AGENT_LENSES, useLensSettings } from "./lens";
 import { useNewTab } from "./newTab";
@@ -393,6 +394,7 @@ const SECTIONS = [
   { id: "fonts", label: "Fonts", Body: FontSettings },
   { id: "chat", label: "Chat", Body: ChatSettings },
   { id: "files", label: "Files", Body: FilesSettings },
+  { id: "shortcuts", label: "Shortcuts", Body: ShortcutsSettings },
 ] as const;
 
 type SectionId = (typeof SECTIONS)[number]["id"];

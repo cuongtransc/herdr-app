@@ -285,3 +285,71 @@ describe("Settings fonts", () => {
     expect(useSettings.getState()).toMatchObject(DEFAULTS);
   });
 });
+
+describe("Settings → Shortcuts", () => {
+  const open = () => {
+    render(<Settings />);
+    fireEvent.click(screen.getByRole("button", { name: "Settings" }));
+    fireEvent.click(screen.getByRole("tab", { name: "Shortcuts" }));
+  };
+  const keyBtn = (name: RegExp) => screen.getByRole("button", { name });
+
+  it("lists every action with its key", () => {
+    open();
+    expect(keyBtn(/^Toggle Files panel: ⌘E$/)).toBeTruthy();
+    expect(keyBtn(/^Previous Open item: ⇧⌘\[$/)).toBeTruthy();
+    expect((screen.getByRole("button", { name: "Reset all" }) as HTMLButtonElement).disabled).toBe(true);
+  });
+
+  it("records a new key, and stops the app from acting on it meanwhile", () => {
+    open();
+    fireEvent.click(keyBtn(/^Toggle Files panel/));
+    expect(keyBtn(/^Toggle Files panel: Press keys…$/)).toBeTruthy();
+    expect(useShortcuts.getState().recording).toBe(true);
+    fireEvent.keyDown(keyBtn(/^Toggle Files panel/), { key: "Meta", code: "MetaLeft", metaKey: true });
+    expect(useShortcuts.getState().recording).toBe(true);
+    fireEvent.keyDown(keyBtn(/^Toggle Files panel/), { key: "l", code: "KeyL", metaKey: true });
+    expect(useShortcuts.getState().bindings["files.toggle"]).toEqual({ code: "KeyL", shift: false, alt: false, ctrl: false });
+    expect(useShortcuts.getState().recording).toBe(false);
+    expect(keyBtn(/^Toggle Files panel: ⌘L$/)).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: "Reset Toggle Files panel" }));
+    expect(keyBtn(/^Toggle Files panel: ⌘E$/)).toBeTruthy();
+  });
+
+  it("Esc cancels recording without closing Settings; ⌫ sets None", () => {
+    open();
+    fireEvent.click(keyBtn(/^Agent Board/));
+    fireEvent.keyDown(keyBtn(/^Agent Board/), { key: "Escape", code: "Escape" });
+    expect(screen.getByRole("dialog", { name: "Settings" })).toBeTruthy();
+    expect(keyBtn(/^Agent Board: ⇧⌘D$/)).toBeTruthy();
+    fireEvent.click(keyBtn(/^Agent Board/));
+    fireEvent.keyDown(keyBtn(/^Agent Board/), { key: "Backspace", code: "Backspace" });
+    expect(keyBtn(/^Agent Board: None$/)).toBeTruthy();
+    expect(useShortcuts.getState().bindings.board).toBeNull();
+  });
+
+  it("refuses a key without ⌘ or a reserved one and keeps listening", () => {
+    open();
+    fireEvent.click(keyBtn(/^Go to file/));
+    fireEvent.keyDown(keyBtn(/^Go to file/), { key: "p", code: "KeyP", ctrlKey: true });
+    expect(screen.getByRole("alert").textContent).toBe("Include ⌘");
+    fireEvent.keyDown(keyBtn(/^Go to file/), { key: "q", code: "KeyQ", metaKey: true });
+    expect(screen.getByRole("alert").textContent).toBe("Reserved by macOS");
+    expect(keyBtn(/^Go to file: Press keys…$/)).toBeTruthy();
+    expect(useShortcuts.getState().bindings["files.goto"]).toEqual({ code: "KeyP", shift: false, alt: false, ctrl: false });
+  });
+
+  it("offers Replace for a key another action uses", () => {
+    open();
+    fireEvent.click(keyBtn(/^Toggle Files panel/));
+    fireEvent.keyDown(keyBtn(/^Toggle Files panel/), { key: "k", code: "KeyK", metaKey: true });
+    expect(screen.getByRole("alert").textContent).toContain("⌘K is used by Jump to pane");
+    expect(useShortcuts.getState().bindings["files.toggle"]).toEqual({ code: "KeyE", shift: false, alt: false, ctrl: false });
+    fireEvent.click(screen.getByRole("button", { name: "Replace" }));
+    expect(keyBtn(/^Toggle Files panel: ⌘K$/)).toBeTruthy();
+    expect(keyBtn(/^Jump to pane: None$/)).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: "Reset all" }));
+    expect(keyBtn(/^Jump to pane: ⌘K$/)).toBeTruthy();
+    expect(keyBtn(/^Toggle Files panel: ⌘E$/)).toBeTruthy();
+  });
+});
