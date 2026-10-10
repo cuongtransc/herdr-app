@@ -1550,7 +1550,8 @@ button.composer-model:disabled { cursor: default; }
 .quota-row.tone-warn .quota-val { color: var(--amber-text); font-weight: 600; }
 /* Numbers that cannot be trusted: quiet text (still 4.5:1), a grey icon, the reason across bar and value. */
 .quota-row.problem .quota-name { color: var(--fg-3); }
-.quota-row.problem .quota-val { grid-column: 3 / 5; font-style: italic; }
+.quota-row.problem .quota-val { grid-column: 3 / 5; display: flex; max-width: 100%; font-style: italic; }
+.quota-row.problem .quota-reason { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
 .quota-row.problem .agent-tile { filter: grayscale(1); }
 /* The strip folds like the Sidebar's sections; its header lines up with theirs (the strip pads 8px). */
 /* Its right edge meets the rows' values, inside the rows' own 8px padding. */

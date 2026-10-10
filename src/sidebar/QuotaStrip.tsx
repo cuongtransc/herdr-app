@@ -12,7 +12,7 @@ import { itemLabel, QuotaPanel } from "./QuotaPanel";
 
 type Row =
   | { item: QuotaItem; label: string; kind: "numbers"; h: NonNullable<ReturnType<typeof headline>> }
-  | { item: QuotaItem; label: string; kind: "trouble"; text: string; message: string };
+  | { item: QuotaItem; label: string; kind: "trouble"; reason: string; ago: string | null; message: string };
 
 /** One row per card worth a line: its most pressing window, or why its numbers cannot be trusted. */
 function stripRows(items: QuotaItem[], now: number): Row[] {
@@ -22,7 +22,7 @@ function stripRows(items: QuotaItem[], now: number): Row[] {
     // A built-in Provider with no numbers yet ("no Go subscription") stays out, as before.
     if (t && (item.fromCta || t.at !== null)) {
       if (t.at !== null && now - t.at > HIDE_AFTER_MS) return [];
-      return [{ item, label, kind: "trouble", text: t.at !== null ? `${t.reason} · ${agoShort(t.at, now)}` : t.reason, message: t.message }];
+      return [{ item, label, kind: "trouble", reason: t.reason, ago: t.at !== null ? agoShort(t.at, now) : null, message: t.message }];
     }
     if (t) return [];
     const h = headline(item.entry, now);
@@ -90,19 +90,24 @@ export function QuotaStrip() {
         const { item, label } = row;
         const id = item.accountId !== null ? ` · ${item.accountId}` : "";
         if (row.kind === "trouble") {
+          const text = row.reason + (row.ago ? ` · ${row.ago}` : "");
           return (
             <button
               key={item.key}
               type="button"
               className="quota-row tone-muted problem"
               title={`${label}${id} · ${row.message}`}
-              aria-label={`${label}, ${row.text}: show quota`}
+              aria-label={`${label}, ${text}: show quota`}
               aria-expanded={open}
               onClick={() => setOpen((o) => !o)}
             >
               <AgentIcon agent={item.agent} />
               <span className="quota-name">{label}</span>
-              <span className="quota-val">{row.text}</span>
+              {/* A long reason clips; its age stays. */}
+              <span className="quota-val">
+                <span className="quota-reason">{row.reason}</span>
+                {row.ago && <span>{` · ${row.ago}`}</span>}
+              </span>
             </button>
           );
         }
