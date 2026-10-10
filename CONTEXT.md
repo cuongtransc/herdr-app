@@ -86,6 +86,10 @@ _Avoid_: hotkey, keybinding, accelerator (a macOS menu's own key)
 The Agent's own conversation file (`.jsonl`) that the Chat lens reads.
 _Avoid_: history, log
 
+**Background task**:
+A shell command or subagent an Agent started that keeps running after the tool call returned; the Agent is told when it ends and may then start a turn by itself.
+_Avoid_: background job, async task, background shell
+
 **Parked tail**:
 The live reading of a Transcript kept after its Chat lens closed, so reopening that Chat lens resumes it instead of reading the Transcript again.
 _Avoid_: cached chat, background tail
@@ -149,6 +153,7 @@ rules and previews: the [Herdr Design System](https://claude.ai/artifact/4xbvNjC
 | **Chat lens** / **Terminal lens** | The main area, as a conversation or the raw terminal | `src/chat/ChatLens.tsx`, `src/terminal/TerminalLens.tsx` |
 | **Work block** | One turn's work folded under "Worked for …" | `src/chat/WorkBlockView.tsx` |
 | **Queued messages** | Messages sent mid-turn that the agent has not read yet | `src/chat/QueuedMessages.tsx` |
+| **Background tasks strip** | The Agent's running Background tasks above Queued messages, each with its time running; a row jumps to its tool card | `src/chat/BackgroundTasks.tsx` |
 | **Working line** | The spinner and "Working 1m 23s" (counted from the prompt) over the Composer while the agent works | `src/chat/WorkingIndicator.tsx` |
 | **Composer** / **Composer chips** | The message box and the reply buttons above it | `src/chat/Composer.tsx` |
 | **Composer keys** | Esc, Ctrl+C, ⇧Tab sent as keys, right of the Composer chips | `.composer-keys` |
