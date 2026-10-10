@@ -280,7 +280,7 @@ function AgentCard({
         </button>
       )}
       {!isProt && (
-        <button className="agent-card-close" aria-label={`Close ${title}`} title="Close pane" onClick={() => a?.guard(close)}>
+        <button className="agent-card-close" aria-label={`${closeLabel} ${title}`} title={closeLabel} onClick={() => a?.guard(close)}>
           <CloseIcon />
         </button>
       )}

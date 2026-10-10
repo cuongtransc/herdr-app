@@ -63,8 +63,8 @@ The file tree of one Workspace under the agent list, following the active Open i
 _Avoid_: files overlay, file browser
 
 **Open item**:
-An Agent's Pane or a file the user opened, shown as a tab in the **Open strip** above the main area, across all Machines and Sessions.
-_Avoid_: tab (a herdr Tab is a layout of Panes), editor
+An Agent's Pane or a file the user opened, shown as an item in the **Open strip** above the main area, across all Machines and Sessions. Removing an item only takes it off the strip: its Pane keeps running.
+_Avoid_: tab (a herdr Tab is a layout of Panes), close (closing ends a Pane or Tab; an item is removed), editor
 
 **File viewer**:
 The main area's view of the active file Open item.
@@ -127,7 +127,7 @@ rules and previews: the [Herdr Design System](https://claude.ai/artifact/4xbvNjC
 | **Queue chip** | "1 blocked · 1 review" atop the Agents column | `SessionQueueChip` |
 | **Fork** | A Claude pane's menu: Fork session / Fork into a new worktree opens a tab running `claude --resume <id> --fork-session`; its Chat lens says where it came from | `src/agents/forkSession.ts` |
 | **Side question** | A `/btw <question>` sent from a Claude pane's Composer: its answer, read off Claude's screen (it never reaches the transcript), shows in a panel above the Composer; Claude's own panel is closed right after | `src/chat/btw.ts`, `src/chat/BtwPanel.tsx` |
-| **Protected pane** | A lock on a Pane row: Close pane is off, and closing its tab, workspace or session names it first; orchestrators start protected | `src/agents/protect.ts` |
+| **Protected pane** | A lock on a Pane row: Close pane (Close tab on a one-pane tab) is off, and closing its tab, workspace or session names it first; orchestrators start protected | `src/agents/protect.ts` |
 | **Lane toggle** | "N lanes ›" on an orchestrator's Pane row | `.lane-toggle` in `AgentList.tsx` |
 | **Triage HUD** | The queue shown by ⌘J | `src/main/TriageHud.tsx`, `src/main/triage.ts` |
 | **Agent Board** | The ⇧⌘D overlay, with the Quota column | `src/dashboard/AgentDashboard.tsx`, `QuotaColumn` |

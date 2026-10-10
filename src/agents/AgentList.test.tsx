@@ -382,9 +382,11 @@ describe("AgentList", () => {
     expect(copyTranscriptPath).toHaveBeenCalledWith({ machine_id: "local", session: "default", pane_id: "p4" });
   });
 
-  it("closes a pane from its card button without asking", () => {
+  it("closes a pane from its card button without asking, naming a one-pane tab's as Close tab", () => {
     render(<AgentList />);
-    fireEvent.click(screen.getByRole("button", { name: "Close Tag v1.4.0" }));
+    expect(screen.getByRole("button", { name: "Close tab Idempotent payments" }).title).toBe("Close tab");
+    expect(screen.getByRole("button", { name: "Close pane Tag v1.4.0" }).title).toBe("Close pane");
+    fireEvent.click(screen.getByRole("button", { name: "Close pane Tag v1.4.0" }));
     expect(screen.queryByRole("dialog")).toBeNull();
     expect(herdrCall).toHaveBeenCalledWith("local", "default", "pane.close", { pane_id: "p3" });
   });
@@ -433,7 +435,7 @@ describe("AgentList", () => {
       usePaneFilter.setState({ filter: "all" });
       render(<AgentList />);
       expect(screen.getByLabelText("Protected: Ship flag")).toBeTruthy();
-      expect(screen.queryByRole("button", { name: "Close Ship flag" })).toBeNull();
+      expect(screen.queryByRole("button", { name: "Close pane Ship flag" })).toBeNull();
       const menu = menuOf("Ship flag");
       const close = within(menu).getByRole("menuitem", { name: "Close pane" }) as HTMLButtonElement;
       expect(close.disabled).toBe(true);
@@ -447,7 +449,7 @@ describe("AgentList", () => {
       render(<AgentList />);
       fireEvent.click(within(menuOf("Ship flag")).getByRole("menuitemcheckbox", { name: "Protected" }));
       expect(screen.queryByLabelText("Protected: Ship flag")).toBeNull();
-      expect(screen.getByRole("button", { name: "Close Ship flag" })).toBeTruthy();
+      expect(screen.getByRole("button", { name: "Close pane Ship flag" })).toBeTruthy();
       expect(useProtect.getState().marks["local/default/p4"]).toBe(false);
     });
 

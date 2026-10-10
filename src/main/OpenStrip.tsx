@@ -71,13 +71,14 @@ export const OpenStrip = memo(function OpenStrip() {
   const twice = (label: string) => tabs.filter((t) => t.label === label).length > 1;
 
   const close = (key: string) => closeItems(key, "one");
-  // Commands that would close nothing are left out.
+  // Remove, not Close: an item leaves the strip and its pane keeps running, unlike a sidebar row's
+  // Close pane / Close tab. Commands that would remove nothing are left out.
   const menuItems = (key: string): MenuItem[] => {
     const at = tabs.findIndex((e) => e.key === key);
-    const list: MenuItem[] = [{ label: "Close", icon: CloseIcon, onSelect: () => close(key) }];
-    if (tabs.length > 1) list.push({ label: "Close Others", icon: CloseIcon, onSelect: () => closeItems(key, "others") });
-    if (at < tabs.length - 1) list.push({ label: "Close to the Right", icon: CloseIcon, onSelect: () => closeItems(key, "right") });
-    list.push({ label: "Close All", icon: CloseIcon, onSelect: () => closeItems(key, "all") });
+    const list: MenuItem[] = [{ label: "Remove", icon: CloseIcon, onSelect: () => close(key) }];
+    if (tabs.length > 1) list.push({ label: "Remove Others", icon: CloseIcon, onSelect: () => closeItems(key, "others") });
+    if (at < tabs.length - 1) list.push({ label: "Remove to the Right", icon: CloseIcon, onSelect: () => closeItems(key, "right") });
+    list.push({ label: "Remove All", icon: CloseIcon, onSelect: () => closeItems(key, "all") });
     return list;
   };
 
@@ -163,7 +164,8 @@ export const OpenStrip = memo(function OpenStrip() {
             <button
               type="button"
               className="files-tab-close"
-              aria-label={`Close ${label}`}
+              aria-label={`Remove ${label}`}
+              title={pane ? "Remove from Open strip (the pane keeps running)" : "Remove from Open strip"}
               onClick={(e) => {
                 e.stopPropagation();
                 close(key);
