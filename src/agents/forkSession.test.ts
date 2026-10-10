@@ -73,7 +73,7 @@ describe("forkSession", () => {
     }));
     const fork = { machine_id: "local", session: "default", pane_id: "w1:p9" };
     expect(useApp.getState().selected).toEqual(fork);
-    expect(useForks.getState().forks[paneKey(fork)]).toEqual({ of: orig, from: "Port Files panel", at: new Date(2026, 9, 9, 16, 5).getTime(), worktree: null });
+    expect(useForks.getState().forks[paneKey(fork)]).toEqual({ of: orig, from: "Port Files panel", at: new Date(2026, 9, 9, 16, 5).getTime(), worktree: null, path: "/h/.claude/projects/x/sid-1.jsonl" });
   });
 
   it("forks into a new worktree named for the time", async () => {

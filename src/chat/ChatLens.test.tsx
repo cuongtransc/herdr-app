@@ -213,6 +213,45 @@ describe("ChatLens", () => {
     useForks.setState({ forks: {} });
   });
 
+  describe("a fork with no transcript of its own yet", () => {
+    const of = { machine_id: "devtuf", session: "default", pane_id: "w1:p0" };
+    const at = Date.parse("2026-10-10T04:48:00Z");
+    const pendingFork = { agent: "claude", path: "/p/fork.jsonl", ambiguous: false, candidates: [], pending: true };
+    const history = [
+      { kind: "user", text: "before the fork", ts: "2026-10-10T04:40:00Z" },
+      { kind: "assistant_text", markdown: "an answer", ts: "2026-10-10T04:41:00Z" },
+      { kind: "user", text: "after the fork", ts: "2026-10-10T04:50:00Z" },
+    ];
+    const outlined = () => [...screen.getByRole("navigation", { name: "Conversation outline" }).querySelectorAll("ol button")].map((b) => b.textContent);
+
+    it("shows the original's history up to the fork, then its own transcript once Claude writes it", async () => {
+      useForks.setState({ forks: { [paneKey(pane)]: { of, from: "Main", at, worktree: null, path: "/p/orig.jsonl" } } });
+      opened = Promise.resolve(pendingFork);
+      vi.mocked(chatLocate).mockImplementation(() => Promise.resolve(pendingFork) as never);
+      render(<ChatLens pane={pane} view={idlePi} />);
+      await waitFor(() => expect(openedPaths).toEqual([null, "/p/orig.jsonl"]));
+      act(() => channels[1].onmessage({ type: "reset", items: history, total: history.length }));
+      expect(outlined()).toEqual(["before the fork"]);
+      expect(screen.getByText(/History copied from Main up to the fork/)).toBeTruthy();
+      expect(screen.queryByText("New conversation: send the first message to start it.")).toBeNull();
+      // The first message makes Claude write the fork's own transcript: the lens moves to it.
+      vi.mocked(chatLocate).mockImplementation(() => Promise.resolve({ ...pendingFork, path: "/p/fork2.jsonl", pending: false }) as never);
+      await waitFor(() => expect(openedPaths[openedPaths.length - 1]).toBeNull(), { timeout: 3000 });
+      expect(openedPaths.length).toBeGreaterThan(2);
+      useForks.setState({ forks: {} });
+    });
+
+    it("finds the original's transcript for a fork recorded without one", async () => {
+      useForks.setState({ forks: { [paneKey(pane)]: { of, from: "Main", at, worktree: null } } });
+      opened = Promise.resolve(pendingFork);
+      vi.mocked(chatLocate).mockImplementation(((p: { pane_id: string }) =>
+        Promise.resolve(p.pane_id === of.pane_id ? { ...pendingFork, path: "/p/orig.jsonl", pending: false } : pendingFork)) as never);
+      render(<ChatLens pane={pane} view={idlePi} />);
+      await waitFor(() => expect(openedPaths).toEqual([null, "/p/orig.jsonl"]));
+      useForks.setState({ forks: {} });
+    });
+  });
+
   it("runs at the chat width chosen in Settings, and follows a change", () => {
     useLensSettings.setState({ chatWidth: "comfortable" });
     const { container } = render(<ChatLens pane={pane} view={idlePi} />);
