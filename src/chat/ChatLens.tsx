@@ -376,7 +376,11 @@ export function ChatLens({ pane, view }: { pane: PaneRef; view: PaneView }) {
     const i = rowOfCall(rows, pendingJump);
     if (i < 0) return;
     setPendingJump(null);
-    jumpNow(pendingJump, i);
+    // The virtualizer re-adjusts scroll from its pre-jump offset when it measures the
+    // rows a prepend just rendered, undoing an immediate jump; wait two frames.
+    // No cleanup: setPendingJump(null) re-runs this effect and would cancel the frames.
+    const target = pendingJump;
+    requestAnimationFrame(() => requestAnimationFrame(() => jumpNow(target, i)));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [pendingJump, rows]);
 
