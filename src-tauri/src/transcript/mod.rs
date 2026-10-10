@@ -1,6 +1,7 @@
 //! Transcript discovery and streaming: find an agent's JSONL transcript on a Machine and
 //! tail it into chat items.
 pub mod claude;
+pub mod fork;
 pub mod images;
 pub mod locate;
 pub mod pi;
@@ -53,6 +54,9 @@ pub struct ChatMeta {
 #[serde(tag = "kind", rename_all = "snake_case")]
 pub enum ChatItem {
     User {
+        /// The Transcript entry that holds it (Claude `uuid`, pi `id`): where a fork cuts.
+        #[serde(skip_serializing_if = "Option::is_none")]
+        id: Option<String>,
         text: String,
         #[serde(skip_serializing_if = "Vec::is_empty")]
         images: Vec<ImageRef>,
@@ -516,6 +520,7 @@ mod tests {
     impl Parser for Echo {
         fn push_line(&mut self, line: &str, _: &mut dyn ImageSink) -> ParserOutput {
             let item = ChatItem::User {
+                id: None,
                 ts: None,
                 text: line.into(),
                 images: vec![],
@@ -858,6 +863,7 @@ mod tests {
     #[test]
     fn serializes_ts_only_when_known() {
         let with = serde_json::to_value(ChatItem::User {
+            id: None,
             text: "a".into(),
             images: vec![],
             skills: vec![],
@@ -866,6 +872,7 @@ mod tests {
         .unwrap();
         assert_eq!(with["ts"], "2026-10-03T00:00:00Z");
         let without = serde_json::to_value(ChatItem::User {
+            id: None,
             text: "a".into(),
             images: vec![],
             skills: vec![],
@@ -878,6 +885,7 @@ mod tests {
     #[test]
     fn omits_empty_images_and_skills() {
         let v = serde_json::to_value(ChatItem::User {
+            id: None,
             text: "a".into(),
             images: vec![],
             skills: vec![],
