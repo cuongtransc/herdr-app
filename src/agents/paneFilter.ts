@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { create } from "zustand";
-import type { PaneView } from "../lib/types";
+import { paneKey, type PaneView, type WorkspaceView } from "../lib/types";
 
 /** Shared with the other settings writers: one JSON object, each writer merges its own keys. */
 const SETTINGS_KEY = "herdr-app:settings";
@@ -59,15 +59,46 @@ const SHELL_NAMES = new Set(["sh", "bash", "zsh", "fish", "nu", "pwsh", "dash", 
 export const isPlainShell = (pane: PaneView) =>
   !pane.agent && (pane.busy != null ? !pane.busy : SHELL_NAMES.has(pane.title.trim().replace(/^-/, "").toLowerCase()));
 
+const agentName = (agent: string) => agent.charAt(0).toUpperCase() + agent.slice(1);
+
 /** Why closing the pane would end work, or null when nothing runs there (ui-ux-guidelines §4.3). */
 export function busyWhy(pane: PaneView): string | null {
   if (pane.agent) {
-    const name = pane.agent.charAt(0).toUpperCase() + pane.agent.slice(1);
+    const name = agentName(pane.agent);
     if (pane.status === "working") return `${name} is working: closing ends its turn.`;
     if (pane.status === "blocked") return `${name} is waiting for you: closing ends it.`;
     return null;
   }
   return isPlainShell(pane) ? null : "It is running a command: closing stops it.";
+}
+
+/** A pane with work running, named in a dialog that would close it with others. */
+export interface BusyPane {
+  key: string;
+  title: string;
+  /** "Claude working", "Codex waiting for you", "running a command" */
+  note: string;
+}
+
+/** busyWhy, short, for a list. */
+function busyNote(pane: PaneView): string | null {
+  if (pane.agent) {
+    if (pane.status === "working") return `${agentName(pane.agent)} working`;
+    if (pane.status === "blocked") return `${agentName(pane.agent)} waiting for you`;
+    return null;
+  }
+  return isPlainShell(pane) ? null : "running a command";
+}
+
+/** The panes of `workspaces` with work running, leaving out `skip` (the protected, named already). */
+export function busyIn(machineId: string, session: string, workspaces: WorkspaceView[], skip: ReadonlySet<string> = new Set()): BusyPane[] {
+  const out: BusyPane[] = [];
+  for (const pane of workspaces.flatMap((w) => w.tabs.flatMap((t) => t.panes))) {
+    const key = paneKey({ machine_id: machineId, session, pane_id: pane.pane_id });
+    const note = busyNote(pane);
+    if (note && !skip.has(key)) out.push({ key, title: pane.title, note });
+  }
+  return out;
 }
 
 /** How Active treats a pane. `since` is when its status last changed (unknown before the app saw a change). */

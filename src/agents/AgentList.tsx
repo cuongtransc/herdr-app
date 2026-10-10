@@ -16,7 +16,7 @@ import { AgentIcon } from "./AgentIcon";
 import { isProtected, protectedIn, useProtect } from "./protect";
 import { forkBlocked, forkSession } from "./forkSession";
 import { copyTranscriptPath } from "./transcriptPath";
-import { busyWhy, idleLabel, paneState, useActiveKeptMs, useMinuteClock, usePaneFilter } from "./paneFilter";
+import { busyIn, busyWhy, idleLabel, paneState, useActiveKeptMs, useMinuteClock, usePaneFilter } from "./paneFilter";
 import { useLaneRecords } from "./laneOwners";
 import { laneTitle, sessionRoles, tabRole } from "./roles";
 import { AGENTS, openAgentTab } from "./openAgentTab";
@@ -186,7 +186,7 @@ function AgentCard({
   // Asks first when the pane has work running; otherwise closes at once.
   const closeChecked = () => {
     const why = busyWhy(pane);
-    if (why) a?.confirm(closeLabel, `${closeLabel} "${title}"? ${why}`, "Close", close, [], true);
+    if (why) a?.confirm(closeLabel, `${closeLabel} "${title}"? ${why}`, "Close", close, [], { cancelFirst: true });
     else a?.guard(close);
   };
   const closePane: MenuItem = isProt
@@ -214,7 +214,8 @@ function AgentCard({
               onSelect: () => {
                 const inTab = new Set(tab.panes.map((p) => paneKey({ machine_id: machineId, session, pane_id: p.pane_id })));
                 const prot = protectedIn(machineId, session, [ws], useProtect.getState().marks).filter((p) => inTab.has(p.key));
-                a.confirm("Close tab", `Close tab "${tab.label}" and all its panes?`, "Close", call("tab.close", { tab_id: tab.tab_id }), prot);
+                const busy = busyIn(machineId, session, [{ ...ws, tabs: [tab] }], new Set(prot.map((p) => p.key)));
+                a.confirm("Close tab", `Close tab "${tab.label}" and all its panes?`, "Close", call("tab.close", { tab_id: tab.tab_id }), prot, { busy });
               },
             },
       ]
@@ -356,9 +357,11 @@ function WorkspaceGroup({ machineId, session, workspace: ws, rows: all, active }
         {
           label: "Close workspace",
           icon: CloseIcon,
-          onSelect: () =>
-            a.confirm("Close workspace", `Close workspace "${ws.label}" and all its panes?`, "Close", call("workspace.close", { workspace_id: ws.workspace_id }),
-              protectedIn(machineId, session, [ws], useProtect.getState().marks)),
+          onSelect: () => {
+            const prot = protectedIn(machineId, session, [ws], useProtect.getState().marks);
+            const busy = busyIn(machineId, session, [ws], new Set(prot.map((p) => p.key)));
+            a.confirm("Close workspace", `Close workspace "${ws.label}" and all its panes?`, "Close", call("workspace.close", { workspace_id: ws.workspace_id }), prot, { busy });
+          },
         },
       ]
     : [];

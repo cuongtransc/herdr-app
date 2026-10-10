@@ -392,6 +392,48 @@ describe("AgentList", () => {
     expect(herdrCall).toHaveBeenCalledWith("local", "default", "pane.close", { pane_id: "p1" });
   });
 
+  describe("closing a tab or workspace with work running", () => {
+    const busyIn = (dialog: HTMLElement) =>
+      [...dialog.querySelectorAll(".busy-list li")].map((li) => li.textContent);
+
+    it("names the panes with work running when closing their workspace, Cancel first", () => {
+      render(<AgentList />);
+      fireEvent.contextMenu(screen.getByText("web", { selector: ".ws-label" }));
+      fireEvent.click(screen.getByRole("menuitem", { name: "Close workspace" }));
+      const dialog = screen.getByRole("dialog", { name: "Close workspace" });
+      expect(within(dialog).getByText("It has work running, which ends too:")).toBeTruthy();
+      expect(busyIn(dialog)).toEqual(["Guard export · Codex waiting for you", "Tag v1.4.0 · running a command"]);
+      expect(document.activeElement?.textContent).toBe("Cancel");
+      expect(within(dialog).getByRole("button", { name: "Close" }).className).toBe("btn btn-danger-text");
+    });
+
+    it("names only the busy panes of a tab", () => {
+      usePaneFilter.setState({ filter: "all" });
+      render(<AgentList />);
+      fireEvent.contextMenu(screen.getByText("Tag v1.4.0"));
+      fireEvent.click(screen.getByRole("menuitem", { name: "Close tab" }));
+      // Ship flag, the tab's idle pi, is not named.
+      expect(busyIn(screen.getByRole("dialog", { name: "Close tab" }))).toEqual(["Tag v1.4.0 · running a command"]);
+    });
+
+    it("keeps the plain confirmation, Close first, when nothing runs", () => {
+      render(<AgentList />);
+      fireEvent.contextMenu(screen.getByText("checkout-api", { selector: ".ws-label" }));
+      fireEvent.click(screen.getByRole("menuitem", { name: "Close workspace" }));
+      const dialog = screen.getByRole("dialog", { name: "Close workspace" });
+      expect(busyIn(dialog)).toEqual([]);
+      expect(document.activeElement?.textContent).toBe("Close");
+    });
+
+    it("names a protected pane once, among the protected", () => {
+      useProtect.getState().set("local/default/p2", true);
+      render(<AgentList />);
+      fireEvent.contextMenu(screen.getByText("web", { selector: ".ws-label" }));
+      fireEvent.click(screen.getByRole("menuitem", { name: "Close workspace" }));
+      expect(busyIn(screen.getByRole("dialog", { name: "Close workspace" }))).toEqual(["Tag v1.4.0 · running a command"]);
+    });
+  });
+
   describe("closing a pane with work running", () => {
     const withStatus = (status: PaneView["status"]): MachineView => ({ ...m, sessions: [{ ...m.sessions[0], workspaces: m.sessions[0].workspaces.map((w) =>
       w.workspace_id !== "w1" ? w : { ...w, tabs: w.tabs.map((t) => ({ ...t, panes: t.panes.map((p) => ({ ...p, status })) })) }) }, m.sessions[1]] });

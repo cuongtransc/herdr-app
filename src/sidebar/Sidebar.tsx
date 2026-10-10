@@ -16,6 +16,7 @@ import {
 import type { MachineView } from "../lib/types";
 import { useApp } from "../store/app";
 import { protectedIn, useProtect } from "../agents/protect";
+import { busyIn } from "../agents/paneFilter";
 import { StatusDot } from "./StatusDot";
 import type { MenuItem } from "./ContextMenu";
 import { ActionsProvider, useActions } from "./actions";
@@ -79,9 +80,11 @@ export function SessionRow({ node }: { node: RSession }) {
             {
               label: "Stop session",
               icon: StopIcon,
-              onSelect: () =>
-                a.confirm("Stop session", `Stop session "${session.name}"? Running agents will end.`, "Stop", () => sessionStop(machineId, session.name),
-                  protectedIn(machineId, session.name, session.workspaces, useProtect.getState().marks)),
+              onSelect: () => {
+                const prot = protectedIn(machineId, session.name, session.workspaces, useProtect.getState().marks);
+                const busy = busyIn(machineId, session.name, session.workspaces, new Set(prot.map((p) => p.key)));
+                a.confirm("Stop session", `Stop session "${session.name}"? Running agents will end.`, "Stop", () => sessionStop(machineId, session.name), prot, { busy });
+              },
             },
             moveItem,
           ]

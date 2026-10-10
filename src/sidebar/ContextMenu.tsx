@@ -3,6 +3,7 @@ import type { ComponentType, SVGProps } from "react";
 import { PathInput } from "../ui/PathInput";
 import { CheckIcon, LockIcon } from "../ui/icons";
 import type { ProtectedPane } from "../agents/protect";
+import type { BusyPane } from "../agents/paneFilter";
 
 export interface MenuItem {
   label: string;
@@ -89,6 +90,7 @@ export function ConfirmDialog({
   onClose,
   protectedPanes = [],
   cancelFirst = false,
+  busyPanes = [],
 }: {
   title: string;
   message: string;
@@ -99,9 +101,11 @@ export function ConfirmDialog({
   protectedPanes?: ProtectedPane[];
   /** Work would be lost (an agent working, a command running): Cancel takes the focus. */
   cancelFirst?: boolean;
+  /** Panes with work running the action would end: listed, and Cancel takes the focus. */
+  busyPanes?: BusyPane[];
 }) {
   const guarded = protectedPanes.length > 0;
-  const safe = guarded || cancelFirst;
+  const safe = guarded || cancelFirst || busyPanes.length > 0;
   return (
     <Modal title={title} onClose={onClose}>
       <p>{message}</p>
@@ -113,6 +117,19 @@ export function ConfirmDialog({
               <li key={p.key}>
                 <LockIcon className="icon" />
                 {p.title}
+              </li>
+            ))}
+          </ul>
+        </>
+      )}
+      {busyPanes.length > 0 && (
+        <>
+          <p>It has work running, which ends too:</p>
+          <ul className="busy-list">
+            {busyPanes.map((p) => (
+              <li key={p.key}>
+                {p.title}
+                <span className="busy-note"> · {p.note}</span>
               </li>
             ))}
           </ul>

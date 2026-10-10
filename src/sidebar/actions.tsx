@@ -14,11 +14,18 @@ import { setFolder } from "../workspaces/folder";
 import type { WorkspaceRef } from "../workspaces/folder";
 import { AddMachineDialog } from "../machines/AddMachineDialog";
 import { useProtect, type ProtectedPane } from "../agents/protect";
+import type { BusyPane } from "../agents/paneFilter";
 const ConnectDialog = lazy(() => import("../machines/ConnectDialog").then((m) => ({ default: m.ConnectDialog })));
+
+/** Cancel first when work would be lost; `busy`: the panes with work running, listed. */
+export interface ConfirmOpts {
+  cancelFirst?: boolean;
+  busy?: BusyPane[];
+}
 
 type Dialog =
   | { kind: "rename"; title: string; initial: string; submitLabel: string; run: (label: string) => Promise<unknown> }
-  | { kind: "confirm"; title: string; message: string; confirmLabel: string; run: () => Promise<unknown>; protectedPanes: ProtectedPane[]; cancelFirst: boolean }
+  | { kind: "confirm"; title: string; message: string; confirmLabel: string; run: () => Promise<unknown>; protectedPanes: ProtectedPane[] } & ConfirmOpts
   | { kind: "session"; machineId?: string; groupId?: string }
   | { kind: "workspace"; machineId: string; session: string; defaultCwd: string }
   | { kind: "agent"; machineId: string; session: string; workspace: WorkspaceView }
@@ -33,7 +40,7 @@ export interface Actions {
   menuAt: (x: number, y: number, items: MenuEntry[]) => void;
   rename: (title: string, initial: string, run: (label: string) => Promise<unknown>, submitLabel?: string) => void;
   /** `protectedPanes`: the protected panes `run` closes; confirming unprotects them first. */
-  confirm: (title: string, message: string, confirmLabel: string, run: () => Promise<unknown>, protectedPanes?: ProtectedPane[], cancelFirst?: boolean) => void;
+  confirm: (title: string, message: string, confirmLabel: string, run: () => Promise<unknown>, protectedPanes?: ProtectedPane[], opts?: ConfirmOpts) => void;
   /** No `machineId`: the dialog offers a machine picker. `groupId`: place the new session there. */
   newSession: (machineId?: string, groupId?: string) => void;
   newWorkspace: (machineId: string, session: string) => void;
@@ -83,8 +90,8 @@ export function ActionsProvider({ children }: { children: ReactNode }) {
       },
       menuAt: (x, y, items) => setMenu({ x, y, items }),
       rename: (title, initial, run, submitLabel = "Rename") => setDialog({ kind: "rename", title, initial, submitLabel, run }),
-      confirm: (title, message, confirmLabel, run, protectedPanes = [], cancelFirst = false) =>
-        setDialog({ kind: "confirm", title, message, confirmLabel, run, protectedPanes, cancelFirst }),
+      confirm: (title, message, confirmLabel, run, protectedPanes = [], opts = {}) =>
+        setDialog({ kind: "confirm", title, message, confirmLabel, run, protectedPanes, ...opts }),
       newAgent: (machineId, session, workspace) => setDialog({ kind: "agent", machineId, session, workspace }),
       changeFolder: (ref, initial) => setDialog({ kind: "folder", ref, initial }),
       moveToGroup: (key) => setDialog({ kind: "move", key }),
@@ -118,7 +125,7 @@ export function ActionsProvider({ children }: { children: ReactNode }) {
     );
   } else if (dialog?.kind === "confirm") {
     modal = (
-      <ConfirmDialog title={dialog.title} message={dialog.message} confirmLabel={dialog.confirmLabel} protectedPanes={dialog.protectedPanes} cancelFirst={dialog.cancelFirst}
+      <ConfirmDialog title={dialog.title} message={dialog.message} confirmLabel={dialog.confirmLabel} protectedPanes={dialog.protectedPanes} cancelFirst={dialog.cancelFirst} busyPanes={dialog.busy}
         onClose={closeDialog}
         onConfirm={() => {
           useProtect.getState().release(dialog.protectedPanes.map((p) => p.key));
