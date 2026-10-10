@@ -1,10 +1,11 @@
-import { memo, useState } from "react";
+import { memo, useContext, useState } from "react";
 import Markdown from "react-markdown";
 import type { ChatItem } from "../lib/types";
 import { BrainIcon, ChevronIcon } from "../ui/icons";
 import { CopyButton } from "./CopyButton";
 import { mdComponents, rehypePlugins, remarkPlugins } from "./markdown";
 import { checklist, checklistSummary, type ChecklistRow } from "./checklist";
+import { BackgroundContext, taskBadge } from "./backgroundTaskState";
 import { ChatImages } from "./images";
 import { SkillChips } from "./skills";
 import { toolIcon } from "./toolIcon";
@@ -63,6 +64,7 @@ function ToolCallView({ item, result, running = false }: { item: Extract<ChatIte
   const input = (item.input ?? {}) as Record<string, unknown>;
   const ToolIcon = toolIcon(item.name);
   const todos = checklist(item.input);
+  const badge = taskBadge(item.id, useContext(BackgroundContext));
   if (todos) {
     return (
       <div className="chat-tool">
@@ -93,6 +95,7 @@ function ToolCallView({ item, result, running = false }: { item: Extract<ChatIte
         <span className="chat-tool-name">{item.name}</span>
         <span className="chat-tool-sep"> · </span>
         <span className="chat-tool-summary">{item.input_summary}</span>
+        {badge && <span className={"chat-tool-badge " + badge.tone}>{badge.label}</span>}
         {running && <span className="spin" aria-label="Running" />}
       </button>
       {open && (

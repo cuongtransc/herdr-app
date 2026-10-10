@@ -17,6 +17,7 @@ import { currentEntry, outline } from "./outline";
 import { Composer } from "./Composer";
 import { QueuedMessages } from "./QueuedMessages";
 import { BackgroundTasks } from "./BackgroundTasks";
+import { BackgroundContext, taskEnds } from "./backgroundTaskState";
 import { BtwPanel } from "./BtwPanel";
 import { WorkingIndicator } from "./WorkingIndicator";
 import { usePiModelPicker } from "./usePiModelPicker";
@@ -198,6 +199,10 @@ export function ChatLens({ pane, view }: { pane: PaneRef; view: PaneView }) {
   // Tool results render inside their call; each turn's work folds into one row.
   const { rows, results } = useMemo(() => buildRows(items, state.total - state.items.length), [items, state.total, state.items.length]);
   const asked = useMemo(() => pendingQuestions(items), [items]);
+  const background = useMemo(
+    () => ({ running: new Set(state.background.map((t) => t.call_id)), ends: taskEnds(items) }),
+    [state.background, items],
+  );
   const sessionPrompts = useMemo(
     () => items.flatMap((i) => (i.kind === "user" && i.text.trim() ? [i.text] : [])),
     [items],
@@ -312,6 +317,7 @@ export function ChatLens({ pane, view }: { pane: PaneRef; view: PaneView }) {
   return (
     <ChatPaneContext.Provider value={pane}>
     <ChatOpenContext.Provider value={opened}>
+    <BackgroundContext.Provider value={background}>
     <div className="chat-lens" data-width={chatWidth}>
     <div className="chat-main">
       {located && <TranscriptPicker located={located} onChoose={choose} />}
@@ -381,6 +387,7 @@ export function ChatLens({ pane, view }: { pane: PaneRef; view: PaneView }) {
     </div>
     <ChatOutline entries={entries} current={current} onJump={jumpTo} />
     </div>
+    </BackgroundContext.Provider>
     </ChatOpenContext.Provider>
     </ChatPaneContext.Provider>
   );
