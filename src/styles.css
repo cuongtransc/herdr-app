@@ -1858,4 +1858,5 @@ button.composer-model:disabled { cursor: default; }
 .chat-tool-badge { flex: none; margin-left: 6px; padding: 0 5px; font-size: 11px; border: 1px solid currentColor; border-radius: var(--r-sm); background: transparent; }
 .chat-tool-badge.running { color: var(--fg-3); }
 .chat-tool-badge.good { color: var(--green-text); }
+.chat-tool-badge.neutral { color: var(--fg-3); }
 .chat-tool-badge.bad { color: var(--err-fg); }

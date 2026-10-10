@@ -77,4 +77,21 @@ describe("TodoWrite in a work block", () => {
     expect(screen.getByText("Implement").closest("li")?.className).toContain("in_progress");
     expect(screen.queryByText("Todos have been modified successfully.")).toBeNull();
   });
+
+  it("scrolls the focused call's card into view once open, then reports it handled", () => {
+    const scroll = vi.fn();
+    const orig = Element.prototype.scrollIntoView;
+    Element.prototype.scrollIntoView = scroll;
+    try {
+      const handled = vi.fn();
+      const { rerender } = render(<WorkBlockView block={block} results={results} open={false} onToggle={() => {}} live={false} focusCall="a" onFocusHandled={handled} />);
+      expect(scroll).not.toHaveBeenCalled();
+      rerender(<WorkBlockView block={block} results={results} open onToggle={() => {}} live={false} focusCall="a" onFocusHandled={handled} />);
+      expect(scroll).toHaveBeenCalledTimes(1);
+      expect((scroll.mock.contexts[0] as HTMLElement).dataset.call).toBe("a");
+      expect(handled).toHaveBeenCalledTimes(1);
+    } finally {
+      Element.prototype.scrollIntoView = orig;
+    }
+  });
 });

@@ -1,6 +1,6 @@
 import { expect, it } from "vitest";
 import type { ChatItem } from "../lib/types";
-import { taskBadge, taskEnds } from "./backgroundTaskState";
+import { stableBackground, taskBadge, taskEnds } from "./backgroundTaskState";
 
 const state = (running: string[], ends: [string, { status: string; exit_code?: number }][]) => ({
   running: new Set(running),
@@ -23,7 +23,16 @@ it.each([
   [state([], [["t1", { status: "failed" }]]), { label: "failed", tone: "bad" }],
   [state([], [["t1", { status: "killed" }]]), { label: "killed", tone: "bad" }],
   [state(["t1"], [["t1", { status: "stopped" }]]), { label: "stopped", tone: "bad" }],
+  [state([], [["t1", { status: "" }]]), { label: "ended", tone: "neutral" }],
   [state([], []), null],
 ])("badges %#", (s, want) => {
   expect(taskBadge("t1", s)).toEqual(want);
+});
+
+it("keeps the previous state object while its running set and ends are unchanged", () => {
+  const a = state(["t1"], [["t2", { status: "completed", exit_code: 0 }]]);
+  const same = state(["t1"], [["t2", { status: "completed", exit_code: 0 }]]);
+  expect(stableBackground(a, same)).toBe(a);
+  expect(stableBackground(a, state(["t1", "t3"], [["t2", { status: "completed", exit_code: 0 }]]))).not.toBe(a);
+  expect(stableBackground(a, state(["t1"], [["t2", { status: "failed", exit_code: 1 }]]))).not.toBe(a);
 });

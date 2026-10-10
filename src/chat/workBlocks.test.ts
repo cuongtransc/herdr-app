@@ -23,6 +23,12 @@ function shape(rows: ChatRow[]): string[] {
 }
 
 describe("buildRows", () => {
+  it("leaves a text-less system item (a task end for the badge) out of the rows without splitting the Work block", () => {
+    const quiet: ChatItem = { kind: "system", text: "", task: { call_id: "a", status: "completed" } };
+    const { rows } = buildRows([user("go"), call("a"), quiet, call("b"), say("done")]);
+    expect(shape(rows)).toEqual(["user:go", "work[call:a,call:b]", "say:done"]);
+  });
+
   it("keys rows by block id or absolute item index, stable across a prepend", () => {
     const newer = [user("2", "t2"), call("b"), say("y")];
     const after = buildRows(newer, 10).rows.map((r) => r.key);

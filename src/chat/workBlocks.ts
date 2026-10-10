@@ -71,6 +71,8 @@ export function buildRows(items: ChatItem[], offset = 0): { rows: ChatRow[]; res
     bodyAt = [];
   };
   items.forEach((it, index) => {
+    // A task end with no text of its own exists for the badge: no row, no turn.
+    if (it.kind === "system" && !it.text.trim()) return;
     if (opensTurn(it)) {
       flush();
       lastBlock = -1;

@@ -17,7 +17,7 @@ import { currentEntry, outline } from "./outline";
 import { Composer } from "./Composer";
 import { QueuedMessages } from "./QueuedMessages";
 import { BackgroundTasks } from "./BackgroundTasks";
-import { BackgroundContext, taskEnds } from "./backgroundTaskState";
+import { BackgroundContext, stableBackground, taskEnds, type BackgroundState } from "./backgroundTaskState";
 import { BtwPanel } from "./BtwPanel";
 import { WorkingIndicator } from "./WorkingIndicator";
 import { usePiModelPicker } from "./usePiModelPicker";
@@ -64,6 +64,12 @@ export function ChatLens({ pane, view }: { pane: PaneRef; view: PaneView }) {
   const loadingTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
   // Work blocks the user opened or closed, by block id: a virtualized row forgets its own state.
   const [chosenOpen, setChosenOpen] = useState<ReadonlyMap<string, boolean>>(new Map());
+  // A jumped-to call whose card is not rendered yet (its Work block only opens on this render):
+  // the block scrolls it into view when it mounts or opens, then calls `clearPendingCard`.
+  const [pendingCard, setPendingCard] = useState<string | null>(null);
+  // A strip click on a call that is not loaded: older pages are fetched, then this jumps to it.
+  const [pendingJump, setPendingJump] = useState<string | null>(null);
+  const [jumpNotice, setJumpNotice] = useState<string | null>(null);
   // The turn picked in the rail stays lit until the user scrolls: near the end it may not reach
   // the top, and the end rule would light the last turn instead.
   const [picked, setPicked] = useState<string | null>(null);
@@ -146,6 +152,9 @@ export function ChatLens({ pane, view }: { pane: PaneRef; view: PaneView }) {
 
   useEffect(() => {
     setChosenOpen(new Map());
+    setPendingCard(null);
+    setPendingJump(null);
+    setJumpNotice(null);
     setPicked(null);
     setLocated(null);
     open(rememberedTranscript(key));
@@ -199,10 +208,15 @@ export function ChatLens({ pane, view }: { pane: PaneRef; view: PaneView }) {
   // Tool results render inside their call; each turn's work folds into one row.
   const { rows, results } = useMemo(() => buildRows(items, state.total - state.items.length), [items, state.total, state.items.length]);
   const asked = useMemo(() => pendingQuestions(items), [items]);
-  const background = useMemo(
-    () => ({ running: new Set(state.background.map((t) => t.call_id)), ends: taskEnds(items) }),
-    [state.background, items],
-  );
+  // Badges follow the strip's rule: nothing runs once the agent is gone, and a fork's preview
+  // of the original transcript must not claim the original's tasks. The value keeps its identity
+  // while its content is unchanged, so an append does not re-render every tool card.
+  const bgRef = useRef<BackgroundState>({ running: new Set(), ends: new Map() });
+  const background = useMemo(() => {
+    const running = new Set(view.agent && !preview ? state.background.map((t) => t.call_id) : []);
+    bgRef.current = stableBackground(bgRef.current, { running, ends: taskEnds(items) });
+    return bgRef.current;
+  }, [state.background, items, view.agent, preview]);
   const sessionPrompts = useMemo(
     () => items.flatMap((i) => (i.kind === "user" && i.text.trim() ? [i.text] : [])),
     [items],
@@ -304,14 +318,67 @@ export function ChatLens({ pane, view }: { pane: PaneRef; view: PaneView }) {
     setPicked(entries.find((e) => e.row === row)?.key ?? null);
     virt.scrollToIndex(row, { align: "start" });
   };
-  // A task's card may sit in a folded work block: open it, then scroll to it.
-  const jumpToCall = (callId: string) => {
-    const i = rowOfCall(rows, callId);
-    if (i < 0) return;
+  // A task's card may sit in a folded work block: open it, scroll to its row, then bring the
+  // card itself into view once the block has rendered.
+  const jumpNow = (callId: string, i: number) => {
     const row = rows[i];
     if (row.kind === "work") setChosenOpen((m) => new Map(m).set(row.block.id, true));
     jumpTo(i);
+    setPendingCard(callId);
   };
+  const clearPendingCard = useCallback(() => setPendingCard(null), []);
+  // The call is older than the loaded window: page back until it appears or the start is reached.
+  const loadUntilCall = async (callId: string) => {
+    if (loadingOlder.current) {
+      setJumpNotice("Still loading older messages; click again in a moment.");
+      return;
+    }
+    loadingOlder.current = true;
+    const gen = generation.current;
+    const first = latest.current.total - latest.current.items.length;
+    const pages: ChatItem[][] = [];
+    let before = first;
+    let found = false;
+    try {
+      while (before > 0 && !found) {
+        const older = await chatPage(pane, before);
+        if (gen !== generation.current) return;
+        if (older.length === 0) break;
+        pages.unshift(older);
+        before -= older.length;
+        found = older.some((it) => it.kind === "tool_call" && it.id === callId);
+      }
+      const now = latest.current;
+      if (now.total - now.items.length !== first) {
+        setJumpNotice("The transcript changed while loading older messages; click again.");
+        return;
+      }
+      if (pages.length > 0) {
+        anchor.current = 0;
+        dispatch({ type: "prepend", items: pages.flat(), before: first });
+      }
+      if (found) setPendingJump(callId);
+      else setJumpNotice("Task call not found in the transcript: it started before the part Herdr can read.");
+    } catch (e) {
+      setJumpNotice(`Could not load older messages: ${e instanceof Error ? e.message : String(e)}`);
+    } finally {
+      loadingOlder.current = false;
+    }
+  };
+  const jumpToCall = (callId: string) => {
+    setJumpNotice(null);
+    const i = rowOfCall(rows, callId);
+    if (i >= 0) jumpNow(callId, i);
+    else void loadUntilCall(callId);
+  };
+  useEffect(() => {
+    if (!pendingJump) return;
+    const i = rowOfCall(rows, pendingJump);
+    if (i < 0) return;
+    setPendingJump(null);
+    jumpNow(pendingJump, i);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pendingJump, rows]);
 
   const err = openError ?? state.error;
   return (
@@ -332,6 +399,7 @@ export function ChatLens({ pane, view }: { pane: PaneRef; view: PaneView }) {
           <button className="btn btn-xs" onClick={() => useApp.getState().select(forkOf.of)}>Back to original</button>
         </div>
       )}
+      {jumpNotice && <div className="chat-notice neutral" role="status">{jumpNotice}</div>}
       {pending && !err && <div className="chat-notice neutral">New conversation: send the first message to start it.</div>}
       {preview && forkOf && !err && (
         <div className="chat-notice neutral">History copied from {forkOf.from} up to the fork. Your first message starts the fork's own transcript.</div>
@@ -357,6 +425,8 @@ export function ChatLens({ pane, view }: { pane: PaneRef; view: PaneView }) {
                     onToggle={toggle}
                     live={live && row.last}
                     working={view.status === "working" && row.last}
+                    focusCall={pendingCard}
+                    onFocusHandled={clearPendingCard}
                   />
                 ) : (
                   <ChatItemView
