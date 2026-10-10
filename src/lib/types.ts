@@ -98,6 +98,11 @@ export interface SkillUse { name: string; path: string }
 export interface ModelAlias { name: string; label: string; provider: string | null; fallback: boolean }
 
 /** `model` is what served the last reply; with `alias`, the alias's target. */
+/** A background Bash command or Agent the Transcript started and has not yet ended; `started`: ISO 8601, if known. */
+export interface BackgroundTask { call_id: string; kind: "bash" | "agent"; description: string; started: string | null }
+/** How a background task ended, carried on the System item that reports it. */
+export interface TaskEnd { call_id: string; status: string; exit_code?: number }
+
 export interface ChatMeta { model: string | null; effort: string | null; context_tokens: number | null; alias?: ModelAlias | null }
 
 /** `ts`: when the Transcript record was written (ISO 8601), if it says. */
@@ -107,7 +112,7 @@ export type ChatItem = (
   | { kind: "thinking"; text: string }
   | { kind: "tool_call"; id: string; name: string; input_summary: string; input: unknown }
   | { kind: "tool_result"; call_id: string; output: string; is_error: boolean; images?: ImageRef[] }
-  | { kind: "system"; text: string }
+  | { kind: "system"; text: string; task?: TaskEnd }
   | { kind: "shell_command"; command: string }
   | { kind: "shell_output"; stdout: string; stderr: string }
 ) & { ts?: string };
@@ -115,7 +120,7 @@ export type ChatItem = (
 export type ChatEvent =
   | { type: "reset"; items: ChatItem[]; total: number }
   | { type: "append"; items: ChatItem[] }
-  | ({ type: "meta"; queued: string[] } & ChatMeta)
+  | ({ type: "meta"; queued: string[]; background: BackgroundTask[] } & ChatMeta)
   | { type: "error"; error: AppError };
 
 /** The folder and git branch a Pane works in (`branch` is null outside a repository). */

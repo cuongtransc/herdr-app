@@ -189,7 +189,7 @@ describe("ChatLens", () => {
   it("shows a message sent mid-turn as queued until the agent reads it", () => {
     render(<ChatLens pane={pane} view={{ status: "working", agent: "claude", title: "claude" } as PaneView} />);
     const send = (queued: string[]) =>
-      act(() => channels[channels.length - 1].onmessage({ type: "meta", model: null, effort: null, context_tokens: null, queued }));
+      act(() => channels[channels.length - 1].onmessage({ type: "meta", model: null, effort: null, context_tokens: null, queued, background: [] }));
     act(() => channels[channels.length - 1].onmessage({ type: "reset", items: [], total: 0 }));
     expect(screen.queryByRole("list", { name: "Queued messages" })).toBeNull();
     send(["sao không commit đi?"]);

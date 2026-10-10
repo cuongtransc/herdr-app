@@ -1,4 +1,4 @@
-import type { AppError, ChatEvent, ChatItem, ChatMeta } from "../lib/types";
+import type { AppError, BackgroundTask, ChatEvent, ChatItem, ChatMeta } from "../lib/types";
 
 export interface ChatState {
   items: ChatItem[];
@@ -7,9 +7,11 @@ export interface ChatState {
   meta: ChatMeta;
   /** The user's messages sent mid-turn that the agent has not read yet, oldest first. */
   queued: string[];
+  /** Background tasks started and not yet ended, in start order. */
+  background: BackgroundTask[];
 }
 
-export const emptyChat: ChatState = { items: [], total: 0, error: null, meta: { model: null, effort: null, context_tokens: null }, queued: [] };
+export const emptyChat: ChatState = { items: [], total: 0, error: null, meta: { model: null, effort: null, context_tokens: null }, queued: [], background: [] };
 
 export const TRIM_AT = 2000;
 export const TRIM_TO = 1000;
@@ -17,7 +19,7 @@ export const TRIM_TO = 1000;
 export function reduce(state: ChatState, ev: ChatEvent, atBottom = false): ChatState {
   switch (ev.type) {
     case "reset":
-      return { items: ev.items, total: ev.total, error: null, meta: state.meta, queued: state.queued };
+      return { items: ev.items, total: ev.total, error: null, meta: state.meta, queued: state.queued, background: state.background };
     case "append":
     {
       let items = [...state.items, ...ev.items];
@@ -26,7 +28,7 @@ export function reduce(state: ChatState, ev: ChatEvent, atBottom = false): ChatS
       return { ...state, items, total: state.total + ev.items.length };
     }
     case "meta":
-      return { ...state, meta: { model: ev.model, effort: ev.effort, context_tokens: ev.context_tokens, alias: ev.alias }, queued: ev.queued };
+      return { ...state, meta: { model: ev.model, effort: ev.effort, context_tokens: ev.context_tokens, alias: ev.alias }, queued: ev.queued, background: ev.background };
     case "error":
       return { ...state, error: ev.error };
   }
