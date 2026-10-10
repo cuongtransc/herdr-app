@@ -114,10 +114,10 @@ impl PiParser {
         let target = msg.and_then(|m| m.get("aliasTarget"));
         let t = |k: &str| target.and_then(|t| t.get(k)).and_then(Value::as_str);
         let served = t("model").or(s("responseModel")).and_then(meta_label);
-        self.meta.alias = Some(
-            self.aliases
-                .describe(&model, t("provider"), served.as_deref()),
-        );
+        let index = target
+            .and_then(|t| t.get("chainIndex"))
+            .and_then(Value::as_u64);
+        self.meta.alias = Some(self.aliases.describe(&model, t("provider"), index));
         self.meta.model = served;
     }
 
@@ -661,12 +661,9 @@ mod tests {
     #[test]
     fn an_alias_model_shows_the_target_that_served_it() {
         use crate::transcript::pi_alias::{ModelAlias, PiAliases};
-        let aliases = PiAliases::from_json(
-            Some(r#"{"segmentOptions":{"model":{"aliasLabels":{"implementer-medium":"impl-m"}}}}"#),
-            Some(
-                r#"{"implementer-medium":["opencode-go/deepseek-v4.1-flash","openai-codex/gpt-6-sol"]}"#,
-            ),
-        );
+        let aliases = PiAliases::from_json(Some(
+            r#"{"segmentOptions":{"model":{"aliasLabels":{"implementer-medium":"impl-m"}}}}"#,
+        ));
         let mut p = PiParser::with_aliases(aliases);
         let mut sink: Vec<(String, String, Vec<u8>)> = vec![];
         let alias = |provider: Option<&str>, fallback| {
@@ -683,8 +680,37 @@ mod tests {
             &mut sink,
         );
         assert_eq!((p.meta().model, p.meta().alias), (None, alias(None, false)));
+        // pi records where in the alias chain the serving target sits: past 0 is a fallback.
+        let reply = |id: &str, target: &str| {
+            format!(
+                r#"{{"type":"message","id":"{id}","parentId":"m1","message":{{"role":"assistant","provider":"alias","model":"implementer-medium","responseModel":"gpt-6-sol","aliasTarget":{target},"content":[],"usage":{{"totalTokens":41326}}}}}}"#
+            )
+        };
         p.push_line(
-            r#"{"type":"message","id":"a","parentId":"m1","message":{"role":"assistant","provider":"alias","model":"implementer-medium","responseModel":"gpt-6-sol","aliasTarget":{"provider":"openai-codex","model":"gpt-6-sol"},"content":[],"usage":{"totalTokens":41326}}}"#,
+            &reply(
+                "a0",
+                r#"{"provider":"opencode-go","model":"deepseek-v4.1-flash","chainIndex":0}"#,
+            ),
+            &mut sink,
+        );
+        assert_eq!(
+            (p.meta().model, p.meta().alias),
+            (
+                Some("deepseek-v4.1-flash".into()),
+                alias(Some("opencode-go"), false)
+            )
+        );
+        // A transcript from before pi recorded the position: no marker, never a guess.
+        p.push_line(
+            &reply("a1", r#"{"provider":"openai-codex","model":"gpt-6-sol"}"#),
+            &mut sink,
+        );
+        assert_eq!(p.meta().alias, alias(Some("openai-codex"), false));
+        p.push_line(
+            &reply(
+                "a",
+                r#"{"provider":"openai-codex","model":"gpt-6-sol","chainIndex":1}"#,
+            ),
             &mut sink,
         );
         assert_eq!(
