@@ -12,7 +12,7 @@ import { HistoryCursor, readHistory, recallList, recordPrompt } from "./promptHi
 import { useApp } from "../store/app";
 import { usePaneImages, type Attachment } from "./draftImages";
 import { activeTrigger, applyCompletion } from "./mentions";
-import { contextMeter, formatTokens, modelLabel, type ContextMeter } from "./modelLabel";
+import { aliasTitle, contextMeter, formatTokens, modelLabel, type ContextMeter } from "./modelLabel";
 import { ModelMenu } from "./ModelMenu";
 import { useClaudeSuggestion } from "./useClaudeSuggestion";
 import { useCompletions } from "./useCompletions";
@@ -199,7 +199,9 @@ export function Composer({
   const label = modelLabel(full && meta ? { ...meta, context_tokens: null } : meta);
   const compact = full && (full.level === "warn" || full.level === "crit") ? full.level : null;
   const modelClass = "composer-model" + (full ? ` ctx ctx-${full.level}` : "");
-  const modelTitle = full ? meterTitle(full) : "Model · reasoning effort · context tokens";
+  const modelTitle = [aliasTitle(meta), full ? meterTitle(full) : "Model · reasoning effort · context tokens"]
+    .filter(Boolean)
+    .join("\n");
   const modelBody = full ? (
     <>
       {label ? `${label} · ` : ""}

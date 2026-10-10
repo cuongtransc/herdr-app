@@ -845,6 +845,7 @@ mod tests {
                 effort: Some("high".into()),
                 context_tokens: None,
                 queued: vec![],
+                alias: None,
             }
         );
     }
@@ -890,6 +891,7 @@ mod tests {
                 effort: Some("xhigh".into()),
                 context_tokens: None,
                 queued: vec![],
+                alias: None,
             }
         );
     }

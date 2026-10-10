@@ -26,7 +26,7 @@ export function reduce(state: ChatState, ev: ChatEvent, atBottom = false): ChatS
       return { ...state, items, total: state.total + ev.items.length };
     }
     case "meta":
-      return { ...state, meta: { model: ev.model, effort: ev.effort, context_tokens: ev.context_tokens }, queued: ev.queued };
+      return { ...state, meta: { model: ev.model, effort: ev.effort, context_tokens: ev.context_tokens, alias: ev.alias }, queued: ev.queued };
     case "error":
       return { ...state, error: ev.error };
   }

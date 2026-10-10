@@ -209,6 +209,7 @@ impl State {
                     effort: meta.effort,
                     context_tokens: meta.context_tokens,
                     queued: meta.queued,
+                    alias: meta.alias,
                 },
             );
         }

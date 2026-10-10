@@ -28,6 +28,11 @@ describe("chat store", () => {
     s = reduce(s, { type: "reset", items: [], total: 0 });
     expect(s.meta).toEqual({ model: "m", effort: "high", context_tokens: 5 });
   });
+  it("keeps a pi alias with the Model it served", () => {
+    const alias = { name: "implementer-medium", label: "impl-m", provider: "openai-codex", fallback: true };
+    const s = reduce(emptyChat, { type: "meta", model: "gpt-6-sol", effort: "low", context_tokens: 5, queued: [], alias });
+    expect(s.meta).toEqual({ model: "gpt-6-sol", effort: "low", context_tokens: 5, alias });
+  });
   const many = (n: number, from = 0) => Array.from({ length: n }, (_, i) => u(`m${from + i}`));
   it("trims to the newest items when an append at the bottom passes the cap", () => {
     let s = reduce(emptyChat, { type: "reset", items: many(500, 4500), total: 5000 });

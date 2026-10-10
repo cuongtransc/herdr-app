@@ -7,11 +7,23 @@ export function formatTokens(n: number): string {
   return `${+(n / 1_000_000).toFixed(2)}M`;
 }
 
-/** The Composer's `model · effort · tokens` label; whichever is unknown is left out, null when all are. */
+/** The Composer's `model · effort · tokens` label; whichever is unknown is left out, null when all are.
+ *  A pi alias reads as pi's footer has it: `label→model`, `label↓model` when a fallback served. */
 export function modelLabel(meta: ChatMeta | undefined): string | null {
   const tokens = meta?.context_tokens ? formatTokens(meta.context_tokens) : null;
-  const parts = [meta?.model, meta?.effort, tokens].filter((p): p is string => !!p);
+  const alias = meta?.alias;
+  const model = alias ? (meta?.model ? `${alias.label}${alias.fallback ? "↓" : "→"}${meta.model}` : alias.label) : meta?.model;
+  const parts = [model, meta?.effort, tokens].filter((p): p is string => !!p);
   return parts.length > 0 ? parts.join(" · ") : null;
+}
+
+/** The alias and its target in full, for the label's tooltip; null when the Model is no alias. */
+export function aliasTitle(meta: ChatMeta | undefined): string | null {
+  const alias = meta?.alias;
+  if (!alias) return null;
+  if (!meta?.model) return `${alias.name} (no reply yet)`;
+  const target = alias.provider ? `${alias.provider}/${meta.model}` : meta.model;
+  return `${alias.name} → ${target}${alias.fallback ? " (fallback: not the alias's first choice)" : ""}`;
 }
 
 /** Context windows by Model id prefix, from the largest contexts seen in Claude transcripts

@@ -2,6 +2,7 @@
 //! the last entry up to the root.
 use super::images::{decode_image, ImageSink};
 use super::locate::input_summary;
+use super::pi_alias::PiAliases;
 use super::skill_prompt::parse_skill_prompt;
 use super::{
     cap_input, meta_label, truncate_result, ChatItem, ChatMeta, ImageRef, Parser, ParserOutput,
@@ -27,6 +28,7 @@ pub struct PiParser {
     limit: usize,
     too_large: bool,
     meta: ChatMeta,
+    aliases: PiAliases,
 }
 
 impl Default for PiParser {
@@ -38,11 +40,20 @@ impl Default for PiParser {
             limit: MAX_BRANCH_BYTES,
             too_large: false,
             meta: ChatMeta::default(),
+            aliases: PiAliases::default(),
         }
     }
 }
 
 impl PiParser {
+    /// Names alias Models the way pi's footer does (see `pi_alias`).
+    pub fn with_aliases(aliases: PiAliases) -> Self {
+        Self {
+            aliases,
+            ..Self::default()
+        }
+    }
+
     #[cfg(test)]
     fn with_limit(limit: usize) -> Self {
         Self {
@@ -57,7 +68,14 @@ impl PiParser {
         match v.get("type").and_then(Value::as_str) {
             Some("model_change") => {
                 if let Some(m) = label(v.get("modelId")).or_else(|| label(v.get("model"))) {
-                    self.meta.model = Some(m);
+                    // An alias names no real Model until a reply says which target served it.
+                    if v.get("provider").and_then(Value::as_str) == Some("alias") {
+                        self.meta.alias = Some(self.aliases.describe(&m, None, None));
+                        self.meta.model = None;
+                    } else {
+                        self.meta.alias = None;
+                        self.meta.model = Some(m);
+                    }
                 }
             }
             Some("thinking_level_change") => {
@@ -69,7 +87,7 @@ impl PiParser {
                 let msg = v.get("message");
                 if msg.and_then(|m| m.get("role")).and_then(Value::as_str) == Some("assistant") {
                     if let Some(m) = label(msg.and_then(|m| m.get("model"))) {
-                        self.meta.model = Some(m);
+                        self.read_model(msg, m);
                     }
                     // A failed reply reports all zeros: keep the last real count.
                     let total = msg
@@ -83,6 +101,24 @@ impl PiParser {
             }
             _ => {}
         }
+    }
+
+    /// A reply by an alias records the alias as `model` and what served it as `aliasTarget`.
+    fn read_model(&mut self, msg: Option<&Value>, model: String) {
+        let s = |k: &str| msg.and_then(|m| m.get(k)).and_then(Value::as_str);
+        if s("provider") != Some("alias") {
+            self.meta.alias = None;
+            self.meta.model = Some(model);
+            return;
+        }
+        let target = msg.and_then(|m| m.get("aliasTarget"));
+        let t = |k: &str| target.and_then(|t| t.get(k)).and_then(Value::as_str);
+        let served = t("model").or(s("responseModel")).and_then(meta_label);
+        let index = target
+            .and_then(|t| t.get("chainIndex"))
+            .and_then(Value::as_u64);
+        self.meta.alias = Some(self.aliases.describe(&model, t("provider"), index));
+        self.meta.model = served;
     }
 
     fn trip(&mut self) -> ParserOutput {
@@ -617,7 +653,78 @@ mod tests {
                 effort: Some("off".into()),
                 context_tokens: Some(82920),
                 queued: vec![],
+                alias: None,
             }
+        );
+    }
+
+    #[test]
+    fn an_alias_model_shows_the_target_that_served_it() {
+        use crate::transcript::pi_alias::{ModelAlias, PiAliases};
+        let aliases = PiAliases::from_json(Some(
+            r#"{"segmentOptions":{"model":{"aliasLabels":{"implementer-medium":"impl-m"}}}}"#,
+        ));
+        let mut p = PiParser::with_aliases(aliases);
+        let mut sink: Vec<(String, String, Vec<u8>)> = vec![];
+        let alias = |provider: Option<&str>, fallback| {
+            Some(ModelAlias {
+                name: "implementer-medium".into(),
+                label: "impl-m".into(),
+                provider: provider.map(Into::into),
+                fallback,
+            })
+        };
+        // Before the first reply only the alias is known.
+        p.push_line(
+            r#"{"type":"model_change","id":"m1","parentId":null,"provider":"alias","modelId":"implementer-medium"}"#,
+            &mut sink,
+        );
+        assert_eq!((p.meta().model, p.meta().alias), (None, alias(None, false)));
+        // pi records where in the alias chain the serving target sits: past 0 is a fallback.
+        let reply = |id: &str, target: &str| {
+            format!(
+                r#"{{"type":"message","id":"{id}","parentId":"m1","message":{{"role":"assistant","provider":"alias","model":"implementer-medium","responseModel":"gpt-6-sol","aliasTarget":{target},"content":[],"usage":{{"totalTokens":41326}}}}}}"#
+            )
+        };
+        p.push_line(
+            &reply(
+                "a0",
+                r#"{"provider":"opencode-go","model":"deepseek-v4.1-flash","chainIndex":0}"#,
+            ),
+            &mut sink,
+        );
+        assert_eq!(
+            (p.meta().model, p.meta().alias),
+            (
+                Some("deepseek-v4.1-flash".into()),
+                alias(Some("opencode-go"), false)
+            )
+        );
+        // A transcript from before pi recorded the position: no marker, never a guess.
+        p.push_line(
+            &reply("a1", r#"{"provider":"openai-codex","model":"gpt-6-sol"}"#),
+            &mut sink,
+        );
+        assert_eq!(p.meta().alias, alias(Some("openai-codex"), false));
+        p.push_line(
+            &reply(
+                "a",
+                r#"{"provider":"openai-codex","model":"gpt-6-sol","chainIndex":1}"#,
+            ),
+            &mut sink,
+        );
+        assert_eq!(
+            (p.meta().model, p.meta().alias),
+            (Some("gpt-6-sol".into()), alias(Some("openai-codex"), true))
+        );
+        // Switching to a plain Model drops the alias.
+        p.push_line(
+            r#"{"type":"model_change","id":"m2","parentId":"a","provider":"anthropic","modelId":"claude-sonnet-5-5"}"#,
+            &mut sink,
+        );
+        assert_eq!(
+            (p.meta().model, p.meta().alias),
+            (Some("claude-sonnet-5-5".into()), None)
         );
     }
 }
