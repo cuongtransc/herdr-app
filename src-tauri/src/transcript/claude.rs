@@ -20,6 +20,10 @@ pub struct ClaudeParser {
     background: Vec<BackgroundTask>,
     /// Tasks whose end was already shown, oldest first and bounded: a repeat is dropped.
     ended: VecDeque<String>,
+    /// Running background tasks' own ids (from their start result): call id → task id.
+    task_ids: HashMap<String, String>,
+    /// `TaskStop` / `KillShell` calls whose result has not arrived: call id → target task id.
+    stops: HashMap<String, String>,
 }
 
 /// Most unfinished calls and ended task ids kept; the oldest are forgotten past it.
@@ -31,6 +35,20 @@ fn started_prefix(kind: &BackgroundKind) -> &'static str {
         BackgroundKind::Bash => "Command running in background with ID:",
         BackgroundKind::Agent => "Async agent launched",
     }
+}
+
+/// The task id a start result names: Bash `ID: <id>.`, Agent `agentId: <id>`.
+fn task_id_of(kind: &BackgroundKind, output: &str) -> Option<String> {
+    let marker = match kind {
+        BackgroundKind::Bash => "ID:",
+        BackgroundKind::Agent => "agentId:",
+    };
+    let rest = output[output.find(marker)? + marker.len()..].trim_start();
+    let id: String = rest
+        .chars()
+        .take_while(|c| !c.is_whitespace() && *c != '.')
+        .collect();
+    (!id.is_empty()).then_some(id)
 }
 
 /// The `N` of `(exit code N)` in a task's summary.
@@ -177,6 +195,34 @@ impl ClaudeParser {
 }
 
 impl ClaudeParser {
+    /// A stopped task ends at once with no notification: drop it and return its
+    /// empty-text end item, which the frontend reads only for the `stopped` badge.
+    fn stop_task(&mut self, target: &str, ts: &Option<String>) -> Option<ChatItem> {
+        let call_id = self
+            .task_ids
+            .iter()
+            .find(|(_, id)| id.as_str() == target)
+            .map(|(call, _)| call.clone())?;
+        self.task_ids.remove(&call_id);
+        if !self.background.iter().any(|t| t.call_id == call_id) {
+            return None;
+        }
+        self.background.retain(|t| t.call_id != call_id);
+        if self.ended.len() >= TRACKED_MAX {
+            self.ended.pop_front();
+        }
+        self.ended.push_back(call_id.clone());
+        Some(ChatItem::System {
+            ts: ts.clone(),
+            text: String::new(),
+            task: Some(TaskEnd {
+                call_id,
+                status: "stopped".into(),
+                exit_code: None,
+            }),
+        })
+    }
+
     /// Replays one `queue-operation` record: `enqueue` adds, `dequeue` takes the oldest
     /// (it names no text), `remove` takes the named one, `popAll` empties the queue.
     fn replay_queue(&mut self, v: &Value) {
@@ -288,6 +334,7 @@ impl ClaudeParser {
             }
             self.ended.push_back(call_id.to_string());
             self.background.retain(|t| t.call_id != call_id);
+            self.task_ids.remove(call_id);
             return ParserOutput::Append(vec![ChatItem::System {
                 ts: ts.clone(),
                 text: summary.unwrap_or("").to_string(),
@@ -323,9 +370,20 @@ impl ClaudeParser {
                                 .to_string();
                             let output = result_text(b.get("content"));
                             let is_error = flag(b, "is_error");
+                            if let Some(target) = self.stops.remove(&call_id) {
+                                if !is_error {
+                                    items.extend(self.stop_task(&target, &ts));
+                                }
+                            }
                             if let Some((kind, description, started)) = self.calls.remove(&call_id)
                             {
                                 if !is_error && output.starts_with(started_prefix(&kind)) {
+                                    if let Some(id) = task_id_of(&kind, &output) {
+                                        if self.task_ids.len() >= TRACKED_MAX {
+                                            self.task_ids.clear();
+                                        }
+                                        self.task_ids.insert(call_id.clone(), id);
+                                    }
                                     self.background.push(BackgroundTask {
                                         call_id: call_id.clone(),
                                         kind,
@@ -384,6 +442,17 @@ impl ClaudeParser {
                                 )),
                                 _ => None,
                             };
+                            let target = match name.as_str() {
+                                "TaskStop" => field("task_id"),
+                                "KillShell" => field("shell_id"),
+                                _ => None,
+                            };
+                            if let Some(target) = target {
+                                if self.stops.len() >= TRACKED_MAX {
+                                    self.stops.clear();
+                                }
+                                self.stops.insert(id.clone(), target.to_string());
+                            }
                             if let Some((kind, description)) = task {
                                 if self.calls.len() >= TRACKED_MAX {
                                     self.calls.clear();
@@ -1346,5 +1415,113 @@ mod tests {
         let call = serde_json::json!({"type":"assistant","message":{"content":[{"type":"tool_use","id":"t1","name":"Bash","input":{"command":long,"run_in_background":true}}]}}).to_string();
         let (_, _, p) = run_with(&[call, tool_result("t1", BASH_STARTED, false)].join("\n"));
         assert_eq!(p.meta().background[0].description, "x".repeat(80));
+    }
+
+    fn stop_call(id: &str, name: &str, key: &str, target: &str) -> String {
+        serde_json::json!({"type":"assistant","timestamp":"2026-10-10T17:20:00.000Z","message":{"content":[{"type":"tool_use","id":id,"name":name,"input":{key:target}}]}}).to_string()
+    }
+    /// A TaskStop result as the CLI writes it: content is one JSON string.
+    fn stop_result(id: &str, task_id: &str, is_error: bool) -> String {
+        let content = serde_json::json!({"message":format!("Successfully stopped task: {task_id} (cd /tmp)"),"task_id":task_id,"task_type":"local_bash"}).to_string();
+        let mut block =
+            serde_json::json!({"type":"tool_result","tool_use_id":id,"content":content});
+        if is_error {
+            block["is_error"] = true.into();
+        }
+        serde_json::json!({"type":"user","timestamp":"2026-10-10T17:20:05.000Z","message":{"content":[block]}}).to_string()
+    }
+    fn started(id: &str, task: &str) -> Vec<String> {
+        vec![
+            bash_call(id, true, Some("ci")),
+            tool_result(id, &format!("Command running in background with ID: {task}. Output is being written to: /tmp/{task}.output"), false),
+        ]
+    }
+    fn stopped_item() -> ChatItem {
+        System {
+            ts: Some("2026-10-10T17:20:05.000Z".into()),
+            text: String::new(),
+            task: end("t1", "stopped", None),
+        }
+    }
+    fn system_items(items: Vec<ChatItem>) -> Vec<ChatItem> {
+        items
+            .into_iter()
+            .filter(|i| matches!(i, System { .. }))
+            .collect()
+    }
+
+    #[test]
+    fn task_stop_ends_a_bash_task_without_a_row() {
+        let (_, _, mut p) = run_with(&started("t1", "b9gjyugpx").join("\n"));
+        push(&mut p, &stop_call("s1", "TaskStop", "task_id", "b9gjyugpx"));
+        let items = push(&mut p, &stop_result("s1", "b9gjyugpx", false));
+        assert_eq!(system_items(items), vec![stopped_item()]);
+        assert_eq!(p.meta().background, vec![]);
+    }
+
+    #[test]
+    fn task_stop_ends_an_agent_task_by_agent_id() {
+        let (_, _, mut p) = run_with(
+            &[
+                agent_call("t1"),
+                tool_result(
+                    "t1",
+                    "Async agent launched successfully.\nagentId: a18a42ecc9696ac94 (internal ID)",
+                    false,
+                ),
+            ]
+            .join("\n"),
+        );
+        push(
+            &mut p,
+            &stop_call("s1", "TaskStop", "task_id", "a18a42ecc9696ac94"),
+        );
+        let items = push(&mut p, &stop_result("s1", "a18a42ecc9696ac94", false));
+        assert_eq!(system_items(items), vec![stopped_item()]);
+        assert_eq!(p.meta().background, vec![]);
+    }
+
+    #[test]
+    fn kill_shell_ends_a_bash_task_by_shell_id() {
+        let (_, _, mut p) = run_with(&started("t1", "b9gjyugpx").join("\n"));
+        push(
+            &mut p,
+            &stop_call("s1", "KillShell", "shell_id", "b9gjyugpx"),
+        );
+        let items = push(&mut p, &stop_result("s1", "b9gjyugpx", false));
+        assert_eq!(system_items(items), vec![stopped_item()]);
+        assert_eq!(p.meta().background, vec![]);
+    }
+
+    #[test]
+    fn a_failed_task_stop_keeps_the_task_running() {
+        let (_, _, mut p) = run_with(&started("t1", "b9gjyugpx").join("\n"));
+        push(&mut p, &stop_call("s1", "TaskStop", "task_id", "b9gjyugpx"));
+        let items = push(&mut p, &stop_result("s1", "b9gjyugpx", true));
+        assert_eq!(system_items(items), vec![]);
+        assert_eq!(p.meta().background.len(), 1);
+    }
+
+    #[test]
+    fn task_stop_for_an_unknown_id_changes_nothing() {
+        let (_, _, mut p) = run_with(&started("t1", "b9gjyugpx").join("\n"));
+        push(&mut p, &stop_call("s1", "TaskStop", "task_id", "bnope"));
+        let items = push(&mut p, &stop_result("s1", "bnope", false));
+        assert_eq!(system_items(items), vec![]);
+        assert_eq!(p.meta().background.len(), 1);
+    }
+
+    #[test]
+    fn a_notification_after_task_stop_is_dropped() {
+        let (_, _, mut p) = run_with(&started("t1", "b9gjyugpx").join("\n"));
+        push(&mut p, &stop_call("s1", "TaskStop", "task_id", "b9gjyugpx"));
+        push(&mut p, &stop_result("s1", "b9gjyugpx", false));
+        assert_eq!(
+            push(
+                &mut p,
+                &notification("t1", "killed", Some("stopped (exit code 137)"))
+            ),
+            vec![]
+        );
     }
 }
