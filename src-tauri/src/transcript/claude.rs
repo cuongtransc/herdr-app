@@ -196,6 +196,12 @@ impl ClaudeParser {
             .into_iter()
             .find(|k| flag(&v, k))
         {
+            // A scheduled prompt is read as a hidden record: unshown, it still leaves the queue.
+            if kind == "user" && reason == "isMeta" {
+                if let Some(text) = v.pointer("/message/content").and_then(Value::as_str) {
+                    self.leave_queue(text);
+                }
+            }
             tracing::trace!(record_type = kind, reason, "skipping transcript record");
             return ParserOutput::None;
         }
@@ -752,6 +758,28 @@ mod tests {
             queued_now(&[queue_op("enqueue", Some("hi")), typed]),
             Vec::<String>::new()
         );
+    }
+    #[test]
+    fn a_scheduled_prompt_read_as_a_hidden_record_leaves_the_queue() {
+        // Seen in a real transcript: an entry left by a Claude process that exited is never
+        // dequeued, so the next dequeue takes it instead of the scheduled tick. The tick then
+        // arrives as an isMeta record, not shown, yet read: it must not wait forever.
+        let orphan = "<task-notification>\n<task-id>b87</task-id>\n</task-notification>";
+        let tick = "[Auto tick — orchestrator] Run one pass";
+        let read =
+            serde_json::json!({"type":"user","isMeta":true,"message":{"content":tick}}).to_string();
+        let (items, _, p) = run_with(
+            &[
+                queue_op("enqueue", Some(orphan)),
+                queue_op("enqueue", Some(tick)),
+                queue_op("dequeue", None),
+                read,
+            ]
+            .join("\n"),
+        );
+        assert_eq!(p.meta().queued, Vec::<String>::new());
+        // Still hidden from the Chat, as before.
+        assert_eq!(items, vec![]);
     }
     #[test]
     fn image_beside_text_attaches_to_the_user_item() {
