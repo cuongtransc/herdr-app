@@ -190,6 +190,15 @@ describe("Sidebar", () => {
     expect(sessionStop).toHaveBeenCalledWith("box", "default");
     expect(useProtect.getState().marks["box/default/w1:p1"]).toBe(false);
   });
+  it("names the agents still working before stopping their session, Cancel first", () => {
+    useProtect.setState({ marks: {} });
+    render(<Sidebar />);
+    fireEvent.contextMenu(screen.getByText("default"));
+    fireEvent.click(screen.getByRole("menuitem", { name: "Stop session" }));
+    const dialog = screen.getByRole("dialog", { name: "Stop session" });
+    expect([...dialog.querySelectorAll(".busy-list li")].map((li) => li.textContent)).toEqual(["Rewrite · Claude working"]);
+    expect(document.activeElement?.textContent).toBe("Cancel");
+  });
   it("ignores clicks on sessions of a machine that is not connected", () => {
     useApp.setState({ machines: { box: { ...m, state: "disconnected" } } });
     render(<Sidebar />);
