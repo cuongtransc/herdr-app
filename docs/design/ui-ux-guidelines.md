@@ -75,8 +75,8 @@ and by how calm it is when nothing needs the user.
   Review). Avoid "INPUT" (a system word: who inputs what?), "Needs you" (long), "waiting" (who waits
   on whom?) and "To do" (a tracker's *not started*).
 
-- **One encoding per surface.** List row and tab: mark + (for blocked) the word. The Top bar has no
-  status of its own: the open tab's mark is it (the Header's Status pill went on 2026-10-10). Never
+- **One encoding per surface.** List row and Open item: mark + (for blocked) the word. The Top bar has no
+  status of its own: the active Open item's mark is it (the Header's Status pill went on 2026-10-10). Never
   mark + badge + tint + border + glow on one row (a blocked card shows five signals today).
 - **Tint is reserved for "needs you"**: `color-mix(in srgb, var(--amber) 7%, transparent)`, no border,
   no glow. Status colours are never used for anything that is not status.

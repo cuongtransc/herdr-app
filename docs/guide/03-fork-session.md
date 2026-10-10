@@ -1,6 +1,6 @@
 # 03 · Fork a Claude session
 
-A fork is a new Claude session that starts with the whole conversation of the original, in a new tab of the same
+A fork is a new Claude session that starts with the whole conversation of the original, in a new Tab of the same
 Workspace. The original keeps running untouched.
 
 ## How
