@@ -120,23 +120,23 @@ rules and previews: the [Herdr Design System](https://claude.ai/artifact/4xbvNjC
 | **Project row** | A Workspace with agent work, under its Session row | `ProjectRows` (`src/sidebar/ProjectRows.tsx`), `sessionProjects` |
 | **Sessions filter** | All \| Active on the Sessions header | `useSessionFilter` (`src/sidebar/activeFilter.ts`) |
 | **Fold line** | "N hidden · idle or stopped" with Show, under what the Active filter keeps | `.filter-hidden` in `GroupTree` |
-| **Agents column** | The middle column, headed by the Session name and PANES | `src/agents/AgentList.tsx` |
+| **Agents column** | The middle column, headed by the Session name and PANES (its rows are Panes: agents and shells) | `src/agents/AgentList.tsx` |
 | **Workspace header** | A Workspace's name over its Pane rows; + starts an agent in it | `.ws-head` in `AgentList.tsx` |
 | **Pane row** | A Pane in the Agents column | `AgentCard` |
 | **Panes filter** | All \| Active on the PANES header | `usePaneFilter` (`src/agents/paneFilter.ts`), `PanesHeader` |
 | **Queue chip** | "1 blocked · 1 review" atop the Agents column | `SessionQueueChip` |
-| **Fork** | A Claude pane's menu: Fork session / Fork into a new worktree opens a tab running `claude --resume <id> --fork-session`; its Chat lens says where it came from | `src/agents/forkSession.ts` |
+| **Fork** | A Claude pane's menu: Fork session / Fork into a new worktree opens a Tab running `claude --resume <id> --fork-session`; its Chat lens says where it came from | `src/agents/forkSession.ts` |
 | **Side question** | A `/btw <question>` sent from a Claude pane's Composer: its answer, read off Claude's screen (it never reaches the transcript), shows in a panel above the Composer; Claude's own panel is closed right after | `src/chat/btw.ts`, `src/chat/BtwPanel.tsx` |
-| **Protected pane** | A lock on a Pane row: Close pane (Close tab on a one-pane tab) is off, and closing its tab, workspace or session names it first; orchestrators start protected | `src/agents/protect.ts` |
+| **Protected pane** | A lock on a Pane row: Close pane (Close tab on a one-pane Tab) is off, and closing its Tab, Workspace or Session names it first; orchestrators start protected | `src/agents/protect.ts` |
 | **Lane toggle** | "N lanes ›" on an orchestrator's Pane row | `.lane-toggle` in `AgentList.tsx` |
 | **Triage HUD** | The queue shown by ⌘J | `src/main/TriageHud.tsx`, `src/main/triage.ts` |
 | **Agent Board** | The ⇧⌘D overlay, with the Quota column | `src/dashboard/AgentDashboard.tsx`, `QuotaColumn` |
 | **Files panel** | Under the Pane rows in the Agents column; ⌘E focuses it, Browse files on a Workspace header | `src/files/FilesPanel.tsx`, `src-tauri/src/files/` |
 | **Go to file** / **Files tree** | ⌘P's box and the folders under the Files panel's root | `src/files/GoToFile.tsx`, `src/files/FileTree.tsx` |
 | **Top bar** | The main area's one bar, as tall as the columns' heads: the Open strip, then the Lens switch while a Pane fills the main area. It replaced the Header (Breadcrumb, Status pill) on 2026-10-10 | `src/main/TopBar.tsx` |
-| **Open strip** | The tabs of open Agents and files; two tabs of one name say where they live (`zsh · herdr-app`), the tooltip the whole path | `src/main/OpenStrip.tsx`, `src/store/openItems.ts` |
+| **Open strip** | The Open items: the Agents and files you opened; two of one name say where they live (`zsh · herdr-app`), the tooltip the whole path | `src/main/OpenStrip.tsx`, `src/store/openItems.ts` |
 | **Lens switch** | Terminal \| Chat as two icons at the Top bar's end | `src/main/LensSwitch.tsx` |
-| **File viewer** | The main area while a file tab is active | `src/files/FileViewer.tsx` |
+| **File viewer** | The main area while a file's Open item is active | `src/files/FileViewer.tsx` |
 | **CHANGED group** | Git's changes under the root, above the Files tree | `ChangedList`, `useChanged`, `files_changed` |
 | **Chat lens** / **Terminal lens** | The main area, as a conversation or the raw terminal | `src/chat/ChatLens.tsx`, `src/terminal/TerminalLens.tsx` |
 | **Work block** | One turn's work folded under "Worked for …" | `src/chat/WorkBlockView.tsx` |

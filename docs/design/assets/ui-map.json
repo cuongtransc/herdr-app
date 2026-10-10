@@ -482,7 +482,7 @@
     318,
     0
    ],
-   "what": "The tabs of open Agents and files. Two tabs of one name say where they live; the tooltip has the whole path.",
+   "what": "The Open items: the Agents and files you opened. Two of one name say where they live; the tooltip has the whole path.",
    "code": "src/main/OpenStrip.tsx",
    "rect": {
     "x": 538,
