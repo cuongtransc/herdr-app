@@ -8,7 +8,7 @@ import { Settings, useSettingsOpen } from "./settings/Settings";
 import { applyChatFont, type FontZoom, useSettings, zoomFont } from "./settings/store";
 import type { ActionId } from "./shortcuts/actions";
 import { actionFor } from "./shortcuts/dispatch";
-import { useShortcuts } from "./shortcuts/store";
+import { useShortcutLabel, useShortcuts } from "./shortcuts/store";
 import { applyTheme, useTheme } from "./settings/theme";
 import { LayoutControls } from "./main/LayoutControls";
 import { useDockBadge } from "./main/dockBadge";
@@ -49,6 +49,7 @@ function EmptyState({ icon, title, children }: { icon: React.ReactNode; title: s
 
 function EmptyMain() {
   const local = useApp((s) => s.machines["local"]);
+  const jumpKey = useShortcutLabel("jump");
   if (local?.state === "error" && local.error?.code === "herdr_not_found") {
     return (
       <EmptyState icon={<AlertIcon />} title="herdr is not installed on this Mac">
@@ -89,7 +90,13 @@ function EmptyMain() {
   return (
     <EmptyState icon={<TerminalIcon />} title="Select a pane">
       <p className="empty-hint">
-        Pick an agent from the list, or press <kbd>⌘</kbd> <kbd>K</kbd> to jump to any pane.
+        {jumpKey ? (
+          <>
+            Pick an agent from the list, or press <kbd>{jumpKey}</kbd> to jump to any pane.
+          </>
+        ) : (
+          "Pick an agent from the list."
+        )}
       </p>
     </EmptyState>
   );

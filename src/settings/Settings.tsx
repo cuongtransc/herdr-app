@@ -11,6 +11,7 @@ import { ACTIVE_MINUTES, idleLabel, useActiveWindow } from "../agents/paneFilter
 import { DEFAULT_QUICK_REPLIES, moveReply, moveReplyTo, QUICK_REPLIES_MAX, QUICK_REPLY_MAX_CHARS, slotAt, useQuickReplies } from "./quickReplies";
 import { CHAT_SIZE, DEFAULTS, TERM_SIZE, useSettings } from "./store";
 import { THEME_PREFS, useTheme } from "./theme";
+import { useShortcutLabel } from "../shortcuts/store";
 
 /** How far one press of − or + moves a font size, in px. */
 const SIZE_STEP = 0.5;
@@ -45,11 +46,12 @@ function Stepper({
 function GeneralSettings() {
   const [notify, setNotify] = useState(notificationsEnabled);
   const newTab = useNewTab();
+  const tabKey = useShortcutLabel("tabs.new");
   const active = useActiveWindow();
   return (
     <>
       <div className="setting-row">
-        <span id="new-tab-label">New tab (⌘T) opens</span>
+        <span id="new-tab-label">{tabKey ? `New tab (${tabKey}) opens` : "New tab opens"}</span>
         <div
           className="seg seg-n"
           role="group"
@@ -64,7 +66,7 @@ function GeneralSettings() {
           ))}
         </div>
       </div>
-      <p className="note">⌘T opens a tab next to the selected pane, in its workspace's folder.</p>
+      <p className="note">{tabKey ? `${tabKey} opens a tab` : "A new tab opens"} next to the selected pane, in its workspace's folder.</p>
       <div className="setting-row">
         <span id="active-window-label">Active window</span>
         <div
@@ -130,6 +132,7 @@ function AppearanceSettings() {
 
 function FontSettings() {
   const s = useSettings();
+  const zoomKeys = [useShortcutLabel("font.bigger"), useShortcutLabel("font.smaller"), useShortcutLabel("font.reset")].filter(Boolean);
   const isDefault =
     s.terminalFontFamily === DEFAULTS.terminalFontFamily &&
     s.terminalFontSize === DEFAULTS.terminalFontSize &&
@@ -143,7 +146,7 @@ function FontSettings() {
       <FontPicker label="Chat font" monospace={false} value={s.chatFontFamily} onChange={(f) => s.set({ chatFontFamily: f })} />
       <FontPicker label="Chat code font" value={s.chatMonoFamily} onChange={(f) => s.set({ chatMonoFamily: f })} />
       <Stepper label="Chat size" value={s.chatFontSize} range={CHAT_SIZE} onChange={(v) => s.set({ chatFontSize: v })} />
-      <p className="note">⌘+ / ⌘− / ⌘0 size the font of the Terminal or Chat on screen.</p>
+      {zoomKeys.length > 0 && <p className="note">{zoomKeys.join(" / ")} size the font of the Terminal or Chat on screen.</p>}
       <p className="note">Lists the fonts installed on this Mac; the code pickers only monospace ones. JetBrains Mono is bundled, covers Vietnamese, and stands in for a code font that is missing.</p>
       <div className="settings-foot">
         <button className="btn btn-xs" aria-label="Reset fonts" disabled={isDefault} onClick={s.reset}>
@@ -450,15 +453,18 @@ export const useSettingsOpen = create<{ open: boolean; show: () => void; hide: (
 // Takes no props: memo keeps it out of App's re-renders; it reads the store itself.
 export const Settings = memo(function Settings() {
   const { open, show, hide } = useSettingsOpen();
+  const jumpKey = useShortcutLabel("jump");
   return (
     <div className="settings">
       {open && <SettingsDialog onClose={hide} />}
       <button className="icon-btn" aria-label="Settings" aria-expanded={open} onClick={show}>
         <GearIcon />
       </button>
-      <span className="settings-hint">
-        <SearchIcon /> Jump <kbd>⌘K</kbd>
-      </span>
+      {jumpKey && (
+        <span className="settings-hint">
+          <SearchIcon /> Jump <kbd>{jumpKey}</kbd>
+        </span>
+      )}
     </div>
   );
 });

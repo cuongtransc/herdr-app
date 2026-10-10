@@ -1,4 +1,5 @@
 import { useEffect } from "react";
+import { useShortcutLabel } from "../shortcuts/store";
 import { useTriage } from "./triage";
 
 const SHOWN_MS = 2000;
@@ -12,6 +13,8 @@ function age(since: number | null, now: number): string {
 /** The queue ⌘J walks, shown for a moment after each step; Esc hides it. */
 export function TriageHud() {
   const hud = useTriage((s) => s.hud);
+  const nextKey = useShortcutLabel("triage.next");
+  const prevKey = useShortcutLabel("triage.prev");
   const hide = useTriage((s) => s.hide);
   useEffect(() => {
     if (!hud) return;
@@ -45,7 +48,7 @@ export function TriageHud() {
           ))}
         </ol>
       )}
-      <div className="triage-keys"><span><kbd>⌘</kbd><kbd>J</kbd> next</span><span><kbd>⇧</kbd><kbd>⌘</kbd><kbd>J</kbd> previous</span><span className="grow" /><span><kbd>Esc</kbd></span></div>
+      <div className="triage-keys">{nextKey && <span><kbd>{nextKey}</kbd> next</span>}{prevKey && <span><kbd>{prevKey}</kbd> previous</span>}<span className="grow" /><span><kbd>Esc</kbd></span></div>
     </div>
   );
 }

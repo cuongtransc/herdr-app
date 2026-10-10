@@ -139,7 +139,7 @@ rules and previews: the [Herdr Design System](https://claude.ai/artifact/4xbvNjC
 | **Lane toggle** | "N lanes ›" on an orchestrator's Pane row | `.lane-toggle` in `AgentList.tsx` |
 | **Triage HUD** | The queue shown by ⌘J | `src/main/TriageHud.tsx`, `src/main/triage.ts` |
 | **Agent Board** | The ⇧⌘D overlay, with the Quota column | `src/dashboard/AgentDashboard.tsx`, `QuotaColumn` |
-| **Files panel** | Under the Pane rows in the Agents column; ⌘E focuses it, Browse files on a Workspace header | `src/files/FilesPanel.tsx`, `src-tauri/src/files/` |
+| **Files panel** | Under the Pane rows in the Agents column; ⌘E shows and hides it, Browse files on a Workspace header | `src/files/FilesPanel.tsx`, `src-tauri/src/files/` |
 | **Go to file** / **Files tree** | ⌘P's box and the folders under the Files panel's root | `src/files/GoToFile.tsx`, `src/files/FileTree.tsx` |
 | **Top bar** | The main area's one bar, as tall as the columns' heads: the Open strip, then the Lens switch while a Pane fills the main area. It replaced the Header (Breadcrumb, Status pill) on 2026-10-10 | `src/main/TopBar.tsx` |
 | **Open strip** | The Open items: the Agents and files you opened; two of one name say where they live (`zsh · herdr-app`), the tooltip the whole path | `src/main/OpenStrip.tsx`, `src/store/openItems.ts` |

@@ -29,7 +29,7 @@ export const SURFACES: Surface[] = [
   { group: "Agents column", name: "Workspace header", selector: ".ws-head", at: [0, 0.5], d: [91, 0], what: "A Workspace's name over its Pane rows; + starts an agent in it.", code: ".ws-head in AgentList" },
   { group: "Agents column", name: "Pane row", selector: ".agent-card", at: [0, 0.5], d: [159, 0], what: "A Pane: agent mark, title, lock, status.", code: "AgentCard" },
   { group: "Agents column", name: "Lane toggle", selector: ".lane-toggle", at: [0.5, 0], d: [3, -11], what: "“N lanes ›” on an orchestrator's Pane row.", code: ".lane-toggle in AgentList" },
-  { group: "Agents column", name: "Files panel", selector: ".files-panel", at: [0, 0], d: [157, 17], what: "Under the Pane rows; ⌘E focuses it.", code: "src/files/FilesPanel.tsx" },
+  { group: "Agents column", name: "Files panel", selector: ".files-panel", at: [0, 0], d: [157, 17], what: "Under the Pane rows; ⌘E shows and hides it.", code: "src/files/FilesPanel.tsx" },
   { group: "Agents column", name: "Go to file", selector: ".files-goto", at: [0, 0.5], d: [223, 0], what: "⌘P: find a file by name in the panel's root.", code: "src/files/GoToFile.tsx" },
   { group: "Agents column", name: "Files tree", selector: ".files-tree", at: [0.5, 0], d: [0, 56], what: "The folders and files under the root.", code: "src/files/FileTree.tsx" },
   { group: "Main area", name: "Top bar", selector: ".topbar", at: [0, 0.5], d: [562, 0], what: "The main area's one bar, as tall as the columns' heads: the Open strip, then the Lens switch.", code: "src/main/TopBar.tsx" },

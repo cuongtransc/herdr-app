@@ -13,12 +13,14 @@ import { Settings, useSettingsOpen } from "./Settings";
 import { DEFAULTS, loadFonts, useSettings } from "./store";
 import { useTheme } from "./theme";
 import { useActiveWindow } from "../agents/paneFilter";
+import { loadBindings, useShortcuts } from "../shortcuts/store";
 
 beforeEach(() => {
   useSettingsOpen.setState({ open: false });
   localStorage.clear();
   useSettings.setState({ ...DEFAULTS });
   useHiddenFolders.setState({ folders: loadHiddenFolders() });
+  useShortcuts.setState({ bindings: loadBindings(), recording: false });
 });
 
 function openSettings() {
@@ -173,6 +175,14 @@ describe("Settings quick replies", () => {
 });
 
 describe("Settings fonts", () => {
+  it("names the current keys in its hints", () => {
+    act(() => useShortcuts.getState().set("tabs.new", { code: "KeyN", shift: true, alt: false, ctrl: false }));
+    render(<Settings />);
+    expect(document.querySelector(".settings-hint kbd")!.textContent).toBe("⌘K");
+    fireEvent.click(screen.getByRole("button", { name: "Settings" }));
+    expect(screen.getByText("New tab (⇧⌘N) opens")).toBeTruthy();
+  });
+
   it("adds, removes and resets the Files panel's hidden folders", () => {
     render(<Settings />);
     fireEvent.click(screen.getByRole("button", { name: "Settings" }));

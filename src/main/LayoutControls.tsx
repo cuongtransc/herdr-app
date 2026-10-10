@@ -1,11 +1,15 @@
 import { memo, useLayoutEffect, useRef } from "react";
 import { triageQueue } from "../dashboard/triage";
 import { useLayout } from "../settings/layout";
+import { useShortcutLabel } from "../shortcuts/store";
 import { useApp } from "../store/app";
 import { BoardIcon, SidebarIcon } from "../ui/icons";
 import { useTriage } from "./triage";
 
 /** Beside the traffic lights whatever the layout: the sidebar toggle and, in focus, the agents that need you (a click steps like ⌘J). */
+/** " (⌘B)" after a name, or nothing when the action has no key. */
+const keyHint = (label: string | null) => (label ? ` (${label})` : "");
+
 export const LayoutControls = memo(function LayoutControls() {
   const layout = useLayout((s) => s.layout);
   const toggle = useLayout((s) => s.toggle);
@@ -20,6 +24,10 @@ export const LayoutControls = memo(function LayoutControls() {
   const boardOpen = useApp((s) => s.dashboardOpen);
   const setBoardOpen = useApp((s) => s.setDashboardOpen);
   const focus = layout === "focus";
+  const sidebarKey = keyHint(useShortcutLabel("layout.sidebar"));
+  const focusKey = keyHint(useShortcutLabel("layout.focus"));
+  const boardKey = keyHint(useShortcutLabel("board"));
+  const nextKey = keyHint(useShortcutLabel("triage.next"));
   // In focus the waiting pill carries the count; the Board shows it otherwise.
   const need = focus ? 0 : waiting + done;
   const shown = layout === "normal";
@@ -42,7 +50,7 @@ export const LayoutControls = memo(function LayoutControls() {
         aria-expanded={shown}
         aria-controls="sidebar"
         aria-label={shown ? "Hide sidebar" : "Show sidebar"}
-        title={shown ? "Hide sidebar (⌘B) · Focus (⇧⌘B)" : "Show sidebar (⌘B)"}
+        title={shown ? `Hide sidebar${sidebarKey} · Focus${focusKey}` : `Show sidebar${sidebarKey}`}
         onClick={() => toggle("sidebar")}
       >
         <SidebarIcon />
@@ -51,8 +59,8 @@ export const LayoutControls = memo(function LayoutControls() {
         type="button"
         className="board-btn"
         aria-pressed={boardOpen}
-        aria-label={`Board${need ? `, ${need} ${need === 1 ? "needs" : "need"} you` : ""} (⇧⌘D)`}
-        title="Agent Board: everything by status (⇧⌘D)"
+        aria-label={`Board${need ? `, ${need} ${need === 1 ? "needs" : "need"} you` : ""}${boardKey}`}
+        title={`Agent Board: everything by status${boardKey}`}
         onClick={() => setBoardOpen(!boardOpen)}
       >
         <BoardIcon />
@@ -64,8 +72,8 @@ export const LayoutControls = memo(function LayoutControls() {
         <button
           type="button"
           className="waiting-pill"
-          aria-label={`${[waiting && `${waiting} blocked`, done && `${done} review`].filter(Boolean).join(", ")}: go to the next one (⌘J)`}
-          title="Next Blocked or Review (⌘J)"
+          aria-label={`${[waiting && `${waiting} blocked`, done && `${done} review`].filter(Boolean).join(", ")}: go to the next one${nextKey}`}
+          title={`Next Blocked or Review${nextKey}`}
           onClick={() => step(1)}
         >
           <span className="dot" aria-hidden="true" />
