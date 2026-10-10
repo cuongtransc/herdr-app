@@ -8,6 +8,8 @@ A macOS desktop client for the [herdr](https://herdr.dev) terminal multiplexer. 
 |---|---|
 | ![Agent Board](docs/screenshots/dashboard.png) | ![Terminal lens](docs/screenshots/terminal.png) |
 
+How to use the Files panel, protected panes, Fork session and `/btw`: [docs/guide](docs/guide/00-index.md).
+
 ## Install
 
 1. Install [herdr](https://herdr.dev) (see Requirements below).
