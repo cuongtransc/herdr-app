@@ -2,11 +2,11 @@
 use super::images::{decode_image, ImageSink};
 use super::locate::input_summary;
 use super::{
-    cap_input, meta_label, truncate_result as truncate, ChatItem, ChatMeta, ImageRef, Parser,
-    ParserOutput,
+    cap_input, meta_label, truncate_result as truncate, BackgroundKind, BackgroundTask, ChatItem,
+    ChatMeta, ImageRef, Parser, ParserOutput, TaskEnd,
 };
 use serde_json::Value;
-use std::collections::VecDeque;
+use std::collections::{HashMap, VecDeque};
 
 #[derive(Default)]
 pub struct ClaudeParser {
@@ -14,6 +14,24 @@ pub struct ClaudeParser {
     /// The CLI's prompt queue as its `queue-operation` records leave it: what was sent
     /// mid-turn and not read yet. `None` is an entry recorded without its text.
     queue: VecDeque<Option<String>>,
+    /// Bash and Agent calls whose result has not arrived: call id → kind, description, start time.
+    calls: HashMap<String, (BackgroundKind, String, Option<String>)>,
+    /// Background tasks started and not yet reported finished, oldest first.
+    background: Vec<BackgroundTask>,
+}
+
+/// What a result starts with when its call went to the background.
+fn started_prefix(kind: &BackgroundKind) -> &'static str {
+    match kind {
+        BackgroundKind::Bash => "Command running in background with ID:",
+        BackgroundKind::Agent => "Async agent launched",
+    }
+}
+
+/// The `N` of `(exit code N)` in a task's summary.
+fn exit_code(summary: &str) -> Option<i32> {
+    let rest = &summary[summary.find("(exit code ")? + "(exit code ".len()..];
+    rest[..rest.find(')')?].trim().parse().ok()
 }
 
 fn flag(v: &Value, key: &str) -> bool {
@@ -230,16 +248,28 @@ impl ClaudeParser {
         // The CLI's own prompts to the agent (a background task finishing)
         // are not the user's words: show their summary as a system line.
         if v.get("promptSource").and_then(Value::as_str) == Some("system") {
-            return match content
-                .and_then(Value::as_str)
-                .and_then(|s| tag(s, "summary"))
-            {
-                Some(text) => ParserOutput::Append(vec![ChatItem::System {
-                    ts: ts.clone(),
-                    text: text.to_string(),
-                }]),
-                None => ParserOutput::None,
+            let text = content.and_then(Value::as_str).unwrap_or("");
+            let summary = tag(text, "summary");
+            let Some(call_id) = tag(text, "tool-use-id").filter(|id| !id.is_empty()) else {
+                return match summary {
+                    Some(text) => ParserOutput::Append(vec![ChatItem::System {
+                        ts: ts.clone(),
+                        text: text.to_string(),
+                        task: None,
+                    }]),
+                    None => ParserOutput::None,
+                };
             };
+            self.background.retain(|t| t.call_id != call_id);
+            return ParserOutput::Append(vec![ChatItem::System {
+                ts: ts.clone(),
+                text: summary.unwrap_or("").to_string(),
+                task: Some(TaskEnd {
+                    call_id: call_id.to_string(),
+                    status: tag(text, "status").unwrap_or("").to_string(),
+                    exit_code: summary.and_then(exit_code),
+                }),
+            }]);
         }
         let mut items = vec![];
         match content {
@@ -258,17 +288,33 @@ impl ClaudeParser {
                                 .and_then(Value::as_str)
                                 .and_then(|t| user_item(t, &ts)),
                         ),
-                        ("user", "tool_result") => items.push(ChatItem::ToolResult {
-                            images: vec![],
-                            ts: ts.clone(),
-                            call_id: b
+                        ("user", "tool_result") => {
+                            let call_id = b
                                 .get("tool_use_id")
                                 .and_then(Value::as_str)
                                 .unwrap_or("")
-                                .to_string(),
-                            output: truncate(result_text(b.get("content"))),
-                            is_error: flag(b, "is_error"),
-                        }),
+                                .to_string();
+                            let output = result_text(b.get("content"));
+                            let is_error = flag(b, "is_error");
+                            if let Some((kind, description, started)) = self.calls.remove(&call_id)
+                            {
+                                if !is_error && output.starts_with(started_prefix(&kind)) {
+                                    self.background.push(BackgroundTask {
+                                        call_id: call_id.clone(),
+                                        kind,
+                                        description,
+                                        started,
+                                    });
+                                }
+                            }
+                            items.push(ChatItem::ToolResult {
+                                images: vec![],
+                                ts: ts.clone(),
+                                call_id,
+                                output: truncate(output),
+                                is_error,
+                            });
+                        }
                         ("assistant", "text") => {
                             if let Some(t) = b.get("text").and_then(Value::as_str) {
                                 items.push(ChatItem::AssistantText {
@@ -292,13 +338,32 @@ impl ClaudeParser {
                                 .unwrap_or("")
                                 .to_string();
                             let input = b.get("input").cloned().unwrap_or(Value::Null);
+                            let id = b
+                                .get("id")
+                                .and_then(Value::as_str)
+                                .unwrap_or("")
+                                .to_string();
+                            let field = |k: &str| input.get(k).and_then(Value::as_str);
+                            let task = match name.as_str() {
+                                "Bash" => Some((
+                                    BackgroundKind::Bash,
+                                    field("description").map(str::to_string).unwrap_or_else(|| {
+                                        field("command").unwrap_or("").chars().take(80).collect()
+                                    }),
+                                )),
+                                "Agent" => Some((
+                                    BackgroundKind::Agent,
+                                    field("description").unwrap_or("").to_string(),
+                                )),
+                                _ => None,
+                            };
+                            if let Some((kind, description)) = task {
+                                self.calls
+                                    .insert(id.clone(), (kind, description, ts.clone()));
+                            }
                             items.push(ChatItem::ToolCall {
                                 ts: ts.clone(),
-                                id: b
-                                    .get("id")
-                                    .and_then(Value::as_str)
-                                    .unwrap_or("")
-                                    .to_string(),
+                                id,
                                 input_summary: input_summary(&name, &input),
                                 name,
                                 input: cap_input(input),
@@ -378,6 +443,7 @@ impl Parser for ClaudeParser {
                 .filter(|text| !text.starts_with('<'))
                 .cloned()
                 .collect(),
+            background: self.background.clone(),
             ..self.meta.clone()
         }
     }
@@ -589,7 +655,8 @@ mod tests {
             run(&note),
             vec![System {
                 ts: None,
-                text: "Agent \"Research\" finished".into()
+                text: "Agent \"Research\" finished".into(),
+                task: None
             }]
         );
         let bare = serde_json::json!({"type":"user","promptSource":"system","message":{"content":"<task-notification>\n<task-id>a1</task-id>\n</task-notification>"}}).to_string();
@@ -874,6 +941,7 @@ mod tests {
                 context_tokens: None,
                 queued: vec![],
                 alias: None,
+                background: vec![],
             }
         );
     }
@@ -920,6 +988,7 @@ mod tests {
                 context_tokens: None,
                 queued: vec![],
                 alias: None,
+                background: vec![],
             }
         );
     }
@@ -953,5 +1022,202 @@ mod tests {
         assert!(items.iter().all(|i| i.ts() == Some(ts)), "{items:?}");
         let bare = run("{\"type\":\"user\",\"message\":{\"content\":\"a\"}}");
         assert_eq!(bare[0].ts(), None);
+    }
+
+    use crate::transcript::{BackgroundKind, BackgroundTask, TaskEnd};
+    const BASH_STARTED: &str = "Command running in background with ID: bxb95ptkq. Output is being written to: /tmp/bxb95ptkq.output";
+    fn bash_call(id: &str, background: bool, description: Option<&str>) -> String {
+        let mut input = serde_json::json!({"command":"mise run ci > /tmp/ci.log 2>&1","run_in_background":background});
+        if let Some(d) = description {
+            input["description"] = d.into();
+        }
+        serde_json::json!({"type":"assistant","timestamp":"2026-10-10T17:08:00.000Z","message":{"content":[{"type":"tool_use","id":id,"name":"Bash","input":input}]}}).to_string()
+    }
+    fn agent_call(id: &str) -> String {
+        serde_json::json!({"type":"assistant","timestamp":"2026-10-10T17:09:00.000Z","message":{"content":[{"type":"tool_use","id":id,"name":"Agent","input":{"description":"Whole-branch review","prompt":"review"}}]}}).to_string()
+    }
+    fn tool_result(id: &str, text: &str, is_error: bool) -> String {
+        serde_json::json!({"type":"user","message":{"content":[{"type":"tool_result","tool_use_id":id,"content":[{"type":"text","text":text}],"is_error":is_error}]}}).to_string()
+    }
+    fn notification(id: &str, status: &str, summary: Option<&str>) -> String {
+        let summary = summary
+            .map(|s| format!("<summary>{s}</summary>\n"))
+            .unwrap_or_default();
+        serde_json::json!({"type":"user","promptSource":"system","origin":{"kind":"task-notification"},"timestamp":"2026-10-10T17:18:00.000Z","message":{"content":format!("<task-notification>\n<task-id>b1</task-id>\n<tool-use-id>{id}</tool-use-id>\n<output-file>/tmp/b1.output</output-file>\n<status>{status}</status>\n{summary}</task-notification>")}}).to_string()
+    }
+    fn end(id: &str, status: &str, exit_code: Option<i32>) -> Option<TaskEnd> {
+        Some(TaskEnd {
+            call_id: id.into(),
+            status: status.into(),
+            exit_code,
+        })
+    }
+    fn push(p: &mut ClaudeParser, line: &str) -> Vec<ChatItem> {
+        match p.push_line(line, &mut Vec::<(String, String, Vec<u8>)>::new()) {
+            ParserOutput::Append(v) => v,
+            _ => vec![],
+        }
+    }
+
+    #[test]
+    fn a_background_command_runs_until_its_notification() {
+        let (_, _, mut p) = run_with(
+            &[
+                bash_call("t1", true, Some("Run full dotfiles CI in background")),
+                tool_result("t1", BASH_STARTED, false),
+            ]
+            .join("\n"),
+        );
+        assert_eq!(
+            p.meta().background,
+            vec![BackgroundTask {
+                call_id: "t1".into(),
+                kind: BackgroundKind::Bash,
+                description: "Run full dotfiles CI in background".into(),
+                started: Some("2026-10-10T17:08:00.000Z".into()),
+            }]
+        );
+        let summary =
+            "Background command \"Run full dotfiles CI in background\" completed (exit code 0)";
+        assert_eq!(
+            push(&mut p, &notification("t1", "completed", Some(summary))),
+            vec![System {
+                ts: Some("2026-10-10T17:18:00.000Z".into()),
+                text: summary.into(),
+                task: end("t1", "completed", Some(0))
+            }]
+        );
+        assert_eq!(p.meta().background, vec![]);
+    }
+
+    #[test]
+    fn a_background_agent_runs_until_its_notification() {
+        let (_, _, mut p) = run_with(
+            &[
+                agent_call("a1"),
+                tool_result(
+                    "a1",
+                    "Async agent launched successfully.\nagentId: a18a42ecc9696ac94",
+                    false,
+                ),
+            ]
+            .join("\n"),
+        );
+        let bg = p.meta().background;
+        assert_eq!(
+            (bg.len(), &bg[0].kind, bg[0].description.as_str()),
+            (1, &BackgroundKind::Agent, "Whole-branch review")
+        );
+        let items = push(
+            &mut p,
+            &notification("a1", "failed", Some("Agent \"Whole-branch review\" failed")),
+        );
+        assert!(matches!(&items[..], [System { task, .. }] if *task == end("a1", "failed", None)));
+        assert_eq!(p.meta().background, vec![]);
+    }
+
+    #[test]
+    fn reads_a_non_zero_exit_code() {
+        let (_, _, mut p) = run_with(
+            &[
+                bash_call("t1", true, Some("ci")),
+                tool_result("t1", BASH_STARTED, false),
+            ]
+            .join("\n"),
+        );
+        let items = push(
+            &mut p,
+            &notification(
+                "t1",
+                "failed",
+                Some("Background command \"ci\" failed (exit code 1)"),
+            ),
+        );
+        assert!(
+            matches!(&items[..], [System { task, .. }] if *task == end("t1", "failed", Some(1)))
+        );
+    }
+
+    #[test]
+    fn a_notification_without_a_summary_still_ends_the_task() {
+        let (_, _, mut p) = run_with(
+            &[
+                bash_call("t1", true, Some("ci")),
+                tool_result("t1", BASH_STARTED, false),
+            ]
+            .join("\n"),
+        );
+        assert_eq!(
+            push(&mut p, &notification("t1", "killed", None)),
+            vec![System {
+                ts: Some("2026-10-10T17:18:00.000Z".into()),
+                text: String::new(),
+                task: end("t1", "killed", None)
+            }]
+        );
+        assert_eq!(p.meta().background, vec![]);
+    }
+
+    #[test]
+    fn foreground_and_failed_starts_stay_out() {
+        let (_, _, p) = run_with(
+            &[
+                bash_call("t1", false, Some("ls")),
+                tool_result("t1", "a\nb", false),
+                bash_call("t2", true, Some("ci")),
+                tool_result("t2", "Permission to use Bash has been denied.", true),
+                serde_json::json!({"type":"assistant","message":{"content":[{"type":"tool_use","id":"r1","name":"Read","input":{"file_path":"/a"}}]}}).to_string(),
+                tool_result("r1", BASH_STARTED, false),
+            ]
+            .join("\n"),
+        );
+        assert_eq!(p.meta().background, vec![]);
+    }
+
+    #[test]
+    fn notification_without_a_start_is_shown() {
+        let (items, _, p) = run_with(&notification(
+            "zz",
+            "completed",
+            Some("Background command \"x\" completed (exit code 0)"),
+        ));
+        assert!(
+            matches!(&items[..], [System { task, .. }] if *task == end("zz", "completed", Some(0)))
+        );
+        assert_eq!(p.meta().background, vec![]);
+    }
+
+    #[test]
+    fn keeps_start_order() {
+        let (_, _, mut p) = run_with(
+            &[
+                bash_call("t1", true, Some("first")),
+                tool_result("t1", BASH_STARTED, false),
+                bash_call("t2", true, Some("second")),
+                tool_result("t2", BASH_STARTED, false),
+                bash_call("t3", true, Some("third")),
+                tool_result("t3", BASH_STARTED, false),
+            ]
+            .join("\n"),
+        );
+        push(
+            &mut p,
+            &notification("t1", "completed", Some("done (exit code 0)")),
+        );
+        let names: Vec<_> = p
+            .meta()
+            .background
+            .into_iter()
+            .map(|t| t.description)
+            .collect();
+        assert_eq!(names, vec!["second", "third"]);
+    }
+
+    #[test]
+    fn describes_a_command_without_a_description_by_its_start() {
+        let long = "x".repeat(100);
+        let call = serde_json::json!({"type":"assistant","message":{"content":[{"type":"tool_use","id":"t1","name":"Bash","input":{"command":long,"run_in_background":true}}]}}).to_string();
+        let (_, _, p) = run_with(&[call, tool_result("t1", BASH_STARTED, false)].join("\n"));
+        assert_eq!(p.meta().background[0].description, "x".repeat(80));
     }
 }

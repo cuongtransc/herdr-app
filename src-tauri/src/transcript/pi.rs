@@ -126,6 +126,7 @@ impl PiParser {
         self.entries.clear();
         ParserOutput::Reset(vec![ChatItem::System {
             ts: None,
+            task: None,
             text: TOO_LARGE.to_string(),
         }])
     }
@@ -552,6 +553,7 @@ mod tests {
                 v,
                 vec![System {
                     ts: None,
+                    task: None,
                     text: "Conversation too large to show; use the Terminal lens.".into()
                 }]
             ),
@@ -654,6 +656,7 @@ mod tests {
                 context_tokens: Some(82920),
                 queued: vec![],
                 alias: None,
+                background: vec![],
             }
         );
     }
