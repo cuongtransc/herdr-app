@@ -59,6 +59,17 @@ const SHELL_NAMES = new Set(["sh", "bash", "zsh", "fish", "nu", "pwsh", "dash", 
 export const isPlainShell = (pane: PaneView) =>
   !pane.agent && (pane.busy != null ? !pane.busy : SHELL_NAMES.has(pane.title.trim().replace(/^-/, "").toLowerCase()));
 
+/** Why closing the pane would end work, or null when nothing runs there (ui-ux-guidelines §4.3). */
+export function busyWhy(pane: PaneView): string | null {
+  if (pane.agent) {
+    const name = pane.agent.charAt(0).toUpperCase() + pane.agent.slice(1);
+    if (pane.status === "working") return `${name} is working: closing ends its turn.`;
+    if (pane.status === "blocked") return `${name} is waiting for you: closing ends it.`;
+    return null;
+  }
+  return isPlainShell(pane) ? null : "It is running a command: closing stops it.";
+}
+
 /** How Active treats a pane. `since` is when its status last changed (unknown before the app saw a change). */
 export function paneState(pane: PaneView, seen: boolean, since: number | undefined, now: number, keptMs = DEFAULT_KEPT_MS): { quiet: boolean; idleFor: number | null } {
   if (!pane.agent) return { quiet: isPlainShell(pane), idleFor: null };

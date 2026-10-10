@@ -16,7 +16,7 @@ import { AgentIcon } from "./AgentIcon";
 import { isProtected, protectedIn, useProtect } from "./protect";
 import { forkBlocked, forkSession } from "./forkSession";
 import { copyTranscriptPath } from "./transcriptPath";
-import { idleLabel, paneState, useActiveKeptMs, useMinuteClock, usePaneFilter } from "./paneFilter";
+import { busyWhy, idleLabel, paneState, useActiveKeptMs, useMinuteClock, usePaneFilter } from "./paneFilter";
 import { useLaneRecords } from "./laneOwners";
 import { laneTitle, sessionRoles, tabRole } from "./roles";
 import { AGENTS, openAgentTab } from "./openAgentTab";
@@ -180,12 +180,18 @@ function AgentCard({
   const close = call("pane.close", { pane_id: pane.pane_id });
   const key = paneKey(ref);
   const isProt = useProtect((s) => isProtected(s.marks, key, row.role === "orch" || (tabRole(tab.label) === "orch" && !!pane.agent)));
-  // A one-pane Tab closes with its pane: one Close tab, which acts as Close pane (no question, off while protected).
+  // A one-pane Tab closes with its pane: one Close tab, which acts as Close pane (off while protected).
   const onlyPane = tab.panes.length === 1;
   const closeLabel = onlyPane ? "Close tab" : "Close pane";
+  // Asks first when the pane has work running; otherwise closes at once.
+  const closeChecked = () => {
+    const why = busyWhy(pane);
+    if (why) a?.confirm(closeLabel, `${closeLabel} "${title}"? ${why}`, "Close", close, [], true);
+    else a?.guard(close);
+  };
   const closePane: MenuItem = isProt
     ? { label: closeLabel, icon: CloseIcon, disabled: true, note: "Protected: unprotect it to close", onSelect: () => {} }
-    : { label: closeLabel, icon: CloseIcon, onSelect: () => a?.guard(close) };
+    : { label: closeLabel, icon: CloseIcon, onSelect: closeChecked };
   const items: MenuEntry[] = a
     ? [
         { label: "Rename pane…", icon: PencilIcon, onSelect: () => a.rename("Rename pane", pane.title, (label) => call("pane.rename", { pane_id: pane.pane_id, label })()) },
@@ -280,7 +286,7 @@ function AgentCard({
         </button>
       )}
       {!isProt && (
-        <button className="agent-card-close" aria-label={`${closeLabel} ${title}`} title={closeLabel} onClick={() => a?.guard(close)}>
+        <button className="agent-card-close" aria-label={`${closeLabel} ${title}`} title={closeLabel} onClick={closeChecked}>
           <CloseIcon />
         </button>
       )}

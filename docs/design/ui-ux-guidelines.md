@@ -189,8 +189,9 @@ a bookmarked project). **Never** bind bare letters, Ctrl-, Alt- or Esc at `windo
 ### 4.3 Destructive actions
 
 One rule for closing a pane, a tab and a workspace: confirm when it can end a running process or
-an agent's work (blocked or working), otherwise act at once. Today a pane closes without
-confirmation while tabs and workspaces confirm.
+an agent's work (blocked or working), otherwise act at once. A pane follows it (`busyWhy`: an
+agent working or blocked, a shell running a command; Cancel is the default); tabs and workspaces
+still always confirm.
 
 ### 4.4 Counts and pills
 

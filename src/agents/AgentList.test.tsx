@@ -386,9 +386,44 @@ describe("AgentList", () => {
     render(<AgentList />);
     expect(screen.getByRole("button", { name: "Close tab Idempotent payments" }).title).toBe("Close tab");
     expect(screen.getByRole("button", { name: "Close pane Tag v1.4.0" }).title).toBe("Close pane");
-    fireEvent.click(screen.getByRole("button", { name: "Close pane Tag v1.4.0" }));
+    // A done agent has nothing running: closed at once.
+    fireEvent.click(screen.getByRole("button", { name: "Close tab Idempotent payments" }));
     expect(screen.queryByRole("dialog")).toBeNull();
-    expect(herdrCall).toHaveBeenCalledWith("local", "default", "pane.close", { pane_id: "p3" });
+    expect(herdrCall).toHaveBeenCalledWith("local", "default", "pane.close", { pane_id: "p1" });
+  });
+
+  describe("closing a pane with work running", () => {
+    const withStatus = (status: PaneView["status"]): MachineView => ({ ...m, sessions: [{ ...m.sessions[0], workspaces: m.sessions[0].workspaces.map((w) =>
+      w.workspace_id !== "w1" ? w : { ...w, tabs: w.tabs.map((t) => ({ ...t, panes: t.panes.map((p) => ({ ...p, status })) })) }) }, m.sessions[1]] });
+
+    it("asks before closing a working agent, Cancel first, and closes nothing on Cancel", () => {
+      useApp.setState({ machines: { local: withStatus("working") } });
+      render(<AgentList />);
+      fireEvent.click(screen.getByRole("button", { name: "Close tab Idempotent payments" }));
+      const dialog = screen.getByRole("dialog", { name: "Close tab" });
+      expect(within(dialog).getByText('Close tab "Idempotent payments"? Claude is working: closing ends its turn.')).toBeTruthy();
+      expect(document.activeElement?.textContent).toBe("Cancel");
+      fireEvent.click(within(dialog).getByRole("button", { name: "Cancel" }));
+      expect(herdrCall).not.toHaveBeenCalled();
+      fireEvent.click(screen.getByRole("button", { name: "Close tab Idempotent payments" }));
+      fireEvent.click(within(screen.getByRole("dialog")).getByRole("button", { name: "Close" }));
+      expect(herdrCall).toHaveBeenCalledWith("local", "default", "pane.close", { pane_id: "p1" });
+    });
+
+    it("asks before closing an agent waiting for the user, from the menu too", () => {
+      render(<AgentList />);
+      fireEvent.contextMenu(screen.getByText("Guard export"));
+      fireEvent.click(screen.getByRole("menuitem", { name: "Close tab" }));
+      expect(within(screen.getByRole("dialog", { name: "Close tab" })).getByText('Close tab "Guard export"? Codex is waiting for you: closing ends it.')).toBeTruthy();
+      expect(herdrCall).not.toHaveBeenCalled();
+    });
+
+    it("asks before closing a shell that is running something", () => {
+      render(<AgentList />);
+      fireEvent.click(screen.getByRole("button", { name: "Close pane Tag v1.4.0" }));
+      expect(within(screen.getByRole("dialog", { name: "Close pane" })).getByText('Close pane "Tag v1.4.0"? It is running a command: closing stops it.')).toBeTruthy();
+      expect(herdrCall).not.toHaveBeenCalled();
+    });
   });
 
   describe("fork", () => {
