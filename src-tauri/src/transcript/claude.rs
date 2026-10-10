@@ -18,7 +18,12 @@ pub struct ClaudeParser {
     calls: HashMap<String, (BackgroundKind, String, Option<String>)>,
     /// Background tasks started and not yet reported finished, oldest first.
     background: Vec<BackgroundTask>,
+    /// Tasks whose end was already shown, oldest first and bounded: a repeat is dropped.
+    ended: VecDeque<String>,
 }
+
+/// Most unfinished calls and ended task ids kept; the oldest are forgotten past it.
+const TRACKED_MAX: usize = 512;
 
 /// What a result starts with when its call went to the background.
 fn started_prefix(kind: &BackgroundKind) -> &'static str {
@@ -30,7 +35,7 @@ fn started_prefix(kind: &BackgroundKind) -> &'static str {
 
 /// The `N` of `(exit code N)` in a task's summary.
 fn exit_code(summary: &str) -> Option<i32> {
-    let rest = &summary[summary.find("(exit code ")? + "(exit code ".len()..];
+    let rest = &summary[summary.rfind("(exit code ")? + "(exit code ".len()..];
     rest[..rest.find(')')?].trim().parse().ok()
 }
 
@@ -107,10 +112,25 @@ fn user_item(text: &str, ts: &Option<String>) -> Option<ChatItem> {
 /// Parenthesised notes such as `(1M context)` are dropped.
 /// A message typed while the agent is mid-turn is recorded as a
 /// `queued_command` attachment, not a user record: rewrite it as the user
-/// record it stands for. Other queued prompts (a subagent's hand-back, a task
-/// notification) are not the user's words.
+/// record it stands for. A task notification becomes the system record the idle
+/// case writes. Other queued prompts (a subagent's hand-back) are not the user's words.
 fn queued_prompt(v: &Value) -> Option<Value> {
     let a = v.get("attachment")?;
+    let kind = a
+        .get("origin")
+        .and_then(|o| o.get("kind"))
+        .and_then(Value::as_str);
+    if a.get("type").and_then(Value::as_str) == Some("queued_command")
+        && kind == Some("task-notification")
+    {
+        return Some(serde_json::json!({
+            "type": "user",
+            "promptSource": "system",
+            "timestamp": v.get("timestamp"),
+            "isSidechain": v.get("isSidechain"),
+            "message": {"content": a.get("prompt")},
+        }));
+    }
     let human = a.get("type")?.as_str()? == "queued_command"
         && a.get("commandMode").and_then(Value::as_str) == Some("prompt")
         && a.get("origin")
@@ -260,6 +280,13 @@ impl ClaudeParser {
                     None => ParserOutput::None,
                 };
             };
+            if self.ended.iter().any(|id| id == call_id) {
+                return ParserOutput::None;
+            }
+            if self.ended.len() >= TRACKED_MAX {
+                self.ended.pop_front();
+            }
+            self.ended.push_back(call_id.to_string());
             self.background.retain(|t| t.call_id != call_id);
             return ParserOutput::Append(vec![ChatItem::System {
                 ts: ts.clone(),
@@ -358,6 +385,9 @@ impl ClaudeParser {
                                 _ => None,
                             };
                             if let Some((kind, description)) = task {
+                                if self.calls.len() >= TRACKED_MAX {
+                                    self.calls.clear();
+                                }
                                 self.calls
                                     .insert(id.clone(), (kind, description, ts.clone()));
                             }
@@ -1156,6 +1186,103 @@ mod tests {
             }]
         );
         assert_eq!(p.meta().background, vec![]);
+    }
+
+    /// The record the CLI writes when a task ends while Claude is mid-turn.
+    fn attached_notification(id: &str, status: &str, summary: &str) -> String {
+        serde_json::json!({"type":"attachment","timestamp":"2026-10-10T19:40:05.000Z","isSidechain":false,"attachment":{"type":"queued_command","prompt":format!("<task-notification>\n<task-id>b1</task-id>\n<tool-use-id>{id}</tool-use-id>\n<output-file>/tmp/b1.output</output-file>\n<status>{status}</status>\n<summary>{summary}</summary>\n<note>n</note>\n<result>r</result>\n</task-notification>"),"commandMode":"task-notification","origin":{"kind":"task-notification"}}}).to_string()
+    }
+
+    #[test]
+    fn a_queued_notification_ends_the_task() {
+        let (_, _, mut p) = run_with(
+            &[
+                agent_call("a1"),
+                tool_result("a1", "Async agent launched successfully.", false),
+            ]
+            .join("\n"),
+        );
+        let items = push(
+            &mut p,
+            &attached_notification("a1", "completed", "Agent \"Review\" finished"),
+        );
+        assert_eq!(
+            items,
+            vec![System {
+                ts: Some("2026-10-10T19:40:05.000Z".into()),
+                text: "Agent \"Review\" finished".into(),
+                task: end("a1", "completed", None)
+            }]
+        );
+        assert_eq!(p.meta().background, vec![]);
+    }
+
+    #[test]
+    fn a_task_ended_by_both_paths_is_shown_once() {
+        let (_, _, mut p) = run_with(
+            &[
+                agent_call("a1"),
+                tool_result("a1", "Async agent launched successfully.", false),
+            ]
+            .join("\n"),
+        );
+        assert_eq!(
+            push(&mut p, &attached_notification("a1", "completed", "done")).len(),
+            1
+        );
+        assert_eq!(
+            push(&mut p, &notification("a1", "completed", Some("done"))),
+            vec![]
+        );
+        assert_eq!(
+            push(&mut p, &attached_notification("a1", "completed", "done")),
+            vec![]
+        );
+    }
+
+    #[test]
+    fn a_repeated_system_notification_is_shown_once() {
+        let mut p = ClaudeParser::default();
+        assert_eq!(
+            push(&mut p, &notification("a1", "completed", Some("done"))).len(),
+            1
+        );
+        assert_eq!(
+            push(&mut p, &notification("a1", "completed", Some("done"))),
+            vec![]
+        );
+        // Another task is unaffected.
+        assert_eq!(
+            push(&mut p, &notification("a2", "completed", Some("done"))).len(),
+            1
+        );
+    }
+
+    #[test]
+    fn a_queued_notification_is_not_the_users_words() {
+        let items = run(&attached_notification("zz", "completed", "x"));
+        assert!(matches!(&items[..], [System { .. }]));
+    }
+
+    #[test]
+    fn reads_the_last_exit_code_in_the_summary() {
+        let items = run(&notification(
+            "t1",
+            "failed",
+            Some("Background command \"echo (exit code 0)\" failed (exit code 2)"),
+        ));
+        assert!(
+            matches!(&items[..], [System { task, .. }] if *task == end("t1", "failed", Some(2)))
+        );
+    }
+
+    #[test]
+    fn unfinished_calls_are_bounded() {
+        let mut p = ClaudeParser::default();
+        for i in 0..2000 {
+            push(&mut p, &agent_call(&format!("a{i}")));
+        }
+        assert!(p.calls.len() <= 512);
     }
 
     #[test]
