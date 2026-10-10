@@ -16,6 +16,7 @@ import { ChatOutline } from "./ChatOutline";
 import { currentEntry, outline } from "./outline";
 import { Composer } from "./Composer";
 import { QueuedMessages } from "./QueuedMessages";
+import { BtwPanel } from "./BtwPanel";
 import { WorkingIndicator } from "./WorkingIndicator";
 import { usePiModelPicker } from "./usePiModelPicker";
 import { usePendingTranscript } from "./pendingTranscript";
@@ -329,6 +330,7 @@ export function ChatLens({ pane, view }: { pane: PaneRef; view: PaneView }) {
         </button>
       )}
       <QueuedMessages texts={state.queued} />
+      <BtwPanel pane={pane} />
       <WorkingIndicator status={view.status} start={start} />
       {view.status === "blocked" || picker.open ? (
         <PromptPanel pane={pane} view={view} fallback={view.status === "blocked"} asked={asked} />

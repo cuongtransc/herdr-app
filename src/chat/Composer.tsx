@@ -16,6 +16,7 @@ import { contextMeter, formatTokens, modelLabel, type ContextMeter } from "./mod
 import { ModelMenu } from "./ModelMenu";
 import { useClaudeSuggestion } from "./useClaudeSuggestion";
 import { useCompletions } from "./useCompletions";
+import { btwQuestion, useBtw } from "./btw";
 import { IMAGE_EXTS } from "../terminal/imagePaste";
 
 // Key names verified against herdr's key parser (pane.send_keys accepts esc, ctrl+c,
@@ -186,6 +187,8 @@ export function Composer({
   };
 
   const [sending, setSending] = useState(false);
+  // Claude's /btw panel takes the pane's keys until the Chat lens has read the answer and closed it.
+  const asking = useBtw((s) => s.asides[key]?.phase === "asking");
   // Read only while the box is empty (that is when the suggestion shows, and Tab takes it), and
   // not while a send is on its way: Claude's box would still show the old suggestion.
   const { suggestion, clear: clearSuggestion } = useClaudeSuggestion(pane, agent, status, text === "" && !sending);
@@ -297,7 +300,7 @@ export function Composer({
     });
 
   const uploading = images.some((a) => a.path === null);
-  const canSend = !uploading && (text.trim() !== "" || images.length > 0);
+  const canSend = !uploading && !asking && (text.trim() !== "" || images.length > 0);
 
   const submit = async (sent: string, paths: string[]) => {
     const target = pane.pane_id;
@@ -332,6 +335,8 @@ export function Composer({
           recordPrompt(scope, sent);
           sentHere.current.push(sent);
           if (agent === "pi" && PI_MODEL_RE.test(sent.trim())) onPiModel?.();
+          const question = agent === "claude" && sentImages.length === 0 ? btwQuestion(sent) : null;
+          if (question) void useBtw.getState().ask(pane, question, (m, p) => herdrCall(pane.machine_id, pane.session, m, p));
         },
         () => {
           setText((cur) => (cur === "" ? sent : cur));
@@ -343,7 +348,7 @@ export function Composer({
 
   /** A canned reply goes straight out; what is typed in the box stays a draft. */
   const sendQuick = (reply: string) => {
-    if (sending) return;
+    if (sending || asking) return;
     clearSuggestion();
     setSending(true);
     call("agent.prompt", { target: pane.pane_id, text: reply })
@@ -529,7 +534,7 @@ export function Composer({
           >
             <StopIcon />
           </button>
-          <button className="send" aria-label="Send" disabled={!canSend} onClick={send}>
+          <button className="send" aria-label="Send" title={asking ? "Wait for the /btw answer" : undefined} disabled={!canSend} onClick={send}>
             <SendIcon />
           </button>
           {menuAt && (
