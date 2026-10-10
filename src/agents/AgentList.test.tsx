@@ -2,7 +2,9 @@ import { fireEvent, render, screen, within } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 // No ctc by default: lanes fold by workspace, as before the lane store reported owners.
 vi.mock("../lib/ipc", () => ({ herdrCall: vi.fn().mockResolvedValue(undefined), chatLocate: vi.fn(), lanesList: vi.fn().mockRejectedValue(new Error("no ctc")) }));
+vi.mock("./transcriptPath", () => ({ copyTranscriptPath: vi.fn() }));
 import { herdrCall, lanesList } from "../lib/ipc";
+import { copyTranscriptPath } from "./transcriptPath";
 import { useLaneOwners } from "./laneOwners";
 import { useFilesPanel } from "../files/panelStore";
 import { panelWorkspace } from "../files/root";
@@ -344,16 +346,40 @@ describe("AgentList", () => {
     expect(herdrCall).toHaveBeenCalledWith("local", "default", "tab.create", { workspace_id: "w2", cwd: "/srv/web", label: "pi", focus: false });
   });
 
-  it("offers pane and tab actions in the card menu", () => {
+  // The menu's entries in order, a line between groups as "—".
+  const menuEntries = () =>
+    [...screen.getByRole("menu").children].map((li) => (li.getAttribute("role") === "separator" ? "—" : li.querySelector("button")!.textContent));
+
+  it("offers pane and tab actions in the card menu, grouped", () => {
     render(<AgentList />);
     fireEvent.contextMenu(screen.getByText("Tag v1.4.0"));
-    const names = screen.getAllByRole("menuitem").map((b) => b.textContent);
-    expect(names).toEqual(["Rename…", "Split right", "Split down", "Close pane", "New tab", "Rename tab…", "Close tab"]);
-    // A shell pane offers no fork.
-    expect(screen.queryByRole("menuitem", { name: "Fork session" })).toBeNull();
+    // A shell pane has no agent group: no fork, no transcript.
+    expect(menuEntries()).toEqual(["Rename pane…", "Split right", "Split down", "Protect", "Close pane", "—", "Rename tab…", "Close tab"]);
     expect(screen.getByRole("menuitemcheckbox", { name: "Protect" }).getAttribute("aria-checked")).toBe("false");
     fireEvent.click(screen.getByRole("menuitem", { name: "Split right" }));
     expect(herdrCall).toHaveBeenCalledWith("local", "default", "pane.split", { target_pane_id: "p3", direction: "right" });
+  });
+
+  it("groups a Claude pane's agent actions, and closes its one-pane tab without asking", () => {
+    render(<AgentList />);
+    fireEvent.contextMenu(screen.getByText("Idempotent payments"));
+    expect(menuEntries()).toEqual([
+      "Rename pane…", "Split right", "Split down", "Protect", "—",
+      "Fork session", "Fork into a new worktree", "Copy transcript path", "—",
+      "Rename tab…", "Close tab",
+    ]);
+    fireEvent.click(screen.getByRole("menuitem", { name: "Close tab" }));
+    expect(screen.queryByRole("dialog")).toBeNull();
+    expect(herdrCall).toHaveBeenCalledWith("local", "default", "pane.close", { pane_id: "p1" });
+  });
+
+  it("copies a pi pane's transcript path, without offering a fork", () => {
+    usePaneFilter.setState({ filter: "all" });
+    render(<AgentList />);
+    fireEvent.contextMenu(screen.getByText("Ship flag"));
+    expect(screen.queryByRole("menuitem", { name: "Fork session" })).toBeNull();
+    fireEvent.click(screen.getByRole("menuitem", { name: "Copy transcript path" }));
+    expect(copyTranscriptPath).toHaveBeenCalledWith({ machine_id: "local", session: "default", pane_id: "p4" });
   });
 
   it("closes a pane from its card button without asking", () => {
@@ -460,9 +486,18 @@ describe("AgentList", () => {
       expect(within(dialog).getByRole("button", { name: "Unprotect and close" })).toBeTruthy();
     });
 
+    it("turns off a protected one-pane tab's Close tab with the reason, as Close pane is", () => {
+      useProtect.getState().set("local/default/p2", true);
+      render(<AgentList />);
+      const menu = menuOf("Guard export");
+      expect((within(menu).getByRole("menuitem", { name: "Close tab" }) as HTMLButtonElement).disabled).toBe(true);
+      expect(within(menu).getByText("Protected: unprotect it to close")).toBeTruthy();
+      expect(within(menu).queryByRole("menuitem", { name: "Close pane" })).toBeNull();
+    });
+
     it("keeps the plain confirmation when nothing in the tab is protected", () => {
       render(<AgentList />);
-      fireEvent.click(within(menuOf("Guard export")).getByRole("menuitem", { name: "Close tab" }));
+      fireEvent.click(within(menuOf("Tag v1.4.0")).getByRole("menuitem", { name: "Close tab" }));
       const dialog = screen.getByRole("dialog", { name: "Close tab" });
       expect(within(dialog).getByRole("button", { name: "Close" })).toBeTruthy();
       expect(within(dialog).queryByRole("button", { name: "Unprotect and close" })).toBeNull();

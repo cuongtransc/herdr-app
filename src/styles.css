@@ -857,6 +857,7 @@ kbd {
 .ctx-menu button:disabled { opacity: 0.5; cursor: default; }
 .ctx-menu button:disabled:hover { background: none; color: inherit; }
 .ctx-menu .ctx-check { margin-left: auto; }
+.ctx-sep { height: 1px; margin: 4px 6px; background: var(--line-2); }
 .ctx-note { padding: 0 10px 4px 32px; color: var(--fg-2); font-size: 11.5px; line-height: 1.35; }
 .protected-list { margin: 0; padding: 0; list-style: none; display: flex; flex-direction: column; gap: 4px; }
 .protected-list li { display: flex; align-items: center; gap: 8px; padding: 6px 10px; border-radius: var(--r-sm); background: var(--surface-1); font-weight: 600; }
