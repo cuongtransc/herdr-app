@@ -4,6 +4,7 @@ pub mod claude;
 pub mod images;
 pub mod locate;
 pub mod pi;
+pub mod pi_alias;
 mod skill_prompt;
 pub mod tail;
 
@@ -16,6 +17,7 @@ use std::collections::{HashMap, VecDeque};
 use std::sync::Mutex;
 
 pub use locate::{locate, Located};
+pub use pi_alias::ModelAlias;
 pub use tail::{spawn_tail, Sink, TailHandle};
 
 /// An image attached to a chat item; its bytes are fetched by `reference`.
@@ -43,6 +45,8 @@ pub struct ChatMeta {
     pub context_tokens: Option<u64>,
     /// The user's messages waiting in the agent's queue, oldest first.
     pub queued: Vec<String>,
+    /// The pi alias the Model was chosen by; `model` is then the target that served it.
+    pub alias: Option<ModelAlias>,
 }
 
 #[derive(Clone, Debug, PartialEq, Serialize)]
@@ -137,6 +141,7 @@ pub enum ChatEvent {
         effort: Option<String>,
         context_tokens: Option<u64>,
         queued: Vec<String>,
+        alias: Option<ModelAlias>,
     },
 }
 
@@ -201,7 +206,9 @@ pub(crate) fn cap_input(v: serde_json::Value) -> serde_json::Value {
 pub fn parser_for(agent: &str) -> Option<Box<dyn Parser>> {
     match agent {
         "claude" => Some(Box::new(claude::ClaudeParser::default())),
-        "pi" => Some(Box::new(pi::PiParser::default())),
+        "pi" => Some(Box::new(pi::PiParser::with_aliases(
+            pi_alias::PiAliases::load(),
+        ))),
         _ => None,
     }
 }
@@ -902,11 +909,18 @@ mod tests {
             effort: None,
             context_tokens: Some(42),
             queued: vec!["hi".into()],
+            alias: Some(ModelAlias {
+                name: "implementer-medium".into(),
+                label: "impl-m".into(),
+                provider: Some("openai-codex".into()),
+                fallback: true,
+            }),
         })
         .unwrap();
         assert_eq!(
             v,
-            serde_json::json!({ "type": "meta", "model": "m", "effort": null, "context_tokens": 42, "queued": ["hi"] })
+            serde_json::json!({ "type": "meta", "model": "m", "effort": null, "context_tokens": 42, "queued": ["hi"],
+                "alias": { "name": "implementer-medium", "label": "impl-m", "provider": "openai-codex", "fallback": true } })
         );
     }
 

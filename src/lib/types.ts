@@ -94,7 +94,11 @@ export type AttachEvent =
 export interface ImageRef { ref: string; media_type: string }
 export interface SkillUse { name: string; path: string }
 /** The Model, Reasoning effort and context size (tokens) the Transcript last named. */
-export interface ChatMeta { model: string | null; effort: string | null; context_tokens: number | null }
+/** A pi alias Model as pi's footer names it; `fallback`: what served it is not the chain's head. */
+export interface ModelAlias { name: string; label: string; provider: string | null; fallback: boolean }
+
+/** `model` is what served the last reply; with `alias`, the alias's target. */
+export interface ChatMeta { model: string | null; effort: string | null; context_tokens: number | null; alias?: ModelAlias | null }
 
 /** `ts`: when the Transcript record was written (ISO 8601), if it says. */
 export type ChatItem = (

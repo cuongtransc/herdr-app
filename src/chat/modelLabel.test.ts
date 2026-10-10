@@ -1,6 +1,24 @@
 import { describe, expect, it } from "vitest";
-import { contextMeter, formatTokens, modelLabel } from "./modelLabel";
+import { aliasTitle, contextMeter, formatTokens, modelLabel } from "./modelLabel";
 describe("modelLabel", () => {
+  const alias = { name: "implementer-medium", label: "impl-m", provider: "openai-codex", fallback: false };
+  it("names a pi alias as pi's footer does: label→model, label↓model on a fallback", () => {
+    const meta = { model: "gpt-6-sol", effort: "low", context_tokens: 53_000, alias };
+    expect(modelLabel(meta)).toBe("impl-m→gpt-6-sol · low · 53k");
+    expect(modelLabel({ ...meta, alias: { ...alias, fallback: true } })).toBe("impl-m↓gpt-6-sol · low · 53k");
+    // Before the first reply only the alias is known.
+    expect(modelLabel({ ...meta, model: null })).toBe("impl-m · low · 53k");
+  });
+  it("spells the alias and its target out in full for the tooltip", () => {
+    const meta = { model: "gpt-6-sol", effort: "low", context_tokens: null, alias };
+    expect(aliasTitle(meta)).toBe("implementer-medium → openai-codex/gpt-6-sol");
+    expect(aliasTitle({ ...meta, alias: { ...alias, fallback: true } })).toBe(
+      "implementer-medium → openai-codex/gpt-6-sol (fallback: not the alias's first choice)",
+    );
+    expect(aliasTitle({ ...meta, model: null })).toBe("implementer-medium (no reply yet)");
+    expect(aliasTitle({ ...meta, alias: null })).toBeNull();
+    expect(aliasTitle(undefined)).toBeNull();
+  });
   it("joins the Model, effort and context size, or shows whichever is known", () => {
     expect(modelLabel({ model: "claude-opus-5-5", effort: "high", context_tokens: 48612 })).toBe("claude-opus-5-5 · high · 48.6k");
     expect(modelLabel({ model: "claude-opus-5-5", effort: "high", context_tokens: null })).toBe("claude-opus-5-5 · high");
