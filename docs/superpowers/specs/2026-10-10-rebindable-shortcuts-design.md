@@ -125,7 +125,11 @@ actions need its state (the palette's `setPaletteOpen`) and stores. Two rules ca
 
 ## Settings → Shortcuts
 
-A new section, after Files. One row per action, in the table's order:
+A new section, after Files. The actions are grouped under small headings, in this order: **Agents**
+(Jump to pane, Next / Previous Blocked or Review, Agent Board, New tab), **Layout** (Toggle sidebar,
+Focus layout), **Files** (Toggle Files panel, Go to file), **Open items** (Previous / Next Open item,
+Remove Open item), **Font size** (Bigger, Smaller, Default). No filter: 15 rows fit one screen. One
+row per action:
 
 - The label, then a key button showing the chord, or `None` (muted).
 - Clicking the key button records: it shows `Press keys…`, `recording` is set, and the next

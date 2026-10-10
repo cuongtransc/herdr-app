@@ -821,7 +821,8 @@ kbd {
 .hidden-folder-add input:focus { border-color: var(--accent); box-shadow: var(--ring); }
 .hidden-folder-add input::placeholder { color: var(--fg-3); }
 .settings-body .hidden-folder-error { color: var(--err-fg); }
-.shortcut-list { display: flex; flex-direction: column; gap: 6px; }
+.shortcut-group { display: flex; flex-direction: column; gap: 6px; }
+.shortcut-group-title { margin: 4px 0 0; font-size: 11px; font-weight: 600; letter-spacing: 0.04em; text-transform: uppercase; color: var(--fg-3); }
 .shortcut-item { display: flex; flex-direction: column; gap: 4px; }
 .shortcut-controls { display: flex; align-items: center; gap: 4px; }
 .shortcut-key {

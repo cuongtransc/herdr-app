@@ -16,8 +16,8 @@ beforeEach(() => {
 describe("shortcuts store", () => {
   it("defaults to the spec's keys", () => {
     expect(ACTIONS.map((a) => a.id)).toEqual([
-      "jump", "triage.next", "triage.prev", "board", "layout.sidebar", "layout.focus", "tabs.new",
-      "files.toggle", "files.goto", "item.remove", "item.prev", "item.next", "font.bigger", "font.smaller", "font.reset",
+      "jump", "triage.next", "triage.prev", "board", "tabs.new", "layout.sidebar", "layout.focus",
+      "files.toggle", "files.goto", "item.prev", "item.next", "item.remove", "font.bigger", "font.smaller", "font.reset",
     ]);
     expect(DEFAULT_BINDINGS["files.toggle"]).toEqual(c("KeyE"));
     expect(DEFAULT_BINDINGS["item.prev"]).toEqual(c("BracketLeft", { shift: true }));

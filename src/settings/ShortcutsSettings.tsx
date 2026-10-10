@@ -1,5 +1,5 @@
 import { type KeyboardEvent, useEffect, useState } from "react";
-import { ACTIONS, type ActionId } from "../shortcuts/actions";
+import { ACTION_GROUPS, ACTIONS, type ActionId } from "../shortcuts/actions";
 import { type Chord, chordOf, formatChord, sameChord } from "../shortcuts/chord";
 import { checkChord, DEFAULT_BINDINGS, useShortcuts } from "../shortcuts/store";
 
@@ -58,64 +58,67 @@ export function ShortcutsSettings() {
   return (
     <>
       <p className="note">Click a key to record a new one: Esc keeps the old key, ⌫ leaves the action without one. Every Shortcut includes ⌘.</p>
-      <div className="shortcut-list">
-        {ACTIONS.map((a) => {
-          const chord = bindings[a.id];
-          const isRecording = recording === a.id;
-          const text = isRecording ? "Press keys…" : chord ? formatChord(chord) : "None";
-          const rowIssue = issue?.id === a.id ? issue : null;
-          return (
-            <div key={a.id} className="shortcut-item">
-              <div className="setting-row">
-                <span>{a.label}</span>
-                <div className="shortcut-controls">
-                  {!sameChord(chord, DEFAULT_BINDINGS[a.id]) && (
-                    <button className="icon-btn" aria-label={`Reset ${a.label}`} title="Back to the default key" onClick={() => reset(a.id)}>
-                      ↺
+      {ACTION_GROUPS.map((group) => (
+        <div key={group} className="shortcut-group" role="group" aria-label={group}>
+          <h4 className="shortcut-group-title">{group}</h4>
+          {ACTIONS.filter((a) => a.group === group).map((a) => {
+            const chord = bindings[a.id];
+            const isRecording = recording === a.id;
+            const text = isRecording ? "Press keys…" : chord ? formatChord(chord) : "None";
+            const rowIssue = issue?.id === a.id ? issue : null;
+            return (
+              <div key={a.id} className="shortcut-item">
+                <div className="setting-row">
+                  <span>{a.label}</span>
+                  <div className="shortcut-controls">
+                    {!sameChord(chord, DEFAULT_BINDINGS[a.id]) && (
+                      <button className="icon-btn" aria-label={`Reset ${a.label}`} title="Back to the default key" onClick={() => reset(a.id)}>
+                        ↺
+                      </button>
+                    )}
+                    <button
+                      className={"shortcut-key" + (isRecording ? " recording" : "") + (chord || isRecording ? "" : " none")}
+                      aria-label={`${a.label}: ${text}`}
+                      onClick={(e) => {
+                        // WebKit leaves focus where it was on a click; the keys must come here.
+                        e.currentTarget.focus();
+                        if (!isRecording) start(a.id);
+                      }}
+                      onKeyDown={(e) => record(a.id, e)}
+                      onBlur={() => {
+                        if (!isRecording) return;
+                        if (rowIssue && "refused" in rowIssue) setIssue(null);
+                        stop();
+                      }}
+                    >
+                      {text}
                     </button>
-                  )}
-                  <button
-                    className={"shortcut-key" + (isRecording ? " recording" : "") + (chord || isRecording ? "" : " none")}
-                    aria-label={`${a.label}: ${text}`}
-                    onClick={(e) => {
-                      // WebKit leaves focus where it was on a click; the keys must come here.
-                      e.currentTarget.focus();
-                      if (!isRecording) start(a.id);
-                    }}
-                    onKeyDown={(e) => record(a.id, e)}
-                    onBlur={() => {
-                      if (!isRecording) return;
-                      if (rowIssue && "refused" in rowIssue) setIssue(null);
-                      stop();
-                    }}
-                  >
-                    {text}
-                  </button>
+                  </div>
                 </div>
+                {rowIssue && "refused" in rowIssue && (
+                  <p className="note shortcut-issue" role="alert">
+                    {rowIssue.refused}
+                  </p>
+                )}
+                {rowIssue && "usedBy" in rowIssue && (
+                  <p className="note shortcut-issue" role="alert">
+                    {formatChord(rowIssue.chord)} is used by {labelOf(rowIssue.usedBy)}{" "}
+                    <button
+                      className="btn btn-xs"
+                      onClick={() => {
+                        replace(a.id, rowIssue.chord);
+                        setIssue(null);
+                      }}
+                    >
+                      Replace
+                    </button>
+                  </p>
+                )}
               </div>
-              {rowIssue && "refused" in rowIssue && (
-                <p className="note shortcut-issue" role="alert">
-                  {rowIssue.refused}
-                </p>
-              )}
-              {rowIssue && "usedBy" in rowIssue && (
-                <p className="note shortcut-issue" role="alert">
-                  {formatChord(rowIssue.chord)} is used by {labelOf(rowIssue.usedBy)}{" "}
-                  <button
-                    className="btn btn-xs"
-                    onClick={() => {
-                      replace(a.id, rowIssue.chord);
-                      setIssue(null);
-                    }}
-                  >
-                    Replace
-                  </button>
-                </p>
-              )}
-            </div>
-          );
-        })}
-      </div>
+            );
+          })}
+        </div>
+      ))}
       <div className="settings-foot">
         <button className="btn btn-xs" disabled={!changed} onClick={resetAll}>
           Reset all

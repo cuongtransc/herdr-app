@@ -300,6 +300,20 @@ describe("Settings → Shortcuts", () => {
     expect(document.activeElement).toBe(keyBtn(/^Agent Board/));
   });
 
+  it("groups the actions under headings, related ones together", () => {
+    open();
+    const groups = screen.getAllByRole("group").filter((g) => g.classList.contains("shortcut-group"));
+    expect(groups.map((g) => g.getAttribute("aria-label"))).toEqual(["Agents", "Layout", "Files", "Open items", "Font size"]);
+    const names = (group: string) =>
+      within(screen.getByRole("group", { name: group }))
+        .getAllByRole("button")
+        .map((b) => b.getAttribute("aria-label")!.split(":")[0])
+        .filter((n) => !n.startsWith("Reset "));
+    expect(names("Agents")).toEqual(["Jump to pane", "Next Blocked or Review", "Previous Blocked or Review", "Agent Board", "New tab"]);
+    expect(names("Files")).toEqual(["Toggle Files panel", "Go to file"]);
+    expect(names("Open items")).toEqual(["Previous Open item", "Next Open item", "Remove Open item"]);
+  });
+
   it("lists every action with its key", () => {
     open();
     expect(keyBtn(/^Toggle Files panel: ⌘E$/)).toBeTruthy();
