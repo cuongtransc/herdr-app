@@ -52,6 +52,9 @@ describe("reservedReason", () => {
     expect(reservedReason(c("KeyG"))).toBe("Reserved by Herdr: Find next");
     expect(reservedReason(c("KeyG", { shift: true }))).toBe("Reserved by Herdr: Find previous");
     expect(reservedReason(c("KeyR"))).toBe("Reserved by Herdr: Reload");
+    expect(reservedReason(c("KeyF", { ctrl: true }))).toBe("Reserved by macOS");
+    expect(reservedReason(c("Space", { ctrl: true }))).toBe("Reserved by macOS");
+    expect(reservedReason(c("KeyQ", { shift: true }))).toBe("Reserved by macOS");
   });
   it("leaves the rest free, including other modifiers on a reserved key", () => {
     expect(reservedReason(c("KeyE"))).toBeNull();

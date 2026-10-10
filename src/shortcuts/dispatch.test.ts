@@ -28,6 +28,15 @@ describe("actionFor", () => {
     expect(actionFor(ev("l", "KeyL"), b)).toBe("files.toggle");
     expect(actionFor(ev("k", "KeyK"), b)).toBeNull();
   });
+  it("falls back to the character when the physical key means nothing: numpad, German ⌘+", () => {
+    expect(actionFor(ev("+", "NumpadAdd"), DEFAULT_BINDINGS)).toBe("font.bigger");
+    expect(actionFor(ev("-", "NumpadSubtract"), DEFAULT_BINDINGS)).toBe("font.smaller");
+    expect(actionFor(ev("0", "Numpad0"), DEFAULT_BINDINGS)).toBe("font.reset");
+    expect(actionFor(ev("+", "BracketRight"), DEFAULT_BINDINGS)).toBe("font.bigger");
+    // The physical key wins when it is bound: no second action from the character.
+    expect(actionFor(ev("ê", "KeyE"), DEFAULT_BINDINGS)).toBe("files.toggle");
+  });
+
   it("ignores keys without ⌘ and unbound chords", () => {
     expect(actionFor(ev("e", "KeyE", { metaKey: false }), DEFAULT_BINDINGS)).toBeNull();
     expect(actionFor(ev("e", "KeyE", { altKey: true }), DEFAULT_BINDINGS)).toBeNull();

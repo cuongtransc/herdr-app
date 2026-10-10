@@ -294,6 +294,12 @@ describe("Settings → Shortcuts", () => {
   };
   const keyBtn = (name: RegExp) => screen.getByRole("button", { name });
 
+  it("focuses the key button it records on, as WebKit does not focus a clicked button", () => {
+    open();
+    fireEvent.click(keyBtn(/^Agent Board/));
+    expect(document.activeElement).toBe(keyBtn(/^Agent Board/));
+  });
+
   it("lists every action with its key", () => {
     open();
     expect(keyBtn(/^Toggle Files panel: ⌘E$/)).toBeTruthy();

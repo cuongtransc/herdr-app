@@ -77,7 +77,11 @@ export function ShortcutsSettings() {
                   <button
                     className={"shortcut-key" + (isRecording ? " recording" : "") + (chord || isRecording ? "" : " none")}
                     aria-label={`${a.label}: ${text}`}
-                    onClick={() => (isRecording ? undefined : start(a.id))}
+                    onClick={(e) => {
+                      // WebKit leaves focus where it was on a click; the keys must come here.
+                      e.currentTarget.focus();
+                      if (!isRecording) start(a.id);
+                    }}
                     onKeyDown={(e) => record(a.id, e)}
                     onBlur={() => {
                       if (!isRecording) return;

@@ -25,8 +25,9 @@ const CODE_OF_KEY: Record<string, string> = {
   Tab: "Tab",
 };
 
-/** The code a synthetic event without one stands for (tests); real events always carry it. */
-function codeFromKey(key: string): string {
+/** The US-layout code of a key's character: for events without a code (tests), and for `actionFor`'s
+ *  fallback when the physical key is bound to nothing. "" when there is none. */
+export function codeFromKey(key: string): string {
   if (/^[a-z]$/i.test(key)) return `Key${key.toUpperCase()}`;
   if (/^[0-9]$/.test(key)) return `Digit${key}`;
   return CODE_OF_KEY[key] ?? "";
@@ -76,7 +77,7 @@ const chord = (code: string, m: Partial<Chord> = {}): Chord => ({ code, shift: f
 
 /** Chords macOS or Herdr's fixed keys own, with why they cannot be a Shortcut. */
 const RESERVED: [Chord, string][] = [
-  ...[chord("KeyQ"), chord("KeyH"), chord("KeyH", { alt: true }), chord("KeyM"), chord("Tab"), chord("Space"), chord("Backquote")].map(
+  ...[chord("KeyQ"), chord("KeyQ", { shift: true }), chord("KeyF", { ctrl: true }), chord("Space", { ctrl: true }), chord("KeyH"), chord("KeyH", { alt: true }), chord("KeyM"), chord("Tab"), chord("Space"), chord("Backquote")].map(
     (c): [Chord, string] => [c, "Reserved by macOS"],
   ),
   ...[chord("KeyC"), chord("KeyV"), chord("KeyX"), chord("KeyA"), chord("KeyZ"), chord("KeyZ", { shift: true })].map(
