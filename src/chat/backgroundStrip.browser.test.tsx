@@ -45,7 +45,6 @@ it.each(["light", "dark"] as const)("lines the strip up with the Working line (%
   const times = [...host.querySelectorAll(".chat-background-time")];
   const stripSpin = host.querySelector(".chat-background .spin")!;
   const workSpin = host.querySelector(".chat-working .spin")!;
-  console.log("x", JSON.stringify({ descs: descs.map(left), stripSpin: left(stripSpin), workSpin: left(workSpin), times: times.map(right) }));
   expect(descs).toHaveLength(2);
   expect(Math.abs(left(descs[0]) - left(descs[1]))).toBeLessThanOrEqual(0.5);
   expect(Math.abs(left(stripSpin) - left(workSpin))).toBeLessThanOrEqual(1);

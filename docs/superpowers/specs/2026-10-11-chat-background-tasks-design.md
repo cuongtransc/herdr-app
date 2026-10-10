@@ -36,8 +36,7 @@ Measured on Claude Code 2.1.295 transcripts (five days, about 6 200 task notific
 | Start, Agent | `assistant` `tool_use` `name: "Agent"`, `input.description`; its `tool_result` text starts `Async agent launched successfully.` |
 | End, agent idle | `user` record with `promptSource: "system"`, `origin.kind: "task-notification"`, content `<task-notification>` holding `<task-id>`, `<tool-use-id>`, `<output-file>`, `<status>`, `<summary>` |
 | End, agent mid-turn | `attachment` record, `attachment.type: "queued_command"`, `attachment.origin.kind: "task-notification"`, `attachment.prompt` holding the same `<task-notification>` text. The CLI writes this instead of the `user` record when the task ends while Claude is working |
-
-| End, stopped by Claude | `assistant` `tool_use` `name: "TaskStop"` (`input.task_id`) or `name: "KillShell"` (`input.shell_id`); its non-error `tool_result` (JSON text `{"message":"Successfully stopped task: ...","task_id":...}`) ends the task. No `<task-notification>` is guaranteed |
+| End, stopped by Claude | `assistant` `tool_use` `name: "TaskStop"` (`input.task_id`) or `name: "KillShell"` (`input.shell_id`); its non-error `tool_result` (JSON text `{"message":"Successfully stopped task: ...","task_id":...}`) ends the task. `TaskStop` writes no `<task-notification>` |
 
 `<status>` is `completed`, `failed`, `killed` or `stopped`. A Bash summary ends `(exit code N)` (the last one in the summary is read):
 `Background command "Use SRC helper, run full dotfiles CI" completed (exit code 0)`. While the
