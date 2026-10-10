@@ -5,7 +5,10 @@ import { machinesList, onMachine, onMenuSettings, onNotifyActivate, onPaneStatus
 import { notifyPaneStatus } from "./notify";
 import { Palette } from "./palette/Palette";
 import { Settings, useSettingsOpen } from "./settings/Settings";
-import { applyChatFont, fontZoomKey, useSettings, zoomFont } from "./settings/store";
+import { applyChatFont, type FontZoom, useSettings, zoomFont } from "./settings/store";
+import type { ActionId } from "./shortcuts/actions";
+import { actionFor } from "./shortcuts/dispatch";
+import { useShortcuts } from "./shortcuts/store";
 import { applyTheme, useTheme } from "./settings/theme";
 import { LayoutControls } from "./main/LayoutControls";
 import { useDockBadge } from "./main/dockBadge";
@@ -91,6 +94,11 @@ function EmptyMain() {
     </EmptyState>
   );
 }
+
+/** Actions an open dialog (`.overlay`) keeps from running: their keys may mean something there. */
+const KEPT_BY_DIALOGS = new Set<ActionId>(["files.toggle", "files.goto", "item.remove", "item.prev", "item.next"]);
+/** Actions a held key runs again. */
+const REPEATS = new Set<ActionId>(["item.prev", "item.next", "font.bigger", "font.smaller", "font.reset"]);
 
 const ChatLens = lazy(() => import("./chat/ChatLens").then((m) => ({ default: m.ChatLens })));
 const TerminalLens = lazy(() => import("./terminal/TerminalLens").then((m) => ({ default: m.TerminalLens })));
@@ -182,65 +190,64 @@ export default function App() {
   }, []);
 
   useEffect(() => {
-    const onKey = (e: KeyboardEvent) => {
+    const zoom = (z: FontZoom) => {
+      const s = useApp.getState();
+      const open = s.selected ? selectedPane(s)?.pane : null;
+      if (!open || !s.selected) return false;
+      zoomFont(defaultLens(open, chosenLens(s, paneKey(s.selected))), z);
+      return true;
+    };
+    const leaveFocus = () => {
+      if (useLayout.getState().layout === "focus") useLayout.getState().toggle("focus");
+    };
+    // Each returns false when it did nothing, leaving the key to the page.
+    const run: Record<ActionId, () => boolean | void> = {
       // ⌘+ / ⌘− / ⌘0: the font of the view on screen, Terminal or Chat (iTerm, Ghostty).
-      const zoom = fontZoomKey(e);
-      if (zoom !== null) {
-        const s = useApp.getState();
-        const open = s.selected ? selectedPane(s)?.pane : null;
-        if (!open || !s.selected) return;
-        e.preventDefault();
-        zoomFont(defaultLens(open, chosenLens(s, paneKey(s.selected))), zoom);
-        return;
-      }
-      // While the dashboard is open, ⌘K focuses its search instead.
-      if (e.metaKey && e.key.toLowerCase() === "k" && !useApp.getState().dashboardOpen) {
-        e.preventDefault();
-        setPaletteOpen((o) => !o);
-      }
-      if (e.metaKey && !e.altKey && !e.ctrlKey && e.key.toLowerCase() === "j") {
-        e.preventDefault();
-        if (!e.repeat) useTriage.getState().step(e.shiftKey ? -1 : 1);
-      }
-      if (e.metaKey && e.shiftKey && !e.altKey && !e.ctrlKey && e.key.toLowerCase() === "d") {
-        e.preventDefault();
-        if (!e.repeat) useApp.getState().setDashboardOpen(!useApp.getState().dashboardOpen);
-      }
-      if (e.metaKey && !e.altKey && !e.ctrlKey && e.key.toLowerCase() === "b") {
-        e.preventDefault();
-        if (!e.repeat) useLayout.getState().toggle(e.shiftKey ? "focus" : "sidebar");
-      }
-      if (e.metaKey && !e.shiftKey && !e.altKey && !e.ctrlKey && e.key.toLowerCase() === "t") {
-        e.preventDefault();
-        if (e.repeat) return;
-        openNewTabHere().catch((err: unknown) =>
+      "font.bigger": () => zoom(1),
+      "font.smaller": () => zoom(-1),
+      "font.reset": () => zoom(0),
+      // While the dashboard is open, the Jump key focuses its search instead.
+      jump: () => (useApp.getState().dashboardOpen ? false : setPaletteOpen((o) => !o)),
+      "triage.next": () => useTriage.getState().step(1),
+      "triage.prev": () => useTriage.getState().step(-1),
+      board: () => useApp.getState().setDashboardOpen(!useApp.getState().dashboardOpen),
+      "layout.sidebar": () => useLayout.getState().toggle("sidebar"),
+      "layout.focus": () => useLayout.getState().toggle("focus"),
+      "tabs.new": () =>
+        void openNewTabHere().catch((err: unknown) =>
           showToast(`Could not open a new tab: ${(err as { message?: string } | null)?.message ?? String(err)}`),
-        );
-      }
-      const plain = e.metaKey && !e.shiftKey && !e.altKey && !e.ctrlKey;
-      const k = e.key.toLowerCase();
-      // A dialog keeps its keys.
-      if (document.querySelector(".overlay")) return;
-      if (plain && k === "e") {
-        e.preventDefault();
-        if (e.repeat) return;
-        // Focus hides the agents column, and the Files panel with it.
-        if (useLayout.getState().layout === "focus") useLayout.getState().toggle("focus");
-        useFilesPanel.getState().focusTree();
-      } else if (plain && k === "p") {
-        e.preventDefault();
-        if (e.repeat) return;
-        if (useLayout.getState().layout === "focus") useLayout.getState().toggle("focus");
+        ),
+      // Shown means expanded and not hidden by Focus, which hides the Agents column and the panel with it.
+      "files.toggle": () => {
+        const panel = useFilesPanel.getState();
+        if (!panel.collapsed && useLayout.getState().layout !== "focus") return panel.setCollapsed(true);
+        leaveFocus();
+        panel.focusTree();
+      },
+      "files.goto": () => {
+        leaveFocus();
         useFilesPanel.getState().focusGoto();
-      } else if (plain && k === "w") {
-        e.preventDefault();
-        if (e.repeat) return;
+      },
+      "item.remove": () => {
         const active = useApp.getState().openItems.active;
         if (active) useApp.getState().closeItems(active, "one");
-      } else if (e.metaKey && e.shiftKey && !e.altKey && !e.ctrlKey && (e.code === "BracketLeft" || e.code === "BracketRight")) {
+      },
+      "item.prev": () => useApp.getState().cycleItems(-1),
+      "item.next": () => useApp.getState().cycleItems(1),
+    };
+    const onKey = (e: KeyboardEvent) => {
+      const keys = useShortcuts.getState();
+      // Settings is recording a key: it gets the key, nothing runs.
+      if (keys.recording) return;
+      const action = actionFor(e, keys.bindings);
+      if (!action) return;
+      // A dialog keeps its keys.
+      if (KEPT_BY_DIALOGS.has(action) && document.querySelector(".overlay")) return;
+      if (e.repeat && !REPEATS.has(action)) {
         e.preventDefault();
-        useApp.getState().cycleItems(e.code === "BracketLeft" ? -1 : 1);
+        return;
       }
+      if (run[action]() !== false) e.preventDefault();
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);

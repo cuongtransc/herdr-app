@@ -6,6 +6,7 @@ import type { MachineView, PaneView } from "../lib/types";
 import { initialQuota, useQuota } from "../quota/store";
 import { useApp } from "../store/app";
 import { AgentDashboard } from "./AgentDashboard";
+import { loadBindings, useShortcuts } from "../shortcuts/store";
 
 const pane = (id: string, title: string, status: PaneView["status"], agent = "claude"): PaneView => ({
   pane_id: id, terminal_id: "t" + id, title, cwd: "/x", agent, status,
@@ -132,6 +133,19 @@ describe("AgentDashboard", () => {
     (document.activeElement as HTMLElement | null)?.blur();
     fireEvent.keyDown(window, { key: "k", metaKey: true });
     expect(document.activeElement).toBe(screen.getByPlaceholderText(/search/i));
+  });
+
+  it("focuses its search with the Jump key, rebound or not", () => {
+    localStorage.clear();
+    useShortcuts.setState({ bindings: loadBindings(), recording: false });
+    act(() => useShortcuts.getState().set("jump", { code: "KeyL", shift: false, alt: false, ctrl: false }));
+    render(<AgentDashboard />);
+    const search = screen.getByPlaceholderText(/search/i);
+    (document.activeElement as HTMLElement | null)?.blur();
+    fireEvent.keyDown(window, { key: "k", code: "KeyK", metaKey: true });
+    expect(document.activeElement).not.toBe(search);
+    fireEvent.keyDown(window, { key: "l", code: "KeyL", metaKey: true });
+    expect(document.activeElement).toBe(search);
   });
 });
 
