@@ -14,6 +14,8 @@ const board: CtaQuota = { kind: "ok", readAt: now, accounts: [
   ok("claude", "955f5fbe-a050", [w("5h", 5, 4 * H, 18_000), w("week", 4, 6 * D + 21 * H, 604_800), w("week · Fable", 0, 6 * D, 604_800)]),
   ok("codex", "edbec1d9", [w("week", 24, 6 * D + 8 * H, 604_800)]),
   { provider: "opencode-go", account: "sha256:008e82c8aa", polledAt: now - 9 * H, status: "http", detail: "HTTP 403 from opencode.ai/zen/go/v1/usage", windows: [] },
+  // A reason longer than the bar and value columns (the screenshot's "RemoteDisconnected · 15m").
+  { provider: "opencode-go", account: "sha256:9c1e7a02aa", polledAt: now - 15 * M, status: "network", detail: "RemoteDisconnected('Remote end closed connection')", windows: [] },
   ok("opencode-go", "sha256:403fae94aa", [w("5h", 19, H + 57 * M, 18_000), w("week", 7, 5 * D, 604_800), w("month", 3, 26 * D, null)]),
   ok("opencode-go", "sha256:68453c11aa", [w("5h", 0, 5 * H, 18_000), w("week", 0, 5 * D, 604_800), w("month", 100, 13 * D + 7 * H, null)]),
   ok("grok", "63f955fd", [w("week", 0, 5 * D + 15 * H, 604_800)]),
@@ -39,11 +41,19 @@ beforeEach(async () => {
 
 it("fits every name and value in the Sidebar's width, with bars in one column", () => {
   const rows = [...document.querySelectorAll(".quota-row")];
-  expect(rows.map((r) => r.querySelector(".quota-name")!.textContent)).toEqual(["Claude 1", "Claude 2", "Codex", "OpenCode 1", "OpenCode 2", "OpenCode 3", "Grok"]);
+  expect(rows.map((r) => r.querySelector(".quota-name")!.textContent)).toEqual(["Claude 1", "Claude 2", "Codex", "OpenCode 1", "OpenCode 2", "OpenCode 3", "OpenCode 4", "Grok"]);
   for (const r of rows) {
-    expect(fits(r.querySelector(".quota-name")!), r.textContent!).toBe(true);
-    expect(fits(r.querySelector(".quota-val")!), r.textContent!).toBe(true);
+    const name = r.querySelector(".quota-name")!, val = r.querySelector(".quota-val")!;
+    expect(fits(name), r.textContent!).toBe(true);
+    // A long trouble reason clips with an ellipsis inside its own columns, never over the name.
+    expect(val.getBoundingClientRect().left, r.textContent!).toBeGreaterThanOrEqual(name.getBoundingClientRect().right);
+    expect(val.getBoundingClientRect().right, r.textContent!).toBeLessThanOrEqual(r.getBoundingClientRect().right);
   }
+  // Only the reason clips: the age stays readable.
+  const reason = [...document.querySelectorAll(".quota-reason")].find((n) => n.textContent!.startsWith("RemoteDisconnected"))!;
+  expect(fits(reason)).toBe(false);
+  expect(reason.parentElement!.textContent).toMatch(/ · 15m$/);
+  expect(reason.nextElementSibling!.getBoundingClientRect().right).toBeLessThanOrEqual(reason.parentElement!.getBoundingClientRect().right);
   const lefts = new Set([...document.querySelectorAll(".quota-row .dash-quota-bar")].map((b) => Math.round(b.getBoundingClientRect().left)));
   expect(lefts.size).toBe(1);
 });
