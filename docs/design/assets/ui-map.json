@@ -151,7 +151,7 @@
   },
   {
    "group": "Sidebar",
-   "name": "Project row",
+   "name": "Workspace row",
    "selector": ".project-row",
    "at": [
     0,
