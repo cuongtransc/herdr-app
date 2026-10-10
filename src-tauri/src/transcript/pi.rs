@@ -205,6 +205,7 @@ fn message_items(entry_id: &str, entry: &Value, sink: &mut dyn ImageSink) -> Vec
                         None => (text, vec![]),
                     };
                     ChatItem::User {
+                        id: None,
                         images: vec![],
                         skills,
                         ts: ts.clone(),
@@ -219,6 +220,7 @@ fn message_items(entry_id: &str, entry: &Value, sink: &mut dyn ImageSink) -> Vec
                     _ => items.insert(
                         0,
                         ChatItem::User {
+                            id: None,
                             images: refs,
                             skills: vec![],
                             ts: ts.clone(),
@@ -430,6 +432,7 @@ mod tests {
             ParserOutput::Append(v) => assert_eq!(
                 v,
                 vec![User {
+                    id: None,
                     ts: None,
                     text: "/skill:tdd".into(),
                     images: vec![],
@@ -451,6 +454,7 @@ mod tests {
             items,
             vec![
                 User {
+                    id: None,
                     images: vec![],
                     skills: vec![],
                     ts: None,
@@ -491,12 +495,14 @@ mod tests {
                 items,
                 vec![
                     User {
+                        id: None,
                         images: vec![],
                         skills: vec![],
                         ts: None,
                         text: "hi".into()
                     },
                     User {
+                        id: None,
                         images: vec![],
                         skills: vec![],
                         ts: None,
@@ -516,7 +522,7 @@ mod tests {
         let mut p = PiParser::default();
         let out = p.push_line(r#"{"type":"message","id":"x","parentId":"gone","message":{"role":"user","content":"hey"}}"#, &mut Vec::<(String, String, Vec<u8>)>::new());
         assert!(
-            matches!(out, ParserOutput::Reset(v) if v == vec![User { ts: None, text: "hey".into(), images: vec![], skills: vec![] }])
+            matches!(out, ParserOutput::Reset(v) if v == vec![User { id: None, ts: None, text: "hey".into(), images: vec![], skills: vec![] }])
         );
     }
     #[test]
@@ -598,6 +604,7 @@ mod tests {
             items,
             vec![
                 User {
+                    id: None,
                     ts: None,
                     text: "see".into(),
                     skills: vec![],
@@ -611,6 +618,7 @@ mod tests {
                     images: vec![r("b:0", "image/jpeg"), r("b:1", "image/png")]
                 },
                 User {
+                    id: None,
                     ts: None,
                     text: "".into(),
                     skills: vec![],
