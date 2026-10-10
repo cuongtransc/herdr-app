@@ -88,6 +88,7 @@ export function ConfirmDialog({
   onConfirm,
   onClose,
   protectedPanes = [],
+  cancelFirst = false,
 }: {
   title: string;
   message: string;
@@ -96,8 +97,11 @@ export function ConfirmDialog({
   onClose: () => void;
   /** Protected panes the action would close: listed, and Cancel takes the focus. */
   protectedPanes?: ProtectedPane[];
+  /** Work would be lost (an agent working, a command running): Cancel takes the focus. */
+  cancelFirst?: boolean;
 }) {
   const guarded = protectedPanes.length > 0;
+  const safe = guarded || cancelFirst;
   return (
     <Modal title={title} onClose={onClose}>
       <p>{message}</p>
@@ -115,11 +119,11 @@ export function ConfirmDialog({
         </>
       )}
       <div className="actions">
-        {/* Guarded: Cancel is the default (filled, focused); closing protected panes stays a plain button in red text. */}
-        <button className={guarded ? "btn btn-primary" : "btn"} autoFocus={guarded} onClick={onClose}>Cancel</button>
+        {/* Safe: Cancel is the default (filled, focused); closing stays a plain button in red text. */}
+        <button className={safe ? "btn btn-primary" : "btn"} autoFocus={safe} onClick={onClose}>Cancel</button>
         <button
-          className={guarded ? "btn btn-danger-text" : "btn btn-danger"}
-          autoFocus={!guarded}
+          className={safe ? "btn btn-danger-text" : "btn btn-danger"}
+          autoFocus={!safe}
           onClick={() => {
             onClose();
             onConfirm();
