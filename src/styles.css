@@ -1170,6 +1170,23 @@ kbd {
 .chat-queued { flex: none; margin: 0; padding: 0; list-style: none; max-height: 30vh; overflow-y: auto; }
 .chat-queued .chat-bubble { background: transparent; border-style: dashed; color: var(--fg-2); }
 .chat-queued-label { flex: none; color: var(--fg-3); font-size: 11px; font-weight: 600; letter-spacing: .04em; }
+/* Claude's /btw answer, read off its screen: sits above the Composer, scrolls on its own. */
+.btw-panel {
+  flex: none; width: calc(100% - 40px); max-width: calc(var(--chat-max) - 40px); margin: 0 auto 4px; box-sizing: border-box;
+  border: 1px solid var(--line); border-radius: var(--r-md, 8px); background: var(--surface-1);
+  display: flex; flex-direction: column; max-height: 40vh; min-height: 0;
+}
+.btw-head { display: flex; align-items: center; gap: 8px; padding: 6px 8px 6px 12px; border-bottom: 1px solid var(--line); }
+.btw-tag { flex: none; font-family: var(--mono); font-size: 11px; font-weight: 600; color: var(--accent); }
+.btw-question { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--fg); font-size: 13px; }
+.btw-panel .chat-copy { opacity: 1; }
+.btw-status { padding: 10px 12px; color: var(--fg-2); font-size: 13px; }
+.btw-answer {
+  margin: 0; padding: 10px 12px; overflow: auto; min-height: 0; white-space: pre-wrap; overflow-wrap: anywhere;
+  font-family: var(--mono); font-size: 12px; line-height: 1.5; color: var(--fg); user-select: text; -webkit-user-select: text;
+}
+.btw-error { display: flex; align-items: center; gap: 8px; padding: 8px 12px; color: var(--err-fg); font-size: 13px; }
+.btw-error > span { flex: 1; min-width: 0; }
 .chat-working {
   flex: none; display: flex; align-items: center; gap: 8px; width: 100%; max-width: var(--chat-max); margin: 0 auto;
   padding: 6px 28px 0; box-sizing: border-box; color: var(--fg-3); font-size: 12px;

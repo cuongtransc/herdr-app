@@ -22,6 +22,7 @@ import { useDraftImages } from "./draftImages";
 import { SUGGESTION_POLL_MS } from "./useClaudeSuggestion";
 import { useApp } from "../store/app";
 import { recordPrompt } from "./promptHistory";
+import { useBtw } from "./btw";
 const pane = { machine_id: "devtuf", session: "default", pane_id: "w1:p1" };
 const png = () => new File([new Uint8Array([137, 80, 78, 71])], "image.png", { type: "image/png" });
 const sendButton = () => screen.getByRole<HTMLButtonElement>("button", { name: "Send" });
@@ -56,6 +57,37 @@ describe("Composer", () => {
     expect(herdrCall).toHaveBeenCalledWith("devtuf", "default", "agent.prompt", { target: "w1:p1", text: "fix the bug" });
     expect((box as HTMLTextAreaElement).value).toBe("");
   });
+  it("follows a /btw to Claude for its answer", async () => {
+    const ask = vi.fn().mockResolvedValue(undefined);
+    useBtw.setState({ asides: {}, ask });
+    render(<Composer pane={pane} agent="claude" />);
+    const box = screen.getByRole("textbox");
+    fireEvent.change(box, { target: { value: "/btw why that file?" } });
+    fireEvent.keyDown(box, { key: "Enter" });
+    expect(herdrCall).toHaveBeenCalledWith("devtuf", "default", "agent.prompt", { target: "w1:p1", text: "/btw why that file?" });
+    await waitFor(() => expect(ask).toHaveBeenCalledWith(pane, "why that file?", expect.any(Function)));
+  });
+
+  it("leaves a /btw to other agents alone", async () => {
+    const ask = vi.fn().mockResolvedValue(undefined);
+    useBtw.setState({ asides: {}, ask });
+    render(<Composer pane={pane} agent="codex" />);
+    const box = screen.getByRole("textbox");
+    fireEvent.change(box, { target: { value: "/btw why?" } });
+    fireEvent.keyDown(box, { key: "Enter" });
+    await waitFor(() => expect(herdrCall).toHaveBeenCalled());
+    expect(ask).not.toHaveBeenCalled();
+  });
+
+  it("holds sends while a /btw answers: Claude's panel would take the keys", () => {
+    useBtw.setState({ asides: { "devtuf/default/w1:p1": { question: "q", phase: "asking", signal: { cancelled: false } } } });
+    render(<Composer pane={pane} agent="claude" />);
+    fireEvent.change(screen.getByRole("textbox"), { target: { value: "next" } });
+    expect(sendButton().disabled).toBe(true);
+    expect(sendButton().title).toMatch(/btw/);
+    useBtw.setState({ asides: {} });
+  });
+
   it("pins the pane's agent tab when it sends", () => {
     useApp.setState({ openItems: { items: [{ kind: "agent", ref: pane }], preview: "agent:devtuf/default/w1:p1", active: "agent:devtuf/default/w1:p1" } });
     render(<Composer pane={pane} agent="claude" />);
