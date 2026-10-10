@@ -37,13 +37,15 @@ Measured on Claude Code 2.1.295 transcripts (five days, about 6 200 task notific
 | End, agent idle | `user` record with `promptSource: "system"`, `origin.kind: "task-notification"`, content `<task-notification>` holding `<task-id>`, `<tool-use-id>`, `<output-file>`, `<status>`, `<summary>` |
 | End, agent mid-turn | `attachment` record, `attachment.type: "queued_command"`, `attachment.origin.kind: "task-notification"`, `attachment.prompt` holding the same `<task-notification>` text. The CLI writes this instead of the `user` record when the task ends while Claude is working |
 
+| End, stopped by Claude | `assistant` `tool_use` `name: "TaskStop"` (`input.task_id`) or `name: "KillShell"` (`input.shell_id`); its non-error `tool_result` (JSON text `{"message":"Successfully stopped task: ...","task_id":...}`) ends the task. No `<task-notification>` is guaranteed |
+
 `<status>` is `completed`, `failed`, `killed` or `stopped`. A Bash summary ends `(exit code N)` (the last one in the summary is read):
 `Background command "Use SRC helper, run full dotfiles CI" completed (exit code 0)`. While the
 agent is busy the same notification is first a `queue-operation` `enqueue` record; the parser
 already keeps those out of Queued messages. Both end records can appear for one task.
 
 A Background task is running from its start `tool_result` until a notification with its
-`<tool-use-id>` arrives.
+`<tool-use-id>` arrives, or a `TaskStop` / `KillShell` call on its task id succeeds.
 
 ## Data (parser, `src-tauri/src/transcript/claude.rs`)
 
@@ -68,6 +70,16 @@ A Background task is running from its start `tool_result` until a notification w
 - Ended task ids are remembered (newest 512). A repeated notification for an ended `<tool-use-id>`,
   by either path, emits nothing: one System line, one end badge.
 - Unfinished remembered calls are bounded at 512; the map is cleared when it reaches that.
+- **TaskStop / KillShell:** when a start `tool_result` succeeds, the parser remembers the task id
+  by call id: Bash `ID: <id>.` in the result text, Agent `agentId: <id>`. On a `tool_use` named
+  `TaskStop` (`input.task_id`) or `KillShell` (`input.shell_id`), it remembers the target by that
+  call's id. On the stop call's `tool_result` with `is_error` false, the running task whose task id
+  matches leaves the running set, joins the ended ids and emits one `System` item with empty text
+  and `task: { call_id, status: "stopped" }` (no exit code), stamped with the result's timestamp.
+  The Chat lens draws no row for it; the badge reads `stopped`. With `is_error` true the task keeps
+  running. An unknown id, or one already ended, is a no-op. A later notification for the same task
+  is dropped through the ended ids (single badge). The task-id and stop maps are bounded at 512 and
+  cleared on reaching it, like the call map.
 - `ChatMeta` gains `background: Vec<BackgroundTask>`, oldest first:
   `{ call_id, kind: "bash" | "agent", description, started }` (`started` is the `tool_use`
   timestamp). It travels in the existing `Meta` event, as `queued` does.
@@ -82,6 +94,10 @@ the same set.
 
 - One row per running task: `Shell` or `Agent`, the description, and the time since `started`
   (`3m 12s`, the Working line's format). It re-renders each second only while it has rows.
+- Layout matches the Working line (`.chat-working`): the strip has `padding: 0 28px`, and each row
+  is a grid, `12px 40px minmax(0, 1fr) auto` with an 8px column gap: spinner, kind, description
+  (ellipsis), time (right-aligned). The spinners share one x with the Working line, descriptions
+  share one x, and times share one right edge.
 - A row is a button: it opens the task's Work block if closed, scrolls to the row, then scrolls
   the tool card itself into view (`block: "nearest"`).
 - `role="list"`, `aria-label="Background tasks"`.
@@ -104,6 +120,8 @@ the original Transcript, so the preview never claims the original's tasks. End b
   if it happens.
 - **Notification by both paths or twice:** dropped after the first; no second badge or System
   line (see Data).
+- **TaskStop / KillShell:** a successful stop ends the task as `stopped` without a notification
+  (see Data); a failed stop leaves it running; a notification arriving after the stop adds nothing.
 - **Notification without `<status>`:** ended, neutral `ended` badge.
 - **Call not loaded** (older than the loaded window): a strip click pages older items in, in one
   prepend, until the call is found, then jumps as above. If the start of the Transcript is
@@ -118,11 +136,13 @@ the original Transcript, so the preview never claims the original's tasks. End b
   exit, `killed`, a notification with no matching start, a foreground Bash that never enters the
   set, a notification without a summary, the same end as a `queued_command` attachment, an end
   delivered by both paths and a repeated one (one item), a summary with two `(exit code N)`
-  (the last wins).
+  (the last wins), TaskStop on a Bash and on an Agent task, KillShell, a stop that errors, a stop
+  with an unknown id, a notification after the stop (one item).
 - Vitest: the strip's rows and elapsed time, hidden with no Agent, the row's jump; the badge for
   each end state, the neutral `ended` badge, no running badge without an Agent or in a fork
   preview, the jump paging older items in and the not-found notice, the card scrolled into view,
   no row for an empty-summary System item.
-- Browser test: badge and strip text contrast ≥ 4.5:1 in both themes.
+- Browser test: badge and strip text contrast ≥ 4.5:1 in both themes; the strip's spinner,
+  description and time line up with the Working line (inset 28px) in both themes.
 - `mise run ci`, then `app:install` and a where/do/expect checklist for the real app, with a
   screenshot of the strip from the real render in the PR.
