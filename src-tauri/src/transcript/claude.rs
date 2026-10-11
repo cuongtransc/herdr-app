@@ -24,6 +24,12 @@ pub struct ClaudeParser {
     task_ids: HashMap<String, String>,
     /// `TaskStop` / `KillShell` calls whose result has not arrived: call id → target task id.
     stops: HashMap<String, String>,
+    /// A slash command shown as typed, with no user item shown after it yet: `/compact`
+    /// is written as typed and again in command form when it runs (after the boundary,
+    /// after a cancel, or after the turn it was typed into), and that copy is not shown.
+    typed: Option<String>,
+    /// The line being parsed showed `typed`.
+    typed_now: bool,
 }
 
 /// Most unfinished calls and ended task ids kept; the oldest are forgotten past it.
@@ -349,7 +355,18 @@ impl ClaudeParser {
         match content {
             Some(Value::String(s)) if kind == "user" => {
                 self.read_command_output(s);
-                items.extend(user_item(s, &ts));
+                let item = user_item(s, &ts);
+                if let Some(ChatItem::User { text, .. }) = &item {
+                    if s.starts_with("<command-") && self.typed.as_ref() == Some(text) {
+                        self.typed = None;
+                        return ParserOutput::None;
+                    }
+                    if text.starts_with('/') && !s.starts_with('<') {
+                        self.typed = Some(text.clone());
+                        self.typed_now = true;
+                    }
+                }
+                items.extend(item);
             }
             Some(Value::Array(blocks)) => {
                 let uuid = v.get("uuid").and_then(Value::as_str);
@@ -519,6 +536,12 @@ impl ClaudeParser {
 impl Parser for ClaudeParser {
     fn push_line(&mut self, line: &str, images: &mut dyn ImageSink) -> ParserOutput {
         let out = self.parse_line(line, images);
+        let typed_now = std::mem::take(&mut self.typed_now);
+        if matches!(&out, ParserOutput::Append(items) if items.iter().any(|i| matches!(i, ChatItem::User { .. })))
+            && !typed_now
+        {
+            self.typed = None;
+        }
         // A queued message shown as the user's words has been read, whatever the queue
         // records said: it must not also wait in the queue.
         if let ParserOutput::Append(items) = &out {
@@ -705,6 +728,76 @@ mod tests {
         );
         let stdout = serde_json::json!({"type":"user","message":{"content":"<local-command-stdout></local-command-stdout>"}}).to_string();
         assert_eq!(run(&stdout), vec![]);
+    }
+    #[test]
+    fn a_compact_shows_once() {
+        // Real records (2.1.296): /compact is written as typed, then again in command form after the boundary.
+        let lines = [
+            serde_json::json!({"type":"user","promptId":"8d7729fb","message":{"role":"user","content":"/compact"}}),
+            serde_json::json!({"type":"system","subtype":"compact_boundary","content":"Conversation compacted","compactMetadata":{"trigger":"manual","preTokens":564_250,"postTokens":20_000}}),
+            serde_json::json!({"type":"user","promptId":"8d7729fb","isCompactSummary":true,"message":{"role":"user","content":"This session is being continued from a previous conversation that ran out of context."}}),
+            serde_json::json!({"type":"user","promptId":"8d7729fb","isMeta":true,"message":{"role":"user","content":"<local-command-caveat>Caveat: the command below was run directly.</local-command-caveat>"}}),
+            serde_json::json!({"type":"user","promptId":"8d7729fb","message":{"role":"user","content":"<command-name>/compact</command-name>\n            <command-message>compact</command-message>\n            <command-args></command-args>"}}),
+            serde_json::json!({"type":"user","promptId":"8d7729fb","message":{"role":"user","content":"<local-command-stdout>Compacted (ctrl+o to see full summary)</local-command-stdout>"}}),
+        ]
+        .map(|v| v.to_string())
+        .join("\n");
+        assert_eq!(
+            run(&lines),
+            vec![User {
+                images: vec![],
+                skills: vec![],
+                ts: None,
+                text: "/compact".into()
+            }]
+        );
+        // 2.1.278 gives the command-form copy a new prompt id.
+        let older = lines
+            .lines()
+            .map(|l| match l.contains("<command-name>") {
+                true => l.replace("8d7729fb", "574dfbdb"),
+                false => l.to_string(),
+            })
+            .collect::<Vec<_>>()
+            .join("\n");
+        assert_ne!(older, lines);
+        assert_eq!(run(&older).len(), 1);
+        // A cancelled /compact writes no boundary, only the two copies and an error.
+        let cancelled = [
+            serde_json::json!({"type":"user","promptId":"19a7c506","message":{"content":"/compact"}}),
+            serde_json::json!({"type":"user","promptId":"dfcb3e63","message":{"content":"<command-name>/compact</command-name>\n            <command-message>compact</command-message>\n            <command-args></command-args>"}}),
+            serde_json::json!({"type":"system","subtype":"local_command","content":"<local-command-stderr>AbortError: Compaction canceled.</local-command-stderr>"}),
+        ]
+        .map(|v| v.to_string())
+        .join("\n");
+        assert_eq!(run(&cancelled).len(), 1);
+        // Typed mid-turn, it runs when the turn ends: the turn's items come between the copies.
+        let cmd = "<command-name>/compact</command-name>\n<command-args></command-args>";
+        let mid_turn = [
+            serde_json::json!({"type":"user","message":{"content":"/compact"}}),
+            serde_json::json!({"type":"assistant","message":{"content":[{"type":"text","text":"done"}]}}),
+            serde_json::json!({"type":"user","message":{"content":cmd}}),
+        ]
+        .map(|v| v.to_string())
+        .join("\n");
+        assert_eq!(run(&mid_turn).len(), 2);
+        // A command run twice in command form shows twice; so does one typed again later.
+        let twice = [
+            serde_json::json!({"type":"user","message":{"content":cmd}}),
+            serde_json::json!({"type":"user","message":{"content":cmd}}),
+            serde_json::json!({"type":"user","message":{"content":"/compact"}}),
+            serde_json::json!({"type":"user","message":{"content":"hi"}}),
+            serde_json::json!({"type":"user","message":{"content":cmd}}),
+        ]
+        .map(|v| v.to_string())
+        .join("\n");
+        assert_eq!(run(&twice).len(), 5);
+        // The same command sent again is a new prompt and shows again.
+        let again = format!(
+            "{lines}\n{}",
+            serde_json::json!({"type":"user","promptId":"9e8f","message":{"role":"user","content":"/compact"}})
+        );
+        assert_eq!(run(&again).len(), 2);
     }
     #[test]
     fn shows_shell_commands_and_their_output() {
