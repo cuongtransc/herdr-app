@@ -322,7 +322,18 @@ impl ClaudeParser {
         if v.get("promptSource").and_then(Value::as_str) == Some("system") {
             let text = content.and_then(Value::as_str).unwrap_or("");
             let summary = tag(text, "summary");
-            let Some(call_id) = tag(text, "tool-use-id").filter(|id| !id.is_empty()) else {
+            // Older CLIs and the resume notice carry only <task-id>: find its call.
+            let call_id = tag(text, "tool-use-id")
+                .filter(|id| !id.is_empty())
+                .map(str::to_string)
+                .or_else(|| {
+                    let task = tag(text, "task-id")?;
+                    self.task_ids
+                        .iter()
+                        .find(|(_, id)| id.as_str() == task)
+                        .map(|(call, _)| call.clone())
+                });
+            let Some(call_id) = call_id.as_deref() else {
                 return match summary {
                     Some(text) => ParserOutput::Append(vec![ChatItem::System {
                         ts: ts.clone(),
@@ -1348,6 +1359,28 @@ mod tests {
             }]
         );
         assert_eq!(p.meta().background, vec![]);
+    }
+
+    #[test]
+    fn a_notification_without_a_call_id_ends_the_task_by_its_task_id() {
+        // Older CLIs, and the "didn't finish before the previous session ended"
+        // notice on resume, carry only <task-id>.
+        let started =
+            "Async agent launched successfully.\nagentId: a18a42ecc9696ac94 (internal ID)";
+        let note = |status: &str| {
+            format!("<task-notification>\n<task-id>a18a42ecc9696ac94</task-id>\n<status>{status}</status>\n<summary>Agent \"Review\" finished</summary>\n</task-notification>")
+        };
+        let user = serde_json::json!({"type":"user","promptSource":"system","origin":{"kind":"task-notification"},"message":{"content":note("stopped")}}).to_string();
+        let queued = serde_json::json!({"type":"attachment","isSidechain":false,"attachment":{"type":"queued_command","prompt":note("completed"),"commandMode":"task-notification","origin":{"kind":"task-notification"}}}).to_string();
+        for (line, status) in [(user, "stopped"), (queued, "completed")] {
+            let (_, _, mut p) =
+                run_with(&[agent_call("a1"), tool_result("a1", started, false)].join("\n"));
+            let items = push(&mut p, &line);
+            assert!(
+                matches!(&items[..], [System { task, .. }] if *task == end("a1", status, None))
+            );
+            assert_eq!(p.meta().background, vec![]);
+        }
     }
 
     /// The record the CLI writes when a task ends while Claude is mid-turn.
