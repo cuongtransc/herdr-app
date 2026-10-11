@@ -14,23 +14,23 @@ describe("chat store", () => {
     expect(reduce(s, { type: "reset", items: [], total: 0 }).items).toEqual([]);
   });
   it("keeps the messages waiting in the queue, across resets, until a meta says otherwise", () => {
-    let s = reduce(emptyChat, { type: "meta", model: null, effort: null, context_tokens: null, queued: ["hi"] });
+    let s = reduce(emptyChat, { type: "meta", model: null, effort: null, context_tokens: null, queued: ["hi"], background: [] });
     expect(s.queued).toEqual(["hi"]);
     s = reduce(s, { type: "reset", items: [], total: 0 });
     expect(s.queued).toEqual(["hi"]);
-    s = reduce(s, { type: "meta", model: null, effort: null, context_tokens: null, queued: [] });
+    s = reduce(s, { type: "meta", model: null, effort: null, context_tokens: null, queued: [], background: [] });
     expect(s.queued).toEqual([]);
   });
 
   it("keeps the latest meta across resets", () => {
-    let s = reduce(emptyChat, { type: "meta", model: "m", effort: "high", context_tokens: 5, queued: [] });
+    let s = reduce(emptyChat, { type: "meta", model: "m", effort: "high", context_tokens: 5, queued: [], background: [] });
     expect(s.meta).toEqual({ model: "m", effort: "high", context_tokens: 5 });
     s = reduce(s, { type: "reset", items: [], total: 0 });
     expect(s.meta).toEqual({ model: "m", effort: "high", context_tokens: 5 });
   });
   it("keeps a pi alias with the Model it served", () => {
     const alias = { name: "implementer-medium", label: "impl-m", provider: "openai-codex", fallback: true };
-    const s = reduce(emptyChat, { type: "meta", model: "gpt-6-sol", effort: "low", context_tokens: 5, queued: [], alias });
+    const s = reduce(emptyChat, { type: "meta", model: "gpt-6-sol", effort: "low", context_tokens: 5, queued: [], background: [], alias });
     expect(s.meta).toEqual({ model: "gpt-6-sol", effort: "low", context_tokens: 5, alias });
   });
   const many = (n: number, from = 0) => Array.from({ length: n }, (_, i) => u(`m${from + i}`));
@@ -61,5 +61,15 @@ describe("chat store", () => {
     s = prepend(s, [u(`m${before - 1}`)], before);
     expect(s.items.length).toBe(501);
     expect((s.items[0] as any).text).toBe(`m${before - 1}`);
+  });
+
+  it("keeps the running background tasks from meta, across a reset", () => {
+    const task = { call_id: "t1", kind: "bash" as const, description: "Run CI", started: "2026-10-10T17:08:00.000Z" };
+    let s = reduce(emptyChat, { type: "meta", model: null, effort: null, context_tokens: null, queued: [], background: [task] });
+    expect(s.background).toEqual([task]);
+    s = reduce(s, { type: "reset", items: [], total: 0 });
+    expect(s.background).toEqual([task]);
+    s = reduce(s, { type: "meta", model: null, effort: null, context_tokens: null, queued: [], background: [] });
+    expect(s.background).toEqual([]);
   });
 });

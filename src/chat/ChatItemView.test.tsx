@@ -3,6 +3,7 @@ import { describe, expect, it, vi } from "vitest";
 vi.mock("../lib/ipc", () => ({ chatImage: vi.fn().mockResolvedValue(new Uint8Array([1]).buffer) }));
 import { ChatItemView } from "./ChatItemView";
 import { ChatPaneContext } from "./images";
+import { BackgroundContext } from "./backgroundTaskState";
 describe("ChatItemView", () => {
   it("renders markdown", () => {
     render(<ChatItemView item={{ kind: "assistant_text", markdown: "Hello **world**" }} />);
@@ -120,4 +121,14 @@ describe("ChatItemView", () => {
     expect(line.querySelector(".chat-copy")).toBeTruthy();
     expect(row.lastElementChild!.classList.contains("skill-chips")).toBe(true);
   });
+});
+
+it("badges a background tool call from the context", () => {
+  const call = { kind: "tool_call" as const, id: "t1", name: "Bash", input_summary: "mise run ci", input: {} };
+  render(
+    <BackgroundContext.Provider value={{ running: new Set(["t1"]), ends: new Map() }}>
+      <ChatItemView item={call} />
+    </BackgroundContext.Provider>,
+  );
+  expect(screen.getByText("background · running").className).toContain("running");
 });

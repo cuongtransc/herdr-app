@@ -104,7 +104,7 @@ vi.mock("../chat/chatSession", async (orig) => ({
   openChat: (_p: unknown, _path: unknown, ch: { onmessage: (e: unknown) => void }) => {
     setTimeout(() => {
       ch.onmessage({ type: "reset", items: chat, total: chat.length });
-      ch.onmessage({ type: "meta", model: "claude-opus-5-5", effort: "high", context_tokens: 84200, queued: ["and rename the Header too"] });
+      ch.onmessage({ type: "meta", model: "claude-opus-5-5", effort: "high", context_tokens: 84200, queued: ["and rename the Header too"], background: [] });
     }, 0);
     return { opened: Promise.resolve({ agent: "claude", path: "/h/s.jsonl", ambiguous: false, candidates: [], pending: false }), close: () => {} };
   },

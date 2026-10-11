@@ -47,6 +47,33 @@ pub struct ChatMeta {
     pub queued: Vec<String>,
     /// The pi alias the Model was chosen by; `model` is then the target that served it.
     pub alias: Option<ModelAlias>,
+    /// Background tasks (a command or an agent) started and not yet finished, oldest first.
+    pub background: Vec<BackgroundTask>,
+}
+
+#[derive(Clone, Debug, PartialEq, Serialize)]
+#[serde(rename_all = "snake_case")]
+pub enum BackgroundKind {
+    Bash,
+    Agent,
+}
+
+/// A command or agent the CLI runs in the background, from its start to its notification.
+#[derive(Clone, Debug, PartialEq, Serialize)]
+pub struct BackgroundTask {
+    pub call_id: String,
+    pub kind: BackgroundKind,
+    pub description: String,
+    pub started: Option<String>,
+}
+
+/// How a background task ended, as its notification reports it.
+#[derive(Clone, Debug, PartialEq, Serialize)]
+pub struct TaskEnd {
+    pub call_id: String,
+    pub status: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub exit_code: Option<i32>,
 }
 
 #[derive(Clone, Debug, PartialEq, Serialize)]
@@ -90,6 +117,8 @@ pub enum ChatItem {
     },
     System {
         text: String,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        task: Option<TaskEnd>,
         #[serde(skip_serializing_if = "Option::is_none")]
         ts: Option<String>,
     },
@@ -142,6 +171,7 @@ pub enum ChatEvent {
         context_tokens: Option<u64>,
         queued: Vec<String>,
         alias: Option<ModelAlias>,
+        background: Vec<BackgroundTask>,
     },
 }
 
@@ -909,6 +939,7 @@ mod tests {
             effort: None,
             context_tokens: Some(42),
             queued: vec!["hi".into()],
+            background: vec![],
             alias: Some(ModelAlias {
                 name: "implementer-medium".into(),
                 label: "impl-m".into(),
@@ -919,7 +950,7 @@ mod tests {
         .unwrap();
         assert_eq!(
             v,
-            serde_json::json!({ "type": "meta", "model": "m", "effort": null, "context_tokens": 42, "queued": ["hi"],
+            serde_json::json!({ "type": "meta", "model": "m", "effort": null, "context_tokens": 42, "queued": ["hi"], "background": [],
                 "alias": { "name": "implementer-medium", "label": "impl-m", "provider": "openai-codex", "fallback": true } })
         );
     }

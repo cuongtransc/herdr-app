@@ -1,4 +1,4 @@
-import { memo } from "react";
+import { memo, useEffect, useRef } from "react";
 import { ChevronIcon } from "../ui/icons";
 import { ChatItemView } from "./ChatItemView";
 import { SkillChips, turnSkills } from "./skills";
@@ -15,6 +15,8 @@ export const WorkBlockView = memo(function WorkBlockView({
   onToggle,
   live,
   working = live,
+  focusCall,
+  onFocusHandled,
 }: {
   block: WorkBlock;
   results: Map<string, ToolResult>;
@@ -24,7 +26,21 @@ export const WorkBlockView = memo(function WorkBlockView({
   live: boolean;
   /** Running, not waiting on the user: a call without its result yet spins. Defaults to `live`. */
   working?: boolean;
+  /** A call id to bring into view once this block is open and its rows are rendered. */
+  focusCall?: string | null;
+  /** Called after the focused call has been scrolled into view. */
+  onFocusHandled?: () => void;
 }) {
+  const rowsRef = useRef<HTMLDivElement>(null);
+  // Runs when the block mounts or opens, so a jumped-to row the virtualizer only just rendered
+  // still reaches its card. A block not holding `focusCall` does nothing.
+  useEffect(() => {
+    if (!focusCall || !open || !rowsRef.current) return;
+    const el = [...rowsRef.current.querySelectorAll<HTMLElement>("[data-call]")].find((c) => c.dataset.call === focusCall);
+    if (!el) return;
+    if (typeof el.scrollIntoView === "function") el.scrollIntoView({ block: "nearest" });
+    onFocusHandled?.();
+  }, [focusCall, open, block.items, onFocusHandled]);
   const duration = formatWorkDuration(block.start, block.end);
   const title = duration ? `Worked for ${duration}` : "Worked";
   const summary = workSummary(block.items, results);
@@ -43,9 +59,9 @@ export const WorkBlockView = memo(function WorkBlockView({
       </button>
       <SkillChips chips={turnSkills(block.items, results)} />
       {open && (
-        <div className="chat-work-rows">
+        <div className="chat-work-rows" ref={rowsRef}>
           {block.items.map((it, i) => (
-            <div key={i} className={it.kind === "assistant_text" ? "chat-narration" : undefined}>
+            <div key={i} data-call={it.kind === "tool_call" ? it.id : undefined} className={it.kind === "assistant_text" ? "chat-narration" : undefined}>
               <ChatItemView
                 item={it}
                 result={it.kind === "tool_call" ? results.get(it.id) : undefined}

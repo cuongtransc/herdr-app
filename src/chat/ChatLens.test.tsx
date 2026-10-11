@@ -1,4 +1,4 @@
-import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { act, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 vi.mock("@tauri-apps/api/core", () => ({ invoke: vi.fn().mockResolvedValue([]), Channel: class {} }));
 vi.mock("../lib/ipc", () => ({
@@ -42,7 +42,7 @@ vi.mock("./chatSession", () => ({
   onOpenFailure: () => "error",
   watchMachine: () => ({ sawDown: false, reopen: false }),
 }));
-import { chatLocate, herdrCall } from "../lib/ipc";
+import { chatLocate, chatPage, herdrCall } from "../lib/ipc";
 import type { PaneView } from "../lib/types";
 import { ChatLens } from "./ChatLens";
 import { useLensSettings } from "../settings/lens";
@@ -189,7 +189,7 @@ describe("ChatLens", () => {
   it("shows a message sent mid-turn as queued until the agent reads it", () => {
     render(<ChatLens pane={pane} view={{ status: "working", agent: "claude", title: "claude" } as PaneView} />);
     const send = (queued: string[]) =>
-      act(() => channels[channels.length - 1].onmessage({ type: "meta", model: null, effort: null, context_tokens: null, queued }));
+      act(() => channels[channels.length - 1].onmessage({ type: "meta", model: null, effort: null, context_tokens: null, queued, background: [] }));
     act(() => channels[channels.length - 1].onmessage({ type: "reset", items: [], total: 0 }));
     expect(screen.queryByRole("list", { name: "Queued messages" })).toBeNull();
     send(["sao không commit đi?"]);
@@ -198,6 +198,20 @@ describe("ChatLens", () => {
     expect(list.textContent).toContain("Queued");
     send([]);
     expect(screen.queryByRole("list", { name: "Queued messages" })).toBeNull();
+  });
+
+  it("shows the background tasks while the agent runs, and hides them once it is gone", () => {
+    const view = { status: "idle", agent: "claude", title: "claude" } as PaneView;
+    const { rerender } = render(<ChatLens pane={pane} view={view} />);
+    act(() =>
+      channels[channels.length - 1].onmessage({
+        type: "meta", model: null, effort: null, context_tokens: null, queued: [],
+        background: [{ call_id: "t1", kind: "bash", description: "Run CI", started: "2026-10-10T17:08:00.000Z" }],
+      }),
+    );
+    expect(screen.getByRole("list", { name: "Background tasks" }).textContent).toContain("Run CI");
+    rerender(<ChatLens pane={pane} view={{ ...view, agent: null }} />);
+    expect(screen.queryByRole("list", { name: "Background tasks" })).toBeNull();
   });
 
   it("says a forked pane is a fork, of what and since when, and goes back to the original", () => {
@@ -238,6 +252,31 @@ describe("ChatLens", () => {
       vi.mocked(chatLocate).mockImplementation(() => Promise.resolve({ ...pendingFork, path: "/p/fork2.jsonl", pending: false }) as never);
       await waitFor(() => expect(openedPaths[openedPaths.length - 1]).toBeNull(), { timeout: 3000 });
       expect(openedPaths.length).toBeGreaterThan(2);
+      useForks.setState({ forks: {} });
+    });
+
+    it("badges none of the original's running tasks while it only previews the original", async () => {
+      useForks.setState({ forks: { [paneKey(pane)]: { of, from: "Main", at, worktree: null, path: "/p/orig.jsonl" } } });
+      opened = Promise.resolve(pendingFork);
+      vi.mocked(chatLocate).mockImplementation(() => Promise.resolve(pendingFork) as never);
+      viewport.on = true;
+      render(<ChatLens pane={pane} view={{ status: "idle", agent: "claude", title: "claude" } as PaneView} />);
+      await waitFor(() => expect(openedPaths).toEqual([null, "/p/orig.jsonl"]));
+      const items = [
+        { kind: "user", text: "run ci", ts: "2026-10-10T04:40:00Z" },
+        { kind: "tool_call", id: "bg1", name: "Bash", input_summary: "ci", input: { command: "ci" }, ts: "2026-10-10T04:40:01Z" },
+        { kind: "assistant_text", markdown: "started", ts: "2026-10-10T04:41:00Z" },
+      ];
+      act(() => channels[1].onmessage({ type: "reset", items, total: items.length }));
+      act(() =>
+        channels[1].onmessage({
+          type: "meta", model: null, effort: null, context_tokens: null, queued: [],
+          background: [{ call_id: "bg1", kind: "bash", description: "Run CI", started: null }],
+        }),
+      );
+      fireEvent.click(screen.getByRole("button", { name: /^Worked/ }));
+      expect(screen.getByText("ci")).toBeTruthy();
+      expect(screen.queryByText("background · running")).toBeNull();
       useForks.setState({ forks: {} });
     });
 
@@ -305,5 +344,124 @@ describe("ChatLens", () => {
     expect(head.getAttribute("aria-expanded")).toBe("false");
     fireEvent.click(head);
     expect(head.getAttribute("aria-expanded")).toBe("true");
+  });
+
+  describe("background tasks in folded work", () => {
+    let cleanupRerender: (view: PaneView) => void = () => {};
+    const load = async (extra: unknown[] = []) => {
+      viewport.on = true;
+      opened = Promise.resolve({ agent: "claude", path: "/h/sid.jsonl", ambiguous: false, candidates: ["/h/sid.jsonl"], pending: false });
+      const { rerender } = render(<ChatLens pane={pane} view={{ status: "idle", agent: "claude", title: "claude" } as PaneView} />);
+      cleanupRerender = (view) => rerender(<ChatLens pane={pane} view={view} />);
+      await act(async () => {});
+      const items = [
+        { kind: "user", text: "run the ci" },
+        { kind: "tool_call", id: "bg1", name: "Bash", input_summary: "mise run ci", input: { command: "mise run ci" } },
+        { kind: "tool_result", call_id: "bg1", output: "started", is_error: false },
+        ...extra,
+        { kind: "assistant_text", markdown: "started it" },
+      ];
+      act(() => channels[channels.length - 1].onmessage({ type: "reset", items, total: items.length }));
+    };
+
+    it("opens the folded work block holding a task when its strip row is clicked", async () => {
+      await load();
+      act(() =>
+        channels[channels.length - 1].onmessage({
+          type: "meta", model: null, effort: null, context_tokens: null, queued: [],
+          background: [{ call_id: "bg1", kind: "bash", description: "Run CI", started: null }],
+        }),
+      );
+      const head = screen.getByRole("button", { name: /^Worked/ });
+      expect(head.getAttribute("aria-expanded")).toBe("false");
+      fireEvent.click(within(screen.getByRole("list", { name: "Background tasks" })).getByRole("button", { name: /Run CI/ }));
+      expect(screen.getByRole("button", { name: /^Worked/ }).getAttribute("aria-expanded")).toBe("true");
+    });
+
+    it("brings the task's own card into view after opening its block", async () => {
+      const scroll = vi.fn();
+      const orig = Element.prototype.scrollIntoView;
+      Element.prototype.scrollIntoView = scroll;
+      try {
+        await load();
+        bgMeta();
+        fireEvent.click(within(screen.getByRole("list", { name: "Background tasks" })).getByRole("button", { name: /Run CI/ }));
+        const cards = () => (scroll.mock.contexts as HTMLElement[]).map((el) => el.dataset.call);
+        await waitFor(() => expect(cards()).toContain("bg1"));
+      } finally {
+        Element.prototype.scrollIntoView = orig;
+      }
+    });
+
+    const bgMeta = () =>
+      act(() =>
+        channels[channels.length - 1].onmessage({
+          type: "meta", model: null, effort: null, context_tokens: null, queued: [],
+          background: [{ call_id: "bg1", kind: "bash", description: "Run CI", started: null }],
+        }),
+      );
+
+    it("badges a running task's call, and stops once the agent is gone", async () => {
+      await load();
+      bgMeta();
+      fireEvent.click(screen.getByRole("button", { name: /^Worked/ }));
+      expect(screen.getByText("background · running")).toBeTruthy();
+      cleanupRerender({ status: "idle", agent: null, title: "sh" } as PaneView);
+      expect(screen.queryByText("background · running")).toBeNull();
+    });
+
+    it("shows a neutral `ended` for a task end with no status", async () => {
+      await load([{ kind: "system", text: "", task: { call_id: "bg1", status: "" } }]);
+      fireEvent.click(screen.getByRole("button", { name: /^Worked/ }));
+      expect(screen.getByText("ended").className).toContain("neutral");
+    });
+
+    it("loads older pages until the clicked task's call appears, then opens its block", async () => {
+      vi.mocked(chatPage).mockReset().mockImplementation((async (_p: unknown, before: number) =>
+        before === 4 ? [{ kind: "user", text: "u2" }, { kind: "assistant_text", markdown: "a2" }]
+          : before === 2 ? [
+            { kind: "tool_call", id: "bg9", name: "Bash", input_summary: "sleep", input: { command: "sleep" } },
+            { kind: "tool_result", call_id: "bg9", output: "started", is_error: false },
+          ] : []) as never);
+      viewport.on = true;
+      opened = Promise.resolve({ agent: "claude", path: "/h/sid.jsonl", ambiguous: false, candidates: ["/h/sid.jsonl"], pending: false });
+      render(<ChatLens pane={pane} view={{ status: "idle", agent: "claude", title: "claude" } as PaneView} />);
+      await act(async () => {});
+      const items = [{ kind: "user", text: "now" }, { kind: "assistant_text", markdown: "ok" }];
+      act(() => channels[channels.length - 1].onmessage({ type: "reset", items, total: 6 }));
+      act(() =>
+        channels[channels.length - 1].onmessage({
+          type: "meta", model: null, effort: null, context_tokens: null, queued: [],
+          background: [{ call_id: "bg9", kind: "bash", description: "Old job", started: null }],
+        }),
+      );
+      fireEvent.click(within(screen.getByRole("list", { name: "Background tasks" })).getByRole("button", { name: /Old job/ }));
+      await waitFor(() => expect(screen.getAllByRole("button", { name: /^Worked/ })[0].getAttribute("aria-expanded")).toBe("true"));
+      expect(vi.mocked(chatPage).mock.calls.map((c) => c[1])).toEqual([4, 2]);
+    });
+
+    it("says so when the clicked task's call is not in the transcript at all", async () => {
+      vi.mocked(chatPage).mockReset().mockResolvedValue([]);
+      viewport.on = true;
+      opened = Promise.resolve({ agent: "claude", path: "/h/sid.jsonl", ambiguous: false, candidates: ["/h/sid.jsonl"], pending: false });
+      render(<ChatLens pane={pane} view={{ status: "idle", agent: "claude", title: "claude" } as PaneView} />);
+      await act(async () => {});
+      const items = [{ kind: "user", text: "now" }];
+      act(() => channels[channels.length - 1].onmessage({ type: "reset", items, total: 5 }));
+      act(() =>
+        channels[channels.length - 1].onmessage({
+          type: "meta", model: null, effort: null, context_tokens: null, queued: [],
+          background: [{ call_id: "gone", kind: "bash", description: "Lost job", started: null }],
+        }),
+      );
+      fireEvent.click(within(screen.getByRole("list", { name: "Background tasks" })).getByRole("button", { name: /Lost job/ }));
+      expect(await screen.findByText(/Task call not found in the transcript/)).toBeTruthy();
+    });
+
+    it("badges a finished task's call with how it ended", async () => {
+      await load([{ kind: "system", text: "Background command finished", task: { call_id: "bg1", status: "completed", exit_code: 0 } }]);
+      fireEvent.click(screen.getByRole("button", { name: /^Worked/ }));
+      expect(screen.getByText("exit 0")).toBeTruthy();
+    });
   });
 });

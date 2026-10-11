@@ -210,6 +210,7 @@ impl State {
                     context_tokens: meta.context_tokens,
                     queued: meta.queued,
                     alias: meta.alias,
+                    background: meta.background,
                 },
             );
         }
@@ -422,6 +423,7 @@ mod tests {
             if line == "RESET" {
                 ParserOutput::Reset(vec![ChatItem::System {
                     ts: None,
+                    task: None,
                     text: "reset".into(),
                 }])
             } else {
