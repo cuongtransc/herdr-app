@@ -79,6 +79,18 @@ fn result_text(content: Option<&Value>) -> String {
     }
 }
 
+/// Every `<name>` element's text, in order.
+fn tags<'a>(mut text: &'a str, name: &str) -> Vec<&'a str> {
+    let mut found = vec![];
+    while let Some(value) = tag(text, name) {
+        found.push(value);
+        let close = format!("</{name}>");
+        let Some(at) = text.find(&close) else { break };
+        text = &text[at + close.len()..];
+    }
+    found
+}
+
 fn tag<'a>(text: &'a str, name: &str) -> Option<&'a str> {
     let open = format!("<{name}>");
     let start = text.find(&open)? + open.len();
@@ -144,8 +156,10 @@ fn queued_prompt(v: &Value) -> Option<Value> {
         .get("origin")
         .and_then(|o| o.get("kind"))
         .and_then(Value::as_str);
+    // Older CLIs mark it by `commandMode` alone, with no `origin`.
     if a.get("type").and_then(Value::as_str) == Some("queued_command")
-        && kind == Some("task-notification")
+        && (kind == Some("task-notification")
+            || a.get("commandMode").and_then(Value::as_str) == Some("task-notification"))
     {
         return Some(serde_json::json!({
             "type": "user",
@@ -201,6 +215,64 @@ impl ClaudeParser {
 }
 
 impl ClaudeParser {
+    /// A notification ends the calls it names: its `<tool-use-id>`, and the call of
+    /// each `<task-id>`, which is all an older CLI writes and which the resume
+    /// notice repeats once per orphaned task. The first end carries the summary.
+    fn task_notification(&mut self, text: &str, ts: &Option<String>) -> ParserOutput {
+        let summary = tag(text, "summary");
+        let mut calls: Vec<String> = tag(text, "tool-use-id")
+            .filter(|id| !id.is_empty())
+            .map(str::to_string)
+            .into_iter()
+            .collect();
+        for task in tags(text, "task-id") {
+            let call = self
+                .task_ids
+                .iter()
+                .find(|(_, id)| id.as_str() == task)
+                .map(|(call, _)| call.clone());
+            if let Some(call) = call.filter(|c| !calls.contains(c)) {
+                calls.push(call);
+            }
+        }
+        if calls.is_empty() {
+            return match summary {
+                Some(text) => ParserOutput::Append(vec![ChatItem::System {
+                    ts: ts.clone(),
+                    text: text.to_string(),
+                    task: None,
+                }]),
+                None => ParserOutput::None,
+            };
+        }
+        let mut items = vec![];
+        for call_id in calls {
+            if self.ended.contains(&call_id) {
+                continue;
+            }
+            if self.ended.len() >= TRACKED_MAX {
+                self.ended.pop_front();
+            }
+            self.ended.push_back(call_id.clone());
+            self.background.retain(|t| t.call_id != call_id);
+            self.task_ids.remove(&call_id);
+            let shown = if items.is_empty() { summary } else { None };
+            items.push(ChatItem::System {
+                ts: ts.clone(),
+                text: shown.unwrap_or("").to_string(),
+                task: Some(TaskEnd {
+                    call_id,
+                    status: tag(text, "status").unwrap_or("").to_string(),
+                    exit_code: shown.and_then(exit_code),
+                }),
+            });
+        }
+        if items.is_empty() {
+            return ParserOutput::None;
+        }
+        ParserOutput::Append(items)
+    }
+
     /// A stopped task ends at once with no notification: drop it and return its
     /// empty-text end item, which the frontend reads only for the `stopped` badge.
     fn stop_task(&mut self, target: &str, ts: &Option<String>) -> Option<ChatItem> {
@@ -318,49 +390,13 @@ impl ClaudeParser {
             .map(str::to_string);
         let content = v.get("message").and_then(|m| m.get("content"));
         // The CLI's own prompts to the agent (a background task finishing)
-        // are not the user's words: show their summary as a system line.
-        if v.get("promptSource").and_then(Value::as_str) == Some("system") {
-            let text = content.and_then(Value::as_str).unwrap_or("");
-            let summary = tag(text, "summary");
-            // Older CLIs and the resume notice carry only <task-id>: find its call.
-            let call_id = tag(text, "tool-use-id")
-                .filter(|id| !id.is_empty())
-                .map(str::to_string)
-                .or_else(|| {
-                    let task = tag(text, "task-id")?;
-                    self.task_ids
-                        .iter()
-                        .find(|(_, id)| id.as_str() == task)
-                        .map(|(call, _)| call.clone())
-                });
-            let Some(call_id) = call_id.as_deref() else {
-                return match summary {
-                    Some(text) => ParserOutput::Append(vec![ChatItem::System {
-                        ts: ts.clone(),
-                        text: text.to_string(),
-                        task: None,
-                    }]),
-                    None => ParserOutput::None,
-                };
-            };
-            if self.ended.iter().any(|id| id == call_id) {
-                return ParserOutput::None;
-            }
-            if self.ended.len() >= TRACKED_MAX {
-                self.ended.pop_front();
-            }
-            self.ended.push_back(call_id.to_string());
-            self.background.retain(|t| t.call_id != call_id);
-            self.task_ids.remove(call_id);
-            return ParserOutput::Append(vec![ChatItem::System {
-                ts: ts.clone(),
-                text: summary.unwrap_or("").to_string(),
-                task: Some(TaskEnd {
-                    call_id: call_id.to_string(),
-                    status: tag(text, "status").unwrap_or("").to_string(),
-                    exit_code: summary.and_then(exit_code),
-                }),
-            }]);
+        // are not the user's words: show their summary as a system line. A
+        // notification is known by its text: `promptSource` is `sdk` under the SDK.
+        let text = content.and_then(Value::as_str).unwrap_or("");
+        if v.get("promptSource").and_then(Value::as_str) == Some("system")
+            || text.starts_with("<task-notification>")
+        {
+            return self.task_notification(text, &ts);
         }
         let mut items = vec![];
         match content {
@@ -1380,6 +1416,95 @@ mod tests {
                 matches!(&items[..], [System { task, .. }] if *task == end("a1", status, None))
             );
             assert_eq!(p.meta().background, vec![]);
+        }
+    }
+
+    fn bash_started(call: &str, task: &str) -> String {
+        [
+            bash_call(call, true, Some(task)),
+            tool_result(
+                call,
+                &format!("Command running in background with ID: {task}. Output is being written to: /tmp/{task}.output"),
+                false,
+            ),
+        ]
+        .join("\n")
+    }
+
+    #[test]
+    fn an_older_queued_notification_without_an_origin_ends_the_task() {
+        // CLIs before `origin` mark the attachment by `commandMode` alone.
+        let (_, _, mut p) = run_with(&bash_started("t1", "bfl2troh8"));
+        let prompt = "<task-notification>\n<task-id>bfl2troh8</task-id>\n<tool-use-id>t1</tool-use-id>\n<output-file>/tmp/bfl2troh8.output</output-file>\n<status>completed</status>\n<summary>Background command \"CI\" completed (exit code 0)</summary>\n</task-notification>";
+        let line = serde_json::json!({"type":"attachment","isSidechain":false,"timestamp":"2026-09-29T03:02:09.489Z","attachment":{"type":"queued_command","prompt":prompt,"source_uuid":"cb1339eb","commandMode":"task-notification","timestamp":"2026-09-29T03:02:09.489Z"}}).to_string();
+        let items = push(&mut p, &line);
+        assert!(
+            matches!(&items[..], [System { task, .. }] if *task == end("t1", "completed", Some(0)))
+        );
+        assert_eq!(p.meta().background, vec![]);
+    }
+
+    #[test]
+    fn an_sdk_notification_ends_the_task() {
+        let (_, _, mut p) = run_with(&bash_started("t1", "bi2ag65w9"));
+        let line = serde_json::json!({"type":"user","promptSource":"sdk","origin":{"kind":"task-notification"},"message":{"role":"user","content":"<task-notification>\n<task-id>bi2ag65w9</task-id>\n<tool-use-id>t1</tool-use-id>\n<status>completed</status>\n<summary>Background command \"Wait\" completed (exit code 0)</summary>\n</task-notification>"}}).to_string();
+        let items = push(&mut p, &line);
+        assert!(
+            matches!(&items[..], [System { task, .. }] if *task == end("t1", "completed", Some(0)))
+        );
+        assert_eq!(p.meta().background, vec![]);
+    }
+
+    #[test]
+    fn a_resume_notice_ends_every_task_it_names() {
+        // On resume the CLI stops all orphans in one notification, one <task-id> each.
+        let (_, _, mut p) = run_with(
+            &[
+                bash_started("t1", "b3wm5gfta"),
+                bash_started("t2", "bzz7cxw6v"),
+                bash_started("t3", "bkeep0001"),
+            ]
+            .join("\n"),
+        );
+        let line = serde_json::json!({"type":"user","promptSource":"system","origin":{"kind":"task-notification"},"message":{"content":"<task-notification>\n<task-id>by8u0fun4</task-id>\n<task-id>b3wm5gfta</task-id>\n<task-id>bzz7cxw6v</task-id>\n<task-id>__orphan_summary__:shell</task-id>\n<status>stopped</status>\n<summary>2 background shell command tasks didn't finish before the previous session ended.</summary>\n</task-notification>"}}).to_string();
+        let items = push(&mut p, &line);
+        assert_eq!(
+            items
+                .iter()
+                .map(|i| match i {
+                    System { text, task, .. } => (text.is_empty(), task.clone()),
+                    other => panic!("{other:?}"),
+                })
+                .collect::<Vec<_>>(),
+            vec![
+                (false, end("t1", "stopped", None)),
+                (true, end("t2", "stopped", None)),
+            ]
+        );
+        let left: Vec<_> = p.meta().background.into_iter().map(|t| t.call_id).collect();
+        assert_eq!(left, vec!["t3".to_string()]);
+    }
+
+    /// Runs the parser over real transcripts and prints every task still running at
+    /// the end, to find a notification shape it misses. `LIST` names one file per line:
+    /// `find ~/.claude/projects -name '*.jsonl' -mtime -14 > /tmp/list`, then
+    /// `LIST=/tmp/list cargo test --release --lib audit_background -- --ignored --nocapture`.
+    /// A task whose session is still open is running for real.
+    #[test]
+    #[ignore = "reads local transcripts"]
+    fn audit_background_tasks_left_running() {
+        let Ok(list) = std::env::var("LIST").map(std::fs::read_to_string) else {
+            return;
+        };
+        for file in list.unwrap_or_default().lines() {
+            let Ok(text) = std::fs::read_to_string(file) else {
+                continue;
+            };
+            let (_, _, p) = run_with(&text);
+            for t in p.meta().background {
+                let task = p.task_ids.get(&t.call_id).cloned().unwrap_or_default();
+                println!("LEFT\t{file}\t{}\t{task}\t{}", t.call_id, t.description);
+            }
         }
     }
 

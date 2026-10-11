@@ -36,6 +36,9 @@ Measured on Claude Code 2.1.295 transcripts (five days, about 6 200 task notific
 | Start, Agent | `assistant` `tool_use` `name: "Agent"`, `input.description`; its `tool_result` text starts `Async agent launched successfully.` |
 | End, agent idle | `user` record with `promptSource: "system"`, `origin.kind: "task-notification"`, content `<task-notification>` holding `<task-id>`, `<tool-use-id>`, `<output-file>`, `<status>`, `<summary>` |
 | End, agent mid-turn | `attachment` record, `attachment.type: "queued_command"`, `attachment.origin.kind: "task-notification"`, `attachment.prompt` holding the same `<task-notification>` text. The CLI writes this instead of the `user` record when the task ends while Claude is working |
+| End, older CLI | as above, with variations seen in real transcripts: the attachment has `commandMode: "task-notification"` and no `origin`; or the notification has `<task-id>` and no `<tool-use-id>` |
+| End, SDK session | the idle `user` record with `promptSource: "sdk"` instead of `"system"` |
+| End, on resume | one `user` notification, `<status>stopped</status>`, naming every task the last process left running with one `<task-id>` each (plus an `__orphan_summary__:…` marker that is not a task) and no `<tool-use-id>` |
 | End, stopped by Claude | `assistant` `tool_use` `name: "TaskStop"` (`input.task_id`) or `name: "KillShell"` (`input.shell_id`); its non-error `tool_result` (JSON text `{"message":"Successfully stopped task: ...","task_id":...}`) ends the task. `TaskStop` writes no `<task-notification>` |
 
 `<status>` is `completed`, `failed`, `killed` or `stopped`. A Bash summary ends `(exit code N)` (the last one in the summary is read):
@@ -43,8 +46,13 @@ Measured on Claude Code 2.1.295 transcripts (five days, about 6 200 task notific
 agent is busy the same notification is first a `queue-operation` `enqueue` record; the parser
 already keeps those out of Queued messages. Both end records can appear for one task.
 
-A Background task is running from its start `tool_result` until a notification with its
-`<tool-use-id>` arrives, or a `TaskStop` / `KillShell` call on its task id succeeds.
+A Background task is running from its start `tool_result` until a notification naming it (its
+`<tool-use-id>`, or its task id in any `<task-id>`) arrives, or a `TaskStop` / `KillShell` call on
+its task id succeeds. A notification is known by its text, which starts `<task-notification>`,
+not by `promptSource` or `origin`: those vary by CLI version and entry point. A task whose
+session ended with no notification shows nothing, because the chat shows no running task while
+the pane has no agent. The ignored test `audit_background_tasks_left_running` replays real
+transcripts and lists every task still running at the end, to find a shape the parser misses.
 
 ## Data (parser, `src-tauri/src/transcript/claude.rs`)
 
@@ -54,11 +62,12 @@ A Background task is running from its start `tool_result` until a notification w
 - On its `tool_result`, if the text starts with one of the two start prefixes above, the call
   becomes a running Background task; otherwise forget it. The remembered calls never outlive their
   result.
-- A `queued_command` attachment with `origin.kind: "task-notification"` is rewritten into the
+- A `queued_command` attachment with `origin.kind` or `commandMode` `"task-notification"` is rewritten into the
   `promptSource: "system"` user record it stands for, so one branch handles both paths. It is
   never shown as the user's words.
-- On a task notification (the existing `promptSource: "system"` branch), take `<tool-use-id>`,
-  drop that task from the running set, and attach `task` to the System line it already emits:
+- On a task notification (`promptSource: "system"`, or text starting `<task-notification>`),
+  end the call of `<tool-use-id>` and the call of each `<task-id>`; each ended call gets a System
+  line, the first carrying the summary and the rest empty (badge only):
   `task: { call_id, status, exit_code? }`, `exit_code` parsed from `(exit code N)` in the summary.
   A notification without a summary still carries `task` when it has a `<tool-use-id>`; a System
   item is emitted for it then, with the summary text empty; the Chat lens draws no row for an
