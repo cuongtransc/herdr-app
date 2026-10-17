@@ -17,6 +17,7 @@ import { FindBar } from "./FindBar";
 import { type FindRequest, onFindRequest } from "./findBus";
 import { FolderView } from "./FolderView";
 import { FileView, type FileMode } from "./FileView";
+import { Crumbs } from "./Crumbs";
 import { latestOnly, STALE } from "./latest";
 import { HIGHLIGHT_LIMIT } from "./limits";
 import { lineOfHash } from "./links";
@@ -330,9 +331,7 @@ export function FileViewer({ item, online }: Props) {
   return (
     <>
       <div className="files-crumbs">
-        <span className="files-crumb-path" title={fullPath}>
-          {rel.split("/").join(" / ")}
-        </span>
+        <Crumbs ws={ws} root={root} rel={rel} title={fullPath} />
         <button type="button" className="icon-btn" aria-label="Copy path" title="Copy path" onClick={copyPath}>
           <CopyIcon />
         </button>
